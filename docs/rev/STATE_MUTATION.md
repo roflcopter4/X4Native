@@ -397,7 +397,137 @@ The hook-based approach is the primary strategy for Phase 1.
 
 ---
 
-## 9. Function Reference
+## 9. Game Pause Mechanism
+
+### Summary
+
+There is **no exported `SetGamePaused` or `PauseGame` function**. The game pause system is a reference-counted internal mechanism. The only exported read-only probe is `IsGamePaused` (thunk → `IsGamePaused_0`). To set or clear pause state from C++, you must call the internal `TimerBase` functions or trigger the Lua global `Pause()` / `Unpause()` via the Lua bridge.
+
+### Pause State Storage
+
+| Global | Address | Type | Role |
+|--------|---------|------|------|
+| `qword_146ADB61C` | `0x146ADB61C` | `uint32_t` (lo-DWORD of qword) | **Pause refcount** — non-zero = paused |
+| `qword_146ADB610` | `0x146ADB610` | `double` | **Current game speed** — 0.0 when paused, 1.0 normal |
+| `qword_146ADB628` | `0x146ADB628` | `double` | **Saved pre-pause speed** — restored on unpause |
+| `stru_146ADB5C0` | `0x146ADB5C0` | `CRITICAL_SECTION` | Lock protecting all three globals |
+
+The refcount design means multiple callers can independently pause the game; the game only unpauses when all of them release. `IsGamePaused_0` returns `true` if the refcount is non-zero.
+
+### Key Functions
+
+| Name (IDA) | Address | RVA | Signature | Role |
+|------------|---------|-----|-----------|------|
+| `IsGamePaused` | `0x140178A50` | `0x178A50` | `bool ()` | **Exported PE thunk** — callable via `x4n::game()->IsGamePaused()` |
+| `TimerBase_IsGamePaused` | `0x14145A020` | `0x145A020` | `bool ()` | Internal implementation — reads refcount under lock |
+| `TimerBase_TB_Pause` | `0x1411C83B0` | `0x11C83B0` | `void (__int64 game_client)` | **Increments** refcount, zeros game speed, fires side effects |
+| `TimerBase_TB_UnPause` | `0x14145A090` | `0x145A090` | `bool ()` | **Decrements** refcount, restores game speed |
+| `Lua_Pause` | `0x14027E920` | `0x27E920` | Lua: `Pause(bool pause, bool permanent?)` | Lua FFI — registered as global `Pause()` |
+| `Lua_Unpause` | `0x14027EAC0` | `0x27EAC0` | Lua: `Unpause(bool permanent?)` | Lua FFI — registered as global `Unpause()` |
+| `FireEvent_gamePaused` | `0x140AEF7A0` | `0xAEF7A0` | Internal | Fires `"gamePaused"` Lua event, updates infobar4 |
+| `FireEvent_gameUnpaused` | `0x140AEFC90` | `0xAEFC90` | Internal | Fires `"gameUnpaused"` Lua event |
+
+### `TimerBase_TB_Pause` — What It Does
+
+```c
+// sub_1411C83B0(__int64 game_client_ptr)
+// Gate: byte_14386FDCA must be 0 (re-entrancy guard)
+byte_14386FDCA = 1;
+EnterCriticalSection(&stru_146ADB5C0);
+LODWORD(qword_146ADB61C) += 1;           // increment refcount
+if (qword_146ADB610 > 0.0)
+    qword_146ADB628 = qword_146ADB610;   // save current speed
+qword_146ADB610 = 0.0;                  // zero game speed
+LeaveCriticalSection(&stru_146ADB5C0);
+sub_1400DD650(qword_146C6B9B8, 0);      // cursor clip update
+```
+
+### `TimerBase_TB_UnPause` — What It Does
+
+```c
+// sub_14145A090()
+EnterCriticalSection(&stru_146ADB5C0);
+if (LODWORD(qword_146ADB61C) == 0) {
+    log_error("TB_UnPause: not paused");  // guard against over-decrement
+    goto done;
+}
+LODWORD(qword_146ADB61C) -= 1;
+if (!IsGamePaused_0()) {
+    // refcount hit zero — restore speed
+    if (byte_146ADB618)
+        qword_146ADB610 = 1.0;           // reduced-speed mode: restore to 1x
+    else
+        qword_146ADB610 = qword_146ADB628; // restore saved speed
+}
+done:
+LeaveCriticalSection(&stru_146ADB5C0);
+```
+
+### `Lua_Pause` — Signature and Semantics
+
+```lua
+-- arg1 (bool): true = pause, false = "soft pause" (uses alternate code path
+--              that sets byte_14386FDC1 flag — same pause counter increment)
+-- arg2 (bool): optional, if true marks as "permanent" (sets byte_14386FDC4)
+Pause(true)         -- standard game pause
+Pause(false)        -- "soft pause" via alternate flag path
+Pause(false, true)  -- permanent soft pause
+Unpause()           -- standard unpause (calls TB_UnPause via sub_1411C8490)
+Unpause(true)       -- also calls TB_UnPause (via sub_1411C8490 path)
+```
+
+The game UI calls `Pause()` and `Unpause()` from menu Lua scripts (gameoptions, detailmonitor, onlineupdate, etc.) when entering/leaving menus that freeze gameplay.
+
+### Lua Events Fired
+
+When pause state changes, the engine fires these Lua events (subscribable via `registerForEvent`):
+
+| Event | Fired when |
+|-------|-----------|
+| `"gamePaused"` | refcount goes from 0 → 1 (first pause) |
+| `"gameUnpaused"` | refcount goes to 0 (last release) |
+
+### How to Pause/Unpause from C++
+
+**Option A — Lua bridge (recommended, matches game pattern):**
+```cpp
+// In on_game_loaded or on_frame_update:
+x4n::raise_lua("Pause", "true");    // pause
+x4n::raise_lua("Unpause", "");      // unpause
+```
+
+**Option B — Direct internal call via hook or function pointer:**
+
+`TimerBase_TB_Pause` takes `game_client_ptr` (the `qword_146C6B960` global). It is NOT in the exported function table and NOT in `X4GameFunctions`, so it cannot be called via `x4n::game()`. It requires a bare function pointer call:
+
+```cpp
+// NOT available via x4n::game() — internal only
+// Address: 0x1411C83B0 (RVA 0x11C83B0)
+// Calling this directly is fragile across game updates.
+// Use Option A instead.
+```
+
+**Option C — Read-only query (already in SDK):**
+```cpp
+bool paused = x4n::game()->IsGamePaused();  // safe, exported
+```
+
+### Threading
+
+`TimerBase_TB_Pause` and `TimerBase_TB_UnPause` are **safe to call from any thread** — they take `stru_146ADB5C0` (`CRITICAL_SECTION`) before touching the refcount. However, the side effects (cursor clipping via `PostMessageW`, Lua event firing) are UI-thread operations. Always call from the UI thread (our frame hook or `on_game_loaded`).
+
+### Classification
+
+| Operation | Safety | Notes |
+|-----------|--------|-------|
+| `IsGamePaused()` | Tier 3 — Safe read | Exported, no side effects |
+| `Pause()` via Lua bridge | Tier 1 — Safe | Triggers `gamePaused` event, cursor update |
+| `Unpause()` via Lua bridge | Tier 1 — Safe | Triggers `gameUnpaused` event |
+| Direct `TimerBase_TB_Pause` call | Tier 4 — Caution | Not exported, not in game func table, fragile |
+
+---
+
+## 10. Function Reference
 
 | Name | Address | RVA | Category |
 |------|---------|-----|----------|
@@ -409,6 +539,13 @@ The hook-based approach is the primary strategy for Phase 1.
 | `GetAllFactionShips` | — | `0x14D1D0` | Enumerate ships by faction |
 | Event bus post | `0x140953650` | `0x953650` | Event dispatch (no lock) |
 | Component lookup | via `0x146C6B940` | — | Entity resolution (no lock) |
-| `IsGamePaused_0` | `0x14145A020` | `0x145A020` | Read-only query |
+| `IsGamePaused` (thunk) | `0x140178A50` | `0x178A50` | Exported read-only query |
+| `TimerBase_IsGamePaused` | `0x14145A020` | `0x145A020` | Internal pause read (refcount) |
+| `TimerBase_TB_Pause` | `0x1411C83B0` | `0x11C83B0` | Internal pause set (increment) |
+| `TimerBase_TB_UnPause` | `0x14145A090` | `0x145A090` | Internal pause clear (decrement) |
+| `Lua_Pause` | `0x14027E920` | `0x27E920` | Lua global `Pause()` FFI binding |
+| `Lua_Unpause` | `0x14027EAC0` | `0x27EAC0` | Lua global `Unpause()` FFI binding |
+| `FireEvent_gamePaused` | `0x140AEF7A0` | `0xAEF7A0` | Fires `"gamePaused"` Lua event |
+| `FireEvent_gameUnpaused` | `0x140AEFC90` | `0xAEFC90` | Fires `"gameUnpaused"` Lua event |
 | Rotation matrix builder | `0x14030D010` | `0x30D010` | sin/cos → 4×4 matrix (internal) |
 | Deg-to-rad constant | `0x142C40EE4` | — | `0x3c8efa35` = π/180 |
