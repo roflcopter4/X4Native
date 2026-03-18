@@ -26,9 +26,11 @@ public:
     static void shutdown();
 
     // Load internal function RVA database for the given game build.
-    // Called during init with the extension root path and game build string.
+    // Tries primary_build first (e.g. "900-beta2"), falls back to fallback_build
+    // (e.g. "900") so beta builds can reuse the last known-good RVA entry.
     static void load_internal_db(const std::string& ext_root,
-                                 const std::string& game_build);
+                                 const std::string& primary_build,
+                                 const std::string& fallback_build = {});
 
     // The resolved function pointer table (NULL if not initialized)
     static X4GameFunctions* table();

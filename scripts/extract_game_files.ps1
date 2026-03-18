@@ -19,6 +19,11 @@
 .PARAMETER OutDir
     Output directory. Defaults to temp/x4_game_dump under the repo root.
 
+.PARAMETER GameVersion
+    Override the version string written to reference/game/VERSION.
+    Used by update_references.ps1 to inject a beta suffix (e.g. "900-beta2")
+    when version.dat has not been bumped by the patch.
+
 .EXAMPLE
     .\scripts\extract_game_files.ps1
     .\scripts\extract_game_files.ps1 -GameDir "D:\Games\X4 Foundations"
@@ -26,7 +31,8 @@
 param(
     [string]$GameDir,
     [string]$ToolDir,
-    [string]$OutDir
+    [string]$OutDir,
+    [string]$GameVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,16 +72,18 @@ if (-not $OutDir) {
 }
 
 # ---------------------------------------------------------------------------
-# Read game version
+# Read game version (use override if provided, e.g. for beta builds)
 # ---------------------------------------------------------------------------
-$versionFile = Join-Path $GameDir 'version.dat'
-$gameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+if (-not $GameVersion) {
+    $versionFile = Join-Path $GameDir 'version.dat'
+    $GameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+}
 
 Write-Host "=== X4 Game File Extractor ===" -ForegroundColor Cyan
 Write-Host "Game dir : $GameDir"
 Write-Host "X Tools  : $ToolDir"
 Write-Host "Output   : $OutDir"
-Write-Host "Version  : $gameVersion"
+Write-Host "Version  : $GameVersion"
 Write-Host ""
 
 # ---------------------------------------------------------------------------
@@ -89,7 +97,7 @@ if (Test-Path $OutDir) {
 }
 
 # Write version marker (useful for git commit messages)
-Set-Content -Path (Join-Path $OutDir 'VERSION') -Value $gameVersion
+Set-Content -Path (Join-Path $OutDir 'VERSION') -Value $GameVersion
 
 # ---------------------------------------------------------------------------
 # Include/exclude patterns
@@ -158,7 +166,7 @@ $breakdown = Get-ChildItem $OutDir -Directory |
 
 Write-Host ""
 Write-Host "=== Extraction Complete ===" -ForegroundColor Cyan
-Write-Host "Version : $gameVersion"
+Write-Host "Version : $GameVersion"
 Write-Host "Total   : $totalFiles files"
 Write-Host ""
 $breakdown | Format-Table -AutoSize

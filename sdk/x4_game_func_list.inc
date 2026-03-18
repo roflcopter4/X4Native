@@ -231,7 +231,6 @@ X4_FUNC(uint32_t, GetAllColorMapMappings, (EditableColorMapEntry* result, uint32
 X4_FUNC(uint32_t, GetAllCommanders, (CommanderInfo* result, uint32_t resultlen, UniverseID controllableid, FleetUnitID fleetunitid))
 X4_FUNC(uint32_t, GetAllControlPosts, (ControlPostInfo* result, uint32_t resultlen))
 X4_FUNC(uint32_t, GetAllCountermeasures, (AmmoData* result, uint32_t resultlen, UniverseID defensibleid))
-X4_FUNC(uint32_t, GetAllEquipment, (EquipmentWareInfo* result, uint32_t resultlen, bool playerblueprint))
 X4_FUNC(uint32_t, GetAllEquipmentModProperties, (EquipmentModPropertyInfo* result, uint32_t resultlen, const char* equipmentmodclass))
 X4_FUNC(uint32_t, GetAllFactions, (const char** result, uint32_t resultlen, bool includehidden))
 X4_FUNC(uint32_t, GetAllFactionShips, (UniverseID* result, uint32_t resultlen, const char* factionid))
@@ -724,7 +723,6 @@ X4_FUNC(uint32_t, GetNumAllColorMapMappings, (void))
 X4_FUNC(uint32_t, GetNumAllCommanders, (UniverseID controllableid, FleetUnitID fleetunitid))
 X4_FUNC(uint32_t, GetNumAllControlPosts, (void))
 X4_FUNC(uint32_t, GetNumAllCountermeasures, (UniverseID defensibleid))
-X4_FUNC(uint32_t, GetNumAllEquipment, (bool playerblueprint))
 X4_FUNC(uint32_t, GetNumAllEquipmentModProperties, (const char* equipmentmodclass))
 X4_FUNC(uint32_t, GetNumAllFactions, (bool includehidden))
 X4_FUNC(uint32_t, GetNumAllFactionShips, (const char* factionid))
@@ -2068,3 +2066,14 @@ X4_FUNC(void, UpdateSupplyOverrides, (UniverseID containerid, SupplyOverride* ov
 X4_FUNC(void, UpdateTradeRule, (TradeRuleInfo info))
 X4_FUNC(bool, WasSessionOnline, (void))
 X4_FUNC(void, ZoomMap, (UniverseID holomapid, float zoomstep))
+
+// ======== Game v9.00-600626 - Added (4 functions) ========
+
+X4_FUNC(uint32_t, GetAllEquipment2, (EquipmentWareInfo* result, uint32_t resultlen, bool playerblueprint, bool customgamestart))
+X4_FUNC(const char*, GetComponentKnownName, (UniverseID componentid))
+X4_FUNC(const char*, GetExtensionErrorText, (const char* extensionid, bool personal))
+X4_FUNC(uint32_t, GetNumAllEquipment2, (bool playerblueprint, bool customgamestart))
+
+// Functions removed in v9.00-600626:
+//   GetAllEquipment
+//   GetNumAllEquipment

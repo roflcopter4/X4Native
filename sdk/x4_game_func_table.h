@@ -1,7 +1,7 @@
 // ==========================================================================
 // x4_game_func_table.h - X4 Game Function Pointer Table
 // ==========================================================================
-// Auto-generated from X4 v9.00 (build 900) FFI declarations.
+// Auto-generated from X4 v9.00-600626 FFI declarations.
 //
 // The X4GameFunctions struct provides compile-time type-safe access to
 // resolved game function pointers. Populated at runtime via GetProcAddress.
@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 // --------------------------------------------------------------------------
-// Function Pointer Table (2051 entries)
+// Function Pointer Table (2055 entries)
 // --------------------------------------------------------------------------
 
 #define X4_FUNC(ret, name, params) ret (*name) params;
@@ -38,7 +38,7 @@ typedef struct X4GameFunctions {
 typedef void* (*X4GetGameFunctionFn)(const char* name);
 
 // --------------------------------------------------------------------------
-// Untyped Exports (308)
+// Untyped Exports (310)
 // --------------------------------------------------------------------------
 // These functions exist in X4.exe's export table but have no known
 // C signature from FFI data. Resolve with X4GetGameFunctionFn and cast.
@@ -64,6 +64,7 @@ typedef void* (*X4GetGameFunctionFn)(const char* name);
 //   GenerateShipLoadout3                                      (see GenerateShipLoadout2)
 //   GenerateShipLoadoutCounts                                 (see GenerateShipLoadoutCounts2)
 //   GenerateShipLoadoutCounts3                                (see GenerateShipLoadoutCounts2)
+//   GetAllEquipment                                           (see GetAllEquipment2)
 //   GetAllShipMacros                                          (see GetAllShipMacros2)
 //   GetBlacklistInfo                                          (see GetBlacklistInfo2)
 //   GetBuildMapStationLocation                                (see GetBuildMapStationLocation2)
@@ -120,6 +121,7 @@ typedef void* (*X4GetGameFunctionFn)(const char* name);
 //   GetMoonInfo                                               (see GetMoonInfo2)
 //   GetNextNewsItem                                           (see GetNextNewsItem2)
 //   GetNotificationTypes                                      (see GetNotificationTypes2)
+//   GetNumAllEquipment                                        (see GetNumAllEquipment2)
 //   GetNumAllShipMacros                                       (see GetNumAllShipMacros2)
 //   GetNumContainerWareReservations                           (see GetNumContainerWareReservations2)
 //   GetNumMissingBuildResources                               (see GetNumMissingBuildResources2)

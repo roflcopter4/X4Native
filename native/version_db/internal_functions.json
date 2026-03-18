@@ -3,7 +3,20 @@
   "description": "RVA database for non-exported (internal) X4.exe functions, resolved via base + rva at runtime. Example:  \"FunctionName\": { \"900\": { \"rva\": \"0x12345678\" } }",
   "functions": {
     "X4_FrameTick": {
-      "900": { "rva": "0x00F4A2A0" }
+      "_find_hints": {
+        "method": "caller_chain",
+        "steps": [
+          "1. Find import PeekMessageW (USER32) — its sole code-caller is the MessagePump",
+          "2. MessagePump has exactly one heavy callee (>400 insns, sole caller = WinMain) — that is X4_FrameTick",
+          "3. Verify: must call IsGamePaused_0 (named export) and reference QPC error string below"
+        ],
+        "verify_callee": "IsGamePaused_0",
+        "verify_string": "Failed to read system high-performance counter!",
+        "byte_sig": "48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57",
+        "byte_sig_note": "First 16 bytes (register-save prologue: mov [rsp+10h],rbx + push rbp/rsi/rdi/r12-r15). Mask all FF. Stable across minor patches; re-verify on major engine changes."
+      },
+      "900": { "rva": "0x00F4A2A0" },
+      "900-600626": { "rva": "0x00F4D1D0" }
     }
   }
 }

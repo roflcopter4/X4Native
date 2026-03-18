@@ -12,10 +12,17 @@
     Requires extract_game_files.ps1, extract_exports.ps1, and extract_ffi.ps1
     to have been run first.
 
+.PARAMETER GameVersion
+    Override the version string used in generated headers and .inc section labels.
+    When omitted, the version is read from reference/game/VERSION.
+    Passed automatically by update_references.ps1 when -VersionSuffix is used.
+
 .EXAMPLE
     .\scripts\generate_headers.ps1
 #>
-param()
+param(
+    [string]$GameVersion
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -41,9 +48,14 @@ if (-not (Test-Path $exportsFile)) {
     exit 1
 }
 
-$gameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
-$versionDisplay = if ($gameVersion -match '^\d{3,}$') {
-    "v$($gameVersion.Substring(0, $gameVersion.Length - 2)).$($gameVersion.Substring($gameVersion.Length - 2)) (build $gameVersion)"
+if (-not $GameVersion) {
+    $GameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+}
+$gameVersion = $GameVersion
+$numericPart = $gameVersion -replace '-.*$', ''
+$versionDisplay = if ($numericPart -match '^\d{3,}$') {
+    $pretty = "v$($numericPart.Substring(0, $numericPart.Length - 2)).$($numericPart.Substring($numericPart.Length - 2))"
+    if ($gameVersion -ne $numericPart) { "$pretty-$($gameVersion.Substring($numericPart.Length + 1))" } else { "$pretty (build $numericPart)" }
 } else { $gameVersion }
 
 Write-Host "=== Header Generation ===" -ForegroundColor Cyan
@@ -353,7 +365,9 @@ $sb = [System.Text.StringBuilder]::new(256KB)
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("// Game build version these types were extracted from.")
 [void]$sb.AppendLine("// Extensions can use this to guard against struct layout mismatches.")
-[void]$sb.AppendLine("#define X4_GAME_TYPES_BUILD $gameVersion")
+[void]$sb.AppendLine("#define X4_GAME_TYPES_BUILD $numericPart")
+[void]$sb.AppendLine("// Full version label - includes beta/hotfix suffix when applicable.")
+[void]$sb.AppendLine('#define X4_GAME_VERSION_LABEL "' + $gameVersion + '"')
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("#include <stdint.h>")
 [void]$sb.AppendLine("#include <stdbool.h>")
@@ -469,18 +483,20 @@ if ($isIncremental) {
     }
 
     Write-Host "  New functions:     $($newFuncs.Count)" -ForegroundColor $(if ($newFuncs.Count -gt 0) { 'Green' } else { 'DarkGray' })
-    Write-Host "  Removed (kept):    $($removedFuncs.Count)" -ForegroundColor $(if ($removedFuncs.Count -gt 0) { 'Yellow' } else { 'DarkGray' })
+    Write-Host "  Removed:           $($removedFuncs.Count)" -ForegroundColor $(if ($removedFuncs.Count -gt 0) { 'Yellow' } else { 'DarkGray' })
     Write-Host "  Signature changes: $($sigChanges.Count)" -ForegroundColor $(if ($sigChanges.Count -gt 0) { 'Red' } else { 'DarkGray' })
 
     if ($sigChanges.Count -gt 0) {
-        Write-Warning "Functions with changed signatures (struct keeps OLD signature for ABI stability):"
+        Write-Warning "Functions with changed signatures:"
         foreach ($sc in $sigChanges) {
             Write-Warning "  $($sc.Name): $($sc.Old) -> $($sc.New)"
         }
     }
 
-    # Preserve all existing lines verbatim (headers, version sections, X4_FUNC entries)
+    # Preserve existing lines, dropping X4_FUNC entries for functions no longer exported
+    $removedFuncSet = [System.Collections.Generic.HashSet[string]]::new([string[]]@($removedFuncs))
     foreach ($el in $existingRawLines) {
+        if ($el -match '^X4_FUNC\(\s*.*?,\s*(\w+),' -and $removedFuncSet.Contains($Matches[1])) { continue }
         [void]$sb.AppendLine($el)
     }
 
@@ -500,16 +516,15 @@ if ($isIncremental) {
         }
     }
 
-    # Append removed function comments (if any new removals this run)
+    # Append removed function comments (deduplicated — version_db tracks the full history)
     if ($removedFuncs.Count -gt 0) {
-        # Check if these are already documented in the file
         $existingContent = $existingRawLines -join "`n"
-        $newlyRemoved = $removedFuncs | Where-Object { $existingContent -notmatch "//\s+$_\s" }
+        $newlyRemoved = $removedFuncs | Where-Object { $existingContent -notmatch "//\s+$_\b" }
         if ($newlyRemoved) {
             [void]$sb.AppendLine("")
-            [void]$sb.AppendLine("// Functions removed in $versionDisplay (still in struct for ABI stability):")
+            [void]$sb.AppendLine("// Functions removed in ${versionDisplay}:")
             foreach ($fname in $newlyRemoved) {
-                [void]$sb.AppendLine("//   $fname - no longer exported")
+                [void]$sb.AppendLine("//   $fname")
             }
         }
     }
@@ -545,8 +560,8 @@ if ($isIncremental) {
     [void]$sb.AppendLine("//   - x4_game_func_table.h defines X4GameFunctions struct fields")
     [void]$sb.AppendLine("//   - game_api.cpp defines the resolver data for GetProcAddress")
     [void]$sb.AppendLine("//")
-    [void]$sb.AppendLine("// APPEND-ONLY - never remove or reorder lines. New game versions append")
-    [void]$sb.AppendLine("// at the end. Removed functions stay as dead slots (resolve to NULL).")
+    [void]$sb.AppendLine("// New functions are appended per game version. Functions removed from the")
+    [void]$sb.AppendLine("// game are dropped; the version_db tracks the full addition/removal history.")
     [void]$sb.AppendLine("//")
     [void]$sb.AppendLine("// DO NOT EDIT - regenerate with: .\scripts\generate_headers.ps1")
     [void]$sb.AppendLine("// ==========================================================================")
@@ -602,6 +617,7 @@ $funcListSize = [math]::Round((Get-Item $funcListOut).Length / 1024, 1)
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("typedef struct X4GameFunctions {")
 [void]$sb.AppendLine('#include "x4_game_func_list.inc"')
+[void]$sb.AppendLine('#include "x4_internal_func_list.inc"')
 [void]$sb.AppendLine("} X4GameFunctions;")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("#undef X4_FUNC")

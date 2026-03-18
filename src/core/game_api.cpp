@@ -124,7 +124,8 @@ void* GameAPI::get_internal(const char* name) {
 }
 
 void GameAPI::load_internal_db(const std::string& ext_root,
-                               const std::string& game_build) {
+                               const std::string& primary_build,
+                               const std::string& fallback_build) {
     std::string db_path = ext_root + "native/version_db/internal_functions.json";
     std::ifstream file(db_path);
     if (!file.is_open()) {
@@ -140,8 +141,11 @@ void GameAPI::load_internal_db(const std::string& ext_root,
         int count = 0;
 
         for (auto& [name, entry] : db["functions"].items()) {
-            if (!entry.contains(game_build)) continue;
-            auto& ver = entry[game_build];
+            const std::string* key = nullptr;
+            if (entry.contains(primary_build))                              key = &primary_build;
+            else if (!fallback_build.empty() && entry.contains(fallback_build)) key = &fallback_build;
+            if (!key) continue;
+            auto& ver = entry[*key];
             if (!ver.contains("rva") || !ver["rva"].is_string()) continue;
 
             auto rva_str = ver["rva"].get<std::string>();

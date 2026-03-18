@@ -9,10 +9,17 @@
 
     Standalone pipeline step — run after generate_headers.ps1.
 
+.PARAMETER GameVersion
+    Override the version key used in func_history.json and type_changes.json.
+    When omitted, the version is read from reference/game/VERSION.
+    Passed automatically by update_references.ps1 when -VersionSuffix is used.
+
 .EXAMPLE
     .\scripts\generate_version_db.ps1
 #>
-param()
+param(
+    [string]$GameVersion
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -39,7 +46,9 @@ if (-not (Test-Path $typesFile)) {
     exit 1
 }
 
-$GameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+if (-not $GameVersion) {
+    $GameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+}
 
 Write-Host "Generating version metadata..." -ForegroundColor Green
 

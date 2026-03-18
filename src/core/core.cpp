@@ -201,7 +201,8 @@ int core_init(CoreInitContext* ctx) {
 
     // 4. Game API — resolve X4.exe function pointers
     x4n::GameAPI::init();
-    x4n::GameAPI::load_internal_db(g_ext_root, x4n::Version::build());
+    x4n::GameAPI::load_internal_db(g_ext_root, X4_GAME_VERSION_LABEL,
+                                    std::to_string(X4_GAME_TYPES_BUILD));
 
     // 5. Hook manager — MinHook initialization
     x4n::HookManager::init();

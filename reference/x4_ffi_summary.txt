@@ -5,7 +5,7 @@ Source: reference/game/ui/**/*.lua
 Lua files scanned: 81
 cdef blocks found: 59
 
-Functions:  2052 unique declarations
+Functions:  2054 unique declarations
 Structs:    310 unique type names
 Typedefs:   13 handle types
 
@@ -25,9 +25,9 @@ Handle Types:
   typedef uint64_t UniverseID;
 
 Cross-Reference (PE exports vs FFI):
-  PE exports:       2359
-  FFI functions:    2052
-  In both:          2051  (ready to use)
-  Export-only:      308 (need manual typing)
+  PE exports:       2363
+  FFI functions:    2054
+  In both:          2053  (ready to use)
+  Export-only:      310 (need manual typing)
   FFI-only:         1  (not exported)
   Coverage:         86.9% of exports have FFI signatures

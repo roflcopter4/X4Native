@@ -34,6 +34,12 @@
 .PARAMETER SkipHeaders
     Skip the header generation step.
 
+.PARAMETER VersionSuffix
+    Optional suffix appended to the numeric version from version.dat, joined with a dash.
+    Overrides auto-detection. Use when the byte-scan heuristic fails or you need a
+    human-readable label instead of the build number.
+    Example: -VersionSuffix beta2  =>  stored version becomes "900-beta2"
+
 .PARAMETER SkipVersionDb
     Skip the version_db metadata generation step.
 
@@ -41,11 +47,13 @@
     .\scripts\update_references.ps1
     .\scripts\update_references.ps1 -SkipGameFiles
     .\scripts\update_references.ps1 -GameDir "D:\Games\X4 Foundations"
+    .\scripts\update_references.ps1 -VersionSuffix beta2
 #>
 param(
     [string]$GameDir,
     [string]$ToolDir,
     [string]$DumpbinPath,
+    [string]$VersionSuffix,
     [switch]$SkipGameFiles,
     [switch]$SkipExports,
     [switch]$SkipFFI,
@@ -56,6 +64,68 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+# Scans the .text section of X4.exe for the consecutive pair:
+#   mov [rip+disp32], <version>    ; C7 05 [4] [version LE]
+#   mov [rip+disp32], <build>      ; C7 05 [4] [build LE]
+# Returns the build number int32, or $null if not found / implausible.
+function Get-X4BuildNumber {
+    param([string]$ExePath, [int]$Version)
+
+    $stream = [System.IO.File]::OpenRead($ExePath)
+    $reader = [System.IO.BinaryReader]::new($stream)
+    try {
+        # Locate PE header
+        $stream.Seek(0x3C, 'Begin') | Out-Null
+        $peOffset = $reader.ReadInt32()
+
+        # Number of sections
+        $stream.Seek($peOffset + 6, 'Begin') | Out-Null
+        $numSections = $reader.ReadUInt16()
+
+        # Optional header size → sections start after it
+        $stream.Seek($peOffset + 20, 'Begin') | Out-Null
+        $optHeaderSize = $reader.ReadUInt16()
+        $sectionsBase  = $peOffset + 24 + $optHeaderSize
+
+        # Find .text section raw offset + size
+        $textOffset = 0; $textSize = 0
+        for ($s = 0; $s -lt $numSections; $s++) {
+            $stream.Seek($sectionsBase + $s * 40, 'Begin') | Out-Null
+            $name    = [System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(8)).TrimEnd([char]0)
+            $null    = $reader.ReadUInt32()   # virtual size
+            $null    = $reader.ReadUInt32()   # virtual address
+            $rawSize = $reader.ReadUInt32()
+            $rawOff  = $reader.ReadUInt32()
+            if ($name -eq '.text') { $textOffset = $rawOff; $textSize = $rawSize; break }
+        }
+        if ($textSize -eq 0) { return $null }
+
+        $stream.Seek($textOffset, 'Begin') | Out-Null
+        $text = $reader.ReadBytes($textSize)
+
+        # Build LE byte array for the version anchor
+        $vLE = [BitConverter]::GetBytes([int32]$Version)
+
+        for ($i = 0; $i -le $text.Length - 20; $i++) {
+            if ($text[$i]    -eq 0xC7 -and $text[$i+1]  -eq 0x05 -and
+                $text[$i+6]  -eq $vLE[0] -and $text[$i+7]  -eq $vLE[1] -and
+                $text[$i+8]  -eq $vLE[2] -and $text[$i+9]  -eq $vLE[3] -and
+                $text[$i+10] -eq 0xC7   -and $text[$i+11] -eq 0x05) {
+                $build = [BitConverter]::ToInt32($text, $i + 16)
+                if ($build -gt 100000 -and $build -lt 9999999) { return $build }
+            }
+        }
+        return $null
+    } finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Auto-detect game directory (shared across steps)
@@ -72,11 +142,29 @@ if (-not $GameDir) {
     }
 }
 
-# Read game version for display
+# Read game version from version.dat, then determine the full version label.
+# Priority: 1) explicit -VersionSuffix  2) build number from X4.exe  3) raw version only
 $versionFile = Join-Path $GameDir 'version.dat'
-$gameVersion = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
-$versionDisplay = if ($gameVersion -match '^\d+$' -and $gameVersion.Length -ge 3) {
-    "v$($gameVersion.Substring(0, $gameVersion.Length - 2)).$($gameVersion.Substring($gameVersion.Length - 2)) (build $gameVersion)"
+$rawVersion  = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { 'unknown' }
+
+$detectedSuffix = $null
+if (-not $VersionSuffix -and $rawVersion -match '^\d+$') {
+    Write-Host "  Scanning X4.exe for build number..." -NoNewline
+    $exeBuildNumber = Get-X4BuildNumber -ExePath (Join-Path $GameDir 'X4.exe') -Version ([int]$rawVersion)
+    if ($exeBuildNumber) {
+        $detectedSuffix = "$exeBuildNumber"
+        Write-Host " $exeBuildNumber" -ForegroundColor Green
+    } else {
+        Write-Host " not found (use -VersionSuffix to set manually)" -ForegroundColor Yellow
+    }
+}
+
+$activeSuffix = if ($VersionSuffix) { $VersionSuffix } else { $detectedSuffix }
+$gameVersion  = if ($activeSuffix) { "$rawVersion-$activeSuffix" } else { $rawVersion }
+
+$versionDisplay = if ($rawVersion -match '^\d+$' -and $rawVersion.Length -ge 3) {
+    $pretty = "v$($rawVersion.Substring(0, $rawVersion.Length - 2)).$($rawVersion.Substring($rawVersion.Length - 2))"
+    if ($activeSuffix) { "$pretty-$activeSuffix" } else { "$pretty (build $rawVersion)" }
 } else {
     $gameVersion
 }
@@ -115,8 +203,9 @@ if ($steps -contains 'game_files') {
     Write-Host "------------------------------------------------------------"
 
     $gameFileArgs = @{}
-    if ($GameDir) { $gameFileArgs['GameDir'] = $GameDir }
-    if ($ToolDir) { $gameFileArgs['ToolDir'] = $ToolDir }
+    if ($GameDir)      { $gameFileArgs['GameDir']      = $GameDir }
+    if ($ToolDir)      { $gameFileArgs['ToolDir']      = $ToolDir }
+    if ($gameVersion)  { $gameFileArgs['GameVersion']  = $gameVersion }
 
     & "$PSScriptRoot\extract_game_files.ps1" @gameFileArgs
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
@@ -170,7 +259,10 @@ if ($steps -contains 'headers') {
     Write-Host "[$stepNum/$totalSteps] Generating C headers..." -ForegroundColor Cyan
     Write-Host "------------------------------------------------------------"
 
-    & "$PSScriptRoot\generate_headers.ps1"
+    $headerArgs = @{}
+    if ($gameVersion) { $headerArgs['GameVersion'] = $gameVersion }
+
+    & "$PSScriptRoot\generate_headers.ps1" @headerArgs
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
         Write-Error "generate_headers.ps1 failed"
         exit 1
@@ -186,7 +278,10 @@ if ($steps -contains 'version_db') {
     Write-Host "[$stepNum/$totalSteps] Generating version_db metadata..." -ForegroundColor Cyan
     Write-Host "------------------------------------------------------------"
 
-    & "$PSScriptRoot\generate_version_db.ps1"
+    $vdbArgs = @{}
+    if ($gameVersion) { $vdbArgs['GameVersion'] = $gameVersion }
+
+    & "$PSScriptRoot\generate_version_db.ps1" @vdbArgs
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
         Write-Error "generate_version_db.ps1 failed"
         exit 1

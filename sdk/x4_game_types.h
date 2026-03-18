@@ -1,7 +1,7 @@
 // ==========================================================================
 // x4_game_types.h - X4: Foundations Game Type Definitions
 // ==========================================================================
-// Auto-generated from X4 v9.00 (build 900) FFI declarations.
+// Auto-generated from X4 v9.00-600626 FFI declarations.
 // Source: reference/x4_ffi_raw.txt
 //
 // DO NOT EDIT - regenerate with: .\scripts\generate_headers.ps1
@@ -11,6 +11,8 @@
 // Game build version these types were extracted from.
 // Extensions can use this to guard against struct layout mismatches.
 #define X4_GAME_TYPES_BUILD 900
+// Full version label - includes beta/hotfix suffix when applicable.
+#define X4_GAME_VERSION_LABEL "900-600626"
 
 #include <stdint.h>
 #include <stdbool.h>
