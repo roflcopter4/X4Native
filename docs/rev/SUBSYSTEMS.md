@@ -383,14 +383,101 @@ This is the same system used by all exported functions that take entity/componen
 | UI Event Dispatcher | `0x141342720` | `0x1342720` | Fires onUpdate etc. |
 | Fire Lua Callback | `0x141344A70` | `0x1344A70` | lua_getfield + lua_pcall |
 | Event bus post | `0x140953650` | `0x953650` | Post event (no lock) |
+| sub_1409A4830 | `0x1409A4830` | `0x9A4830` | NewGame world init (called by U::NewGameAction) |
+| GameStartDB::Import | `0x1409D39B0` | `0x9D39B0` | Parses gamestart XML, reads nosave attribute |
+| sub_14088D4B0 | `0x14088D4B0` | `0x88D4B0` | Galaxy creation from gamestart XML |
 | BST root | `0x143139400` | — | Subsystem tree root pointer |
 | BST sentinel | `0x1431393E0` | — | Subsystem tree end node |
 | Suspended array | `0x146C6B9A0 + 136` | — | 17 keep-alive subsystems |
 | Component system | `0x146C6B940` | — | Entity lookup table |
+| IsNewGame sentinel | `0x143C97650` | — | Global: 0 = new game, non-zero = save ID |
+| U::NewGameAction RTTI | `0x1431c50b8` | — | RTTI for the new-game action object |
+| nosave string | `0x142b37f68` | — | Literal "nosave" parsed by GameStartDB::Import |
 
 ---
 
-## 10. Related Documents
+## 10. World Initialization — NewGame vs. Load
+
+X4 has exactly two paths that initialize a live game world. Both end at the same point (`U::UniverseGeneratedEvent` → `on_game_loaded`) and are indistinguishable to code running after that event fires.
+
+### Global: `qword_143C97650` — IsNewGame Sentinel
+
+**Address:** `0x143C97650`
+
+This global is the single bit the engine uses to distinguish new games from loaded saves:
+
+```c
+bool IsNewGame() {
+    return qword_143C97650 == 0;
+}
+```
+
+- Set to **`0`** by `NewGame()` path (new session)
+- Set to **non-zero** (the save ID) by `GameClass::Load()` path
+
+`NotifyUniverseGenerated` checks this to decide whether to run new-game post-init logic vs. load-game restore logic.
+
+### Path A — NewGame (sub_1409A4830)
+
+Called via `NewGame(modulename, numparams, params)` (exported from X4.exe):
+
+```
+NewGame("x4online_client", 0, nullptr)
+  → U::NewGameAction posted to engine action queue
+  → Next frame: sub_1409A4830 runs
+    → GUID allocated for session
+    → qword_143C97650 = 0          // IsNewGame() = true
+    → Physics subsystem reset
+    → Galaxy created from gamestart XML (sub_14088D4B0)
+    → MD starts, fires event_universe_generated
+  → U::UniverseGeneratedEvent posted
+  → AnarkLuaEngine processes event
+  → X4Native fires on_game_loaded
+```
+
+**`U::NewGameAction` RTTI:** `0x1431c50b8`
+
+### Path B — GameClass::Load
+
+Called via `Load(filename)` to deserialize an existing save (`.xml.gz` or `.xml`):
+
+```
+GameClass::Load("save01.xml.gz")
+  → UniverseClass::Import() — reads XML tree
+  → qword_143C97650 = save_id    // IsNewGame() = false
+  → Player, entities, economy, factions all restored from file
+  → U::UniverseGeneratedEvent posted
+  → on_game_loaded fires
+```
+
+### Gamestart XML — nosave Attribute
+
+A gamestart definition in `libraries/gamestarts/*.xml` drives Path A. The `nosave="1"` attribute suppresses all autosave triggers for that session:
+
+- **String address:** `0x142b37f68` — the literal `"nosave"` string
+- **Parsed by:** `GameStartDB::Import` at `0x1409D39B0`
+
+Extensions place custom gamestarts in `extension/libraries/gamestarts/` — X4 auto-scans all active extensions' `libraries/` directories.
+
+### SetCustomGameStartPlayerPropertySectorAndOffset
+
+Before calling `NewGame`, the starting sector and position can be pre-configured:
+
+```cpp
+SetCustomGameStartPlayerPropertySectorAndOffset(
+    gamestart_id,    // e.g. "x4online_client"
+    property_name,   // e.g. "player"
+    entry_id,        // e.g. "entry0"
+    sector_macro,    // MACRO NAME string (e.g. "Cluster_01_Sector001_macro") — NOT UniverseID
+    pos              // UIPosRot
+);
+```
+
+Note: takes the sector **macro name** string, not a `UniverseID`.
+
+---
+
+## 11. Related Documents
 
 | Document | Contents |
 |----------|----------|
