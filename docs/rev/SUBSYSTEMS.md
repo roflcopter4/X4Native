@@ -384,7 +384,7 @@ This is the same system used by all exported functions that take entity/componen
 | Fire Lua Callback | `0x141344A70` | `0x1344A70` | lua_getfield + lua_pcall |
 | Event bus post | `0x140953650` | `0x953650` | Post event (no lock) |
 | sub_1409A4830 | `0x1409A4830` | `0x9A4830` | NewGame world init (called by U::NewGameAction) |
-| GameStartDB::Import | `0x1409D39B0` | `0x9D39B0` | Parses gamestart XML, reads nosave attribute |
+| GameStartDB::Import | `0x1409D39B0` | `0x9D39B0` | Parses gamestart XML, reads `nosave` tag from `tags` attribute |
 | sub_14088D4B0 | `0x14088D4B0` | `0x88D4B0` | Galaxy creation from gamestart XML |
 | BST root | `0x143139400` | — | Subsystem tree root pointer |
 | BST sentinel | `0x1431393E0` | — | Subsystem tree end node |
@@ -450,14 +450,20 @@ GameClass::Load("save01.xml.gz")
   → on_game_loaded fires
 ```
 
-### Gamestart XML — nosave Attribute
+### Gamestart XML — nosave Tag
 
-A gamestart definition in `libraries/gamestarts/*.xml` drives Path A. The `nosave="1"` attribute suppresses all autosave triggers for that session:
+A gamestart definition in `libraries/gamestarts/*.xml` drives Path A. Autosave is suppressed by including `nosave` as a space-separated value in the `tags` attribute — **not** as a standalone `nosave="1"` attribute:
 
-- **String address:** `0x142b37f68` — the literal `"nosave"` string
+```xml
+<gamestart id="my_gamestart" tags="nosave" ...>
+```
+
+This is confirmed in both the binary and the game files:
+- **String address:** `0x142b37f68` — the literal `"nosave"` string, parsed by `GameStartDB::Import`
 - **Parsed by:** `GameStartDB::Import` at `0x1409D39B0`
+- **Game file evidence:** Every tutorial and workshop gamestart in `libraries/gamestarts.xml` uses `tags="tutorial nosave"` or `tags="stationdesigner nosave"` — no standalone `nosave` attribute exists anywhere in the schema
 
-Extensions place custom gamestarts in `extension/libraries/gamestarts/` — X4 auto-scans all active extensions' `libraries/` directories.
+Extensions place custom gamestarts in `extension/libraries/gamestarts/` — X4 auto-scans all active extensions' `libraries/` directories. Additional recognized tag values include `tutorial`, `customeditor`, `stationdesigner`.
 
 ### SetCustomGameStartPlayerPropertySectorAndOffset
 
@@ -468,12 +474,15 @@ SetCustomGameStartPlayerPropertySectorAndOffset(
     gamestart_id,    // e.g. "x4online_client"
     property_name,   // e.g. "player"
     entry_id,        // e.g. "entry0"
-    sector_macro,    // MACRO NAME string (e.g. "Cluster_01_Sector001_macro") — NOT UniverseID
+    sector_macro,    // MACRO NAME string — NOT a UniverseID
+                     // e.g. "cluster_01_sector001_macro" (Argon Prime area)
+                     //      "cluster_14_sector001_macro" (Second Contact / Holy Vision)
+                     // Real names confirmed in gamestarts.xml: all lowercase, no universe prefix
     pos              // UIPosRot
 );
 ```
 
-Note: takes the sector **macro name** string, not a `UniverseID`.
+Note: takes the sector **macro name** string, not a `UniverseID`. Sector macro naming convention: `cluster_NN_sectorNNN_macro` (confirmed from `libraries/gamestarts.xml` v9.00). Use `GetComponentName(sector_universe_id)` on the host to retrieve the macro name for an arbitrary sector.
 
 ---
 
