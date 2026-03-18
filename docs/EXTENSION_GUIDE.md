@@ -1,0 +1,279 @@
+# Extension Developer Guide
+
+Build native C++ extensions for X4: Foundations using the X4Native framework.
+
+## Prerequisites
+
+- Visual Studio 2022 Build Tools (MSVC, C++23)
+- CMake 3.20+
+- X4Native installed in the game's `extensions/x4native/` folder
+
+## Project Structure
+
+An extension is a standard X4 extension folder with a native DLL:
+
+```
+extensions/x4native_mymod/
+  content.xml         ← X4 extension manifest
+  x4native.json       ← X4Native config (name, DLL path, priority)
+  native/
+    x4native_mymod.dll
+```
+
+### content.xml
+
+Standard X4 extension descriptor. Must declare `x4native` as a dependency:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<content version="900" id="x4native_mymod" name="My Mod"
+         description="My native extension." author="you"
+         date="2026-01-01" save="0" enabled="1">
+  <dependency id="x4native" optional="false" />
+  <text language="44" name="My Mod" description="My native extension." />
+</content>
+```
+
+- `save="0"` — extension doesn't affect save compatibility (use `1` only if your mod adds persistent data that breaks saves without it)
+- `<text language="44" ...>` — optional localization override (language 44 = English); omit if not needed
+- `version` in the root `<content>` element reflects the **game version** this was built for (900 = 9.00)
+
+### x4native.json
+
+Tells the framework where to find your DLL and how to load it:
+
+```json
+{
+    "name": "mymod",
+    "library": "native\\x4native_mymod.dll",
+    "priority": 100,
+    "min_api_version": 1
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Extension identifier (used in logs) |
+| `library` | Yes | Relative path to your DLL |
+| `priority` | No | Load order (lower = earlier, default 0) |
+| `min_api_version` | No | Minimum framework API version required |
+
+## Minimal Extension
+
+```cpp
+#include <x4native.h>
+
+X4N_EXTENSION {
+    x4n::log::info("Hello from my extension!");
+
+    x4n::on("on_game_loaded", [] {
+        x4n::log::info("Game world is ready!");
+    });
+}
+
+X4N_SHUTDOWN {
+    x4n::log::info("Goodbye!");
+}
+```
+
+`X4N_EXTENSION` runs when the framework loads your DLL. `X4N_SHUTDOWN` runs on unload. The framework auto-cleans event subscriptions and hooks on shutdown, but explicit cleanup is good practice.
+
+## CMakeLists.txt
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(x4native_mymod)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(x4native_mymod SHARED mymod.cpp)
+
+target_include_directories(x4native_mymod PRIVATE
+    path/to/x4native/sdk
+)
+
+set_target_properties(x4native_mymod PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "x4native_mymod"
+)
+```
+
+Build: `cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Debug`
+
+## API Reference
+
+All API functions live in the `x4n::` namespace. Include `<x4native.h>`.
+
+### Lifecycle Events
+
+| Event | When |
+|-------|------|
+| `on_game_loaded` | Game world is initialized and safe to call game functions |
+| `on_game_save` | Game is being saved |
+| `on_ui_reload` | Lua state rebuilt (after `/reloadui`) |
+| `on_frame_update` | Every UI frame tick |
+
+### Events
+
+```cpp
+// Subscribe (returns subscription ID)
+int id = x4n::on("on_game_loaded", [] { /* no params */ });
+int id = x4n::on("event_name", [](const char* p) { /* string param from Lua */ });
+int id = x4n::on("event_name", [](void* p) { /* raw pointer from C++ raise */ });
+
+// Unsubscribe
+x4n::off(id);
+
+// Raise a C++ event (other extensions can subscribe to it)
+x4n::raise("my_custom_event");
+x4n::raise("my_custom_event", my_data_ptr);  // subscribers get void*
+
+// Raise a Lua event (C++ → Lua)
+x4n::raise_lua("my_lua_event_name", "optional_param");
+```
+
+### Lua Event Bridges
+
+Forward game Lua events into C++ without writing any Lua:
+
+```cpp
+// Register bridge (call during on_game_loaded)
+x4n::bridge_lua_event("playerUndocked", "on_player_undocked");
+
+// Subscribe — string param from Lua is forwarded automatically
+x4n::on("on_player_undocked", [](const char* param) {
+    x4n::log::info("Player undocked (param: %s)", param ? param : "none");
+});
+
+// Or subscribe without params if you don't need them
+x4n::on("on_player_undocked", [] { x4n::log::info("A ship undocked!"); });
+```
+
+### Custom MD Event Forwarding
+
+Some game events (e.g. `event_object_destroyed`, `event_player_money_updated`) only exist in the Mission Director system and have no Lua equivalent. To use them in C++, your extension needs two pieces:
+
+**1. MD cue** — add an XML file in your extension's `md/` folder (the game auto-discovers all `*.xml` files there; no registration in `content.xml` needed):
+
+```xml
+<!-- md/my_events.xml -->
+<mdscript name="MyModEvents"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="md.xsd">
+  <cues>
+    <cue name="mymod_ObjectDestroyed" instantiate="true">
+      <conditions>
+        <event_object_destroyed />
+      </conditions>
+      <actions>
+        <raise_lua_event name="'mymod.object_destroyed'" />
+      </actions>
+    </cue>
+  </cues>
+</mdscript>
+```
+
+**2. Bridge to C++** in your extension code:
+
+```cpp
+X4N_EXTENSION {
+    x4n::on("on_game_loaded", [] {
+        x4n::bridge_lua_event("mymod.object_destroyed", "on_object_destroyed");
+    });
+
+    x4n::on("on_object_destroyed", [](const char* param) {
+        x4n::log::info("Destroyed: %s", param ? param : "unknown");
+    });
+}
+```
+
+The full flow is: **Game Engine → MD cue → `raise_lua_event` → Lua bridge → C++ event**. This is the same pattern X4Native itself uses for `on_game_loaded` and `on_game_saved`.
+
+### Logging
+
+```cpp
+x4n::log::debug("value = %d", 42);
+x4n::log::info("loaded %s", name);
+x4n::log::warn("something odd");
+x4n::log::error("failed: %s", reason);
+```
+
+Output goes to `extensions/x4native/x4native.log`. Uses printf-style formatting.
+
+### Game Functions
+
+2,051 typed game functions resolved from `X4.exe` exports:
+
+```cpp
+// Cache the table pointer during init
+static X4GameFunctions* game = nullptr;
+
+X4N_EXTENSION {
+    game = x4n::game();
+}
+
+// Call game functions (only after on_game_loaded!)
+void on_game_loaded() {
+    UniverseID player = game->GetPlayerID();
+    const char* name = game->GetComponentName(player);
+    bool docked = game->IsPlayerValid();
+}
+```
+
+Browse `sdk/x4_game_func_table.h` for the full function list.
+
+### Function Hooks
+
+Intercept game function calls with before/after hooks:
+
+```cpp
+// Before-hook: args by reference, can modify or skip the original
+static void before_fn(x4n::hook::HookControl& ctl,
+                      UniverseID& id, uint32_t& count) {
+    x4n::log::info("intercepted call with id=%llu", id);
+    // ctl.skip_original = 1;  // skip the real function
+}
+
+// After-hook: args by value (read-only)
+static void after_fn(UniverseID id, uint32_t count) {
+    x4n::log::info("call completed");
+}
+
+// Install (returns hook ID, 0 on failure)
+int h1 = x4n::hook::before<&X4GameFunctions::SomeFunction>(before_fn);
+int h2 = x4n::hook::after<&X4GameFunctions::SomeFunction>(after_fn);
+
+// Remove
+x4n::hook::remove(h1);
+x4n::hook::remove(h2);
+```
+
+Install hooks in `on_game_loaded`. The framework auto-removes hooks when your extension unloads.
+
+### Info
+
+```cpp
+x4n::game_version();  // "9.00"
+x4n::version();       // "0.9.0 (game: 9.00)"
+x4n::path();          // "G:\...\extensions\x4native_mymod\"
+```
+
+## Important Notes
+
+- **Never call game functions before `on_game_loaded`** — the game world isn't ready yet.
+- **All code runs on the UI thread** — no threading required, no thread safety concerns.
+- **Extensions are auto-cleaned on unload** — hooks and event subscriptions are removed automatically, but explicit cleanup in `X4N_SHUTDOWN` is recommended.
+- **Protected UI mode must be OFF** in game settings for native extensions to work.
+- **Game updates may break hooks** — function signatures or addresses can change between patches.
+
+## Examples
+
+See the `examples/` folder for working extensions:
+
+| Example | Demonstrates |
+|---------|-------------|
+| `hello` | Lifecycle events, game function calls, logging |
+| `event_test` | Event round-trips (C++→Lua→C++), frame updates |
+| `hook_test` | Before/after hooks on a game function |
+| `lua_bridge` | Dynamic Lua→C++ event forwarding |

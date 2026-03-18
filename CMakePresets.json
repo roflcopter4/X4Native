@@ -1,0 +1,37 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "X4Native",
+            "description": "Base configuration — inherit in CMakeUserPresets.json to set X4_GAME_DIR",
+            "generator": "Visual Studio 17 2022",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo",
+                "X4_GAME_DIR": {
+                    "type": "PATH",
+                    "value": ""
+                }
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug",
+            "configurePreset": "default",
+            "configuration": "Debug"
+        },
+        {
+            "name": "release",
+            "displayName": "Release",
+            "configurePreset": "default",
+            "configuration": "Release"
+        }
+    ]
+}

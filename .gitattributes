@@ -1,0 +1,2 @@
+# Exclude extracted game reference files from GitHub language stats
+reference/** linguist-vendored

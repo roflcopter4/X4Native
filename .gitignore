@@ -1,0 +1,17 @@
+# Build output
+build/
+
+# Local developer config (contains machine-specific X4 game path)
+CMakeUserPresets.json
+
+# Built DLLs and debug symbols
+native/*.dll
+native/*.pdb
+
+# Release packaging staging
+pkg/
+
+.github/copilot/**
+
+# Game reference files (large, machine-specific, not for repo)
+reference/game/

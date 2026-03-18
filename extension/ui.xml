@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon name="x4native" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="../../ui/core/addon.xsd">
+  <environment type="menus">
+    <file name="ui/x4native.lua" />
+    <!-- Add more Lua files here; order matters (dependencies first) -->
+    <!-- <file name="ui/x4native_helpers.lua" /> -->
+  </environment>
+</addon>

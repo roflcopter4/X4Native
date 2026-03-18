@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content version="900" id="x4native_event_test" name="X4Native Event Test" description="Tests the x4native bidirectional event system." author="eg3r" date="2026-03-16" save="0" enabled="1">
+  <dependency id="x4native" optional="false" />
+  <text language="44" description="Tests the x4native bidirectional event system." name="X4Native Event Test"/>
+</content>

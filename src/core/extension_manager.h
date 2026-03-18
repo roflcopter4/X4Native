@@ -1,0 +1,79 @@
+#pragma once
+// ---------------------------------------------------------------------------
+// x4native_core.dll — Extension Manager
+//
+// Discovers and loads native extension DLLs. Each extension lives in its
+// own X4 extension folder and declares itself via x4native.json.
+//
+// Lifecycle:
+//   discover() → scan game extensions dirs for x4native.json
+//   load_all() → LoadLibrary + x4native_init() for each (priority order)
+//   shutdown() → x4native_shutdown() + FreeLibrary (reverse order)
+// ---------------------------------------------------------------------------
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+#include <string>
+#include <vector>
+
+#include <x4native_extension.h>
+
+namespace x4n {
+
+struct ExtensionInfo {
+    std::string name;
+    std::string extension_id;   // X4 extension ID from content.xml (for IsExtensionEnabled check)
+    std::string path;           // Absolute path to the extension's folder
+    std::string dll_path;       // Absolute path to the extension DLL
+    int         priority = 0;
+    int         api_version = 0;
+
+    HMODULE     module = nullptr;
+    bool        initialized = false;
+
+    // API struct for this extension — persists for the extension's lifetime.
+    // Extensions store a pointer to this during x4native_init().
+    X4NativeAPI api = {};
+
+    // Event subscription IDs — tracked for auto-cleanup on unload
+    std::vector<int> subscription_ids;
+
+    // Resolved exports
+    using api_version_fn = int  (*)();
+    using init_fn        = int  (*)(X4NativeAPI*);
+    using shutdown_fn    = void (*)();
+
+    api_version_fn fn_api_version = nullptr;
+    init_fn        fn_init        = nullptr;
+    shutdown_fn    fn_shutdown    = nullptr;
+};
+
+class ExtensionManager {
+public:
+    static void init(const std::string& ext_root, const std::string& game_version,
+                     int (*raise_lua_event)(const char*, const char*) = nullptr,
+                     int (*register_lua_bridge)(const char*, const char*) = nullptr);
+    static void shutdown();
+
+    static void discover();
+    static void load_all();
+    static const std::vector<ExtensionInfo>& extensions() { return s_extensions; }
+    static std::string loaded_extensions_json();
+
+private:
+    enum class LoadResult { ok, skipped, failed };
+
+    static bool parse_config(const std::string& json_path, ExtensionInfo& info);
+    static LoadResult load_extension(ExtensionInfo& ext);
+    static void unload_extension(ExtensionInfo& ext);
+    static void fill_api(X4NativeAPI& api, ExtensionInfo& ext);
+
+    static std::vector<ExtensionInfo> s_extensions;
+    static std::string s_ext_root;
+    static std::string s_game_version;
+};
+
+} // namespace x4n
