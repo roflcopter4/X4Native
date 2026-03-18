@@ -48,17 +48,13 @@ void EventSystem::fire(const char* event_name, void* data) {
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         auto it = s_subscribers.find(event_name);
-        if (it == s_subscribers.end() || it->second.empty()) {
-            Logger::debug("Event '{}': fired (no subscribers)", event_name);
+        if (it == s_subscribers.end() || it->second.empty())
             return;
-        }
         snapshot = it->second;
     }
 
-    std::string_view ev(event_name);
-    if (ev != "on_frame_update" && ev != "on_native_frame_update")
-        Logger::debug("Event '{}': dispatching to {} subscriber(s)",
-                      event_name, snapshot.size());
+    Logger::debug("Event '{}': dispatching to {} subscriber(s)",
+                  event_name, snapshot.size());
 
     for (auto& sub : snapshot) {
         sub.callback(event_name, data, sub.userdata);

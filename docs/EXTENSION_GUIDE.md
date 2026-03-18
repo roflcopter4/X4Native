@@ -57,6 +57,7 @@ Tells the framework where to find your DLL and how to load it:
 | `library` | Yes | Relative path to your DLL |
 | `priority` | No | Load order (lower = earlier, default 0) |
 | `min_api_version` | No | Minimum framework API version required |
+| `autoreload` | No | `true` → watch DLL for changes and hot-reload in-place (default `false`) |
 
 ## Minimal Extension
 
@@ -258,6 +259,24 @@ x4n::game_version();  // "9.00"
 x4n::version();       // "0.9.0 (game: 9.00)"
 x4n::path();          // "G:\...\extensions\x4native_mymod\"
 ```
+
+## Hot-Reload Workflow
+
+Extension DLLs use the same copy-on-load pattern as the framework core: the original DLL is never locked by the game process. This means you can **rebuild your extension while the game is running** and have it reload automatically.
+
+### Manual reload
+Trigger `/reloadui` at any time — the framework unloads all extensions, copies the new binaries, and reinitializes everything.
+
+### Automatic per-extension reload
+Set `"autoreload": true` in your `x4native.json`. The framework polls your DLL's modification time every ~2 seconds (120 frames). When a change is detected, it hot-reloads **only your extension** without disturbing others or triggering a full UI reload:
+
+1. Build your DLL (original is never file-locked, overwrite freely)
+2. The framework detects the new mtime within ~2 seconds
+3. Your extension is shut down, the new binary is loaded, and `X4N_EXTENSION` runs again
+
+Each extension controls its own autoreload independently via its `x4native.json`.
+
+> **Never ship `"autoreload": true` in a release build.** The framework always tracks DLL mtimes when the flag is set — polling every frame, comparing file timestamps, and unloading/reloading the DLL mid-session. This adds overhead and is a development-only tool. Your released `x4native.json` must have `"autoreload": false` or omit the field entirely.
 
 ## Important Notes
 

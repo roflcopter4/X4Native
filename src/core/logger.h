@@ -3,7 +3,7 @@
 // x4native_core.dll — Logger
 //
 // Lightweight logger with two sinks:
-//   1. File sink  → <mod_root>/x4native.log   (truncated each run)
+//   1. File sink  → <mod_root>/x4native.log   (rotated each init: keeps x4native.1-4.log)
 //   2. MSVC sink  → OutputDebugString          (visible in debugger / DebugView)
 //
 // Uses C++23 std::format — no external dependencies.

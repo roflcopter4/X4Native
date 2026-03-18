@@ -82,6 +82,11 @@ static void __fastcall frame_tick_detour(void* engineCtx, bool isSuspended) {
     auto* table = x4n::GameAPI::table();
     update.game_paused = (table && table->IsGamePaused) ? table->IsGamePaused() : false;
 
+    // Check for extension DLL changes and reload any that have autoreload enabled.
+    // Must happen before firing the event so no extension code is on the stack.
+    x4n::ExtensionManager::tick();
+    x4n::ExtensionManager::flush_pending_reloads();
+
     x4n::EventSystem::fire("on_native_frame_update", &update);
 }
 

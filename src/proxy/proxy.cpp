@@ -54,7 +54,7 @@ static void read_autoreload_setting() {
     std::string path = g_ext_root + "x4native_settings.json";
     std::ifstream file(path);
     if (!file.is_open()) {
-        if (g_dispatch.log) g_dispatch.log(2, "Autoreload: settings file not found");
+        if (g_dispatch.log) g_dispatch.log(2, "Core autoreload: settings file not found");
         return;
     }
 
@@ -66,8 +66,8 @@ static void read_autoreload_setting() {
 
     if (g_dispatch.log)
         g_dispatch.log(1, g_autoreload_enabled
-            ? "Autoreload: ENABLED"
-            : "Autoreload: disabled");
+            ? "Core autoreload: ENABLED"
+            : "Core autoreload: disabled");
 }
 
 /// Check if core DLL on disk is newer than last known timestamp.

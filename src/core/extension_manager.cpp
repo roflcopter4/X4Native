@@ -22,6 +22,8 @@ namespace x4n {
 std::vector<ExtensionInfo> ExtensionManager::s_extensions;
 std::string ExtensionManager::s_ext_root;
 std::string ExtensionManager::s_game_version;
+int  ExtensionManager::s_tick_frame    = 0;
+bool ExtensionManager::s_any_autoreload = false;
 static int (*s_raise_lua_event)(const char*, const char*) = nullptr;
 static int (*s_register_lua_bridge)(const char*, const char*) = nullptr;
 
@@ -45,6 +47,8 @@ void ExtensionManager::shutdown() {
         unload_extension(*it);
     }
     s_extensions.clear();
+    s_any_autoreload = false;
+    s_tick_frame     = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +164,9 @@ bool ExtensionManager::parse_config(const std::string& json_path, ExtensionInfo&
     if (cfg.contains("min_api_version") && cfg["min_api_version"].is_number_integer())
         info.api_version = cfg["min_api_version"].get<int>();
 
+    if (cfg.contains("autoreload") && cfg["autoreload"].is_boolean())
+        info.autoreload = cfg["autoreload"].get<bool>();
+
     return true;
 }
 
@@ -173,6 +180,12 @@ void ExtensionManager::load_all() {
         if (result == LoadResult::failed)
             Logger::error("Failed to load extension: {}", ext.name);
     }
+    s_any_autoreload = std::any_of(s_extensions.begin(), s_extensions.end(),
+                                   [](const ExtensionInfo& e) { return e.autoreload && e.initialized; });
+    if (s_any_autoreload)
+        Logger::info("Autoreload: watching {} extension(s) for DLL changes",
+                     std::count_if(s_extensions.begin(), s_extensions.end(),
+                                   [](const ExtensionInfo& e) { return e.autoreload && e.initialized; }));
 }
 
 // SEH wrappers — must be in separate functions (no C++ objects requiring unwinding)
@@ -224,11 +237,25 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
         return LoadResult::failed;
     }
 
-    // LoadLibrary
-    ext.module = LoadLibraryA(ext.dll_path.c_str());
+    // Copy-on-load: keep the original unlocked so the extension can be rebuilt
+    // while the game is running. The live copy is what gets LoadLibrary'd.
+    fs::path src(ext.dll_path);
+    ext.dll_live_path = (src.parent_path() / (src.stem().string() + "_live" + src.extension().string())).string();
+    if (!CopyFileA(ext.dll_path.c_str(), ext.dll_live_path.c_str(), FALSE)) {
+        Logger::error("Extension '{}': CopyFile failed (error={})", ext.name, GetLastError());
+        return LoadResult::failed;
+    }
+
+    // Snapshot the original DLL's mtime so tick() can detect future changes
+    WIN32_FILE_ATTRIBUTE_DATA mtime_attr = {};
+    if (GetFileAttributesExA(ext.dll_path.c_str(), GetFileExInfoStandard, &mtime_attr))
+        ext.dll_mtime = mtime_attr.ftLastWriteTime;
+
+    ext.module = LoadLibraryA(ext.dll_live_path.c_str());
     if (!ext.module) {
         Logger::error("Extension '{}': LoadLibrary failed (error={})",
                       ext.name, GetLastError());
+        DeleteFileA(ext.dll_live_path.c_str());
         return LoadResult::failed;
     }
 
@@ -240,11 +267,17 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
     ext.fn_shutdown = reinterpret_cast<ExtensionInfo::shutdown_fn>(
         GetProcAddress(ext.module, "x4native_shutdown"));
 
+    auto unload_live = [&] {
+        FreeLibrary(ext.module);
+        ext.module = nullptr;
+        DeleteFileA(ext.dll_live_path.c_str());
+        ext.dll_live_path.clear();
+    };
+
     if (!ext.fn_api_version || !ext.fn_init || !ext.fn_shutdown) {
         Logger::error("Extension '{}': missing required exports (x4native_api_version, x4native_init, x4native_shutdown)",
                       ext.name);
-        FreeLibrary(ext.module);
-        ext.module = nullptr;
+        unload_live();
         return LoadResult::failed;
     }
 
@@ -252,16 +285,14 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
     int ext_api = seh_call_api_version(ext.fn_api_version);
     if (ext_api == -1) {
         Logger::error("Extension '{}': x4native_api_version() crashed", ext.name);
-        FreeLibrary(ext.module);
-        ext.module = nullptr;
+        unload_live();
         return LoadResult::failed;
     }
 
     if (ext_api > X4NATIVE_API_VERSION) {
         Logger::error("Extension '{}': runtime API v{} > framework v{}",
                       ext.name, ext_api, X4NATIVE_API_VERSION);
-        FreeLibrary(ext.module);
-        ext.module = nullptr;
+        unload_live();
         return LoadResult::failed;
     }
 
@@ -274,15 +305,13 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
     int result = seh_call_init(ext.fn_init, &ext.api);
     if (result == -1) {
         Logger::error("Extension '{}': x4native_init() crashed (SEH exception)", ext.name);
-        FreeLibrary(ext.module);
-        ext.module = nullptr;
+        unload_live();
         return LoadResult::failed;
     }
 
     if (result != X4NATIVE_OK) {
         Logger::error("Extension '{}': x4native_init() returned error ({})", ext.name, result);
-        FreeLibrary(ext.module);
-        ext.module = nullptr;
+        unload_live();
         return LoadResult::failed;
     }
 
@@ -308,6 +337,57 @@ void ExtensionManager::unload_extension(ExtensionInfo& ext) {
         FreeLibrary(ext.module);
         ext.module = nullptr;
     }
+    if (!ext.dll_live_path.empty()) {
+        DeleteFileA(ext.dll_live_path.c_str());
+        ext.dll_live_path.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Autoreload — per-extension mtime polling and deferred reload
+// ---------------------------------------------------------------------------
+
+static constexpr int AUTORELOAD_TICK_INTERVAL = 120;  // frames between mtime checks (~2s @60fps)
+
+void ExtensionManager::tick() {
+    if (!s_any_autoreload) return;
+    if (++s_tick_frame < AUTORELOAD_TICK_INTERVAL) return;
+    s_tick_frame = 0;
+
+    for (auto& ext : s_extensions) {
+        if (!ext.autoreload || !ext.initialized || ext.reload_pending) continue;
+
+        WIN32_FILE_ATTRIBUTE_DATA attr = {};
+        if (!GetFileAttributesExA(ext.dll_path.c_str(), GetFileExInfoStandard, &attr)) continue;
+
+        if (CompareFileTime(&attr.ftLastWriteTime, &ext.dll_mtime) > 0) {
+            Logger::info("Extension '{}': DLL changed on disk, queuing hot-reload", ext.name);
+            ext.reload_pending = true;
+        }
+    }
+}
+
+void ExtensionManager::flush_pending_reloads() {
+    if (!s_any_autoreload) return;
+
+    bool any_reloaded = false;
+    for (auto& ext : s_extensions) {
+        if (!ext.reload_pending) continue;
+        ext.reload_pending = false;
+        any_reloaded = true;
+
+        Logger::info("Hot-reloading extension: {}", ext.name);
+        unload_extension(ext);
+
+        if (load_extension(ext) == LoadResult::ok)
+            Logger::info("Extension '{}': hot-reload complete", ext.name);
+        else
+            Logger::error("Extension '{}': hot-reload failed", ext.name);
+    }
+
+    if (any_reloaded)
+        s_any_autoreload = std::any_of(s_extensions.begin(), s_extensions.end(),
+                                       [](const ExtensionInfo& e) { return e.autoreload && e.initialized; });
 }
 
 // ---------------------------------------------------------------------------
