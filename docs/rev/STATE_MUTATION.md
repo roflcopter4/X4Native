@@ -549,3 +549,45 @@ bool paused = x4n::game()->IsGamePaused();  // safe, exported
 | `FireEvent_gameUnpaused` | `0x140AEFC90` | `0xAEFC90` | Fires `"gameUnpaused"` Lua event |
 | Rotation matrix builder | `0x14030D010` | `0x30D010` | sin/cos → 4×4 matrix (internal) |
 | Deg-to-rad constant | `0x142C40EE4` | — | `0x3c8efa35` = π/180 |
+
+---
+
+## 11. Player State API — Runtime Behavior (v9.00)
+
+Runtime testing of player state query functions across on-foot scenarios. Tested 2026-03-20.
+
+### Test Scenario
+
+Player docked at station. Transitions: pilot seat → ship interior (elevator) → station (elevator → crew quarters) → back to ship → pilot seat → leave seat.
+
+### Function Return Values by State
+
+| Function | Pilot Seat | Ship Interior (on-foot) | Station (on-foot) | Notes |
+|----------|-----------|------------------------|-------------------|-------|
+| `GetPlayerOccupiedShipID()` | ship_id (93546) | 0 | 0 | Non-zero ONLY when sitting in pilot seat |
+| `GetPlayerControlledShipID()` | ship_id (93546) | 0 | 0 | Same as occupied for pilot seat |
+| `GetPlayerShipID()` | ship_id (93546) | ship_id (93546) | 0 | Non-zero when inside own ship (even on-foot), 0 on station |
+| `GetPlayerContainerID()` | ship_id (93546) | ship_id (93546) | station_id (94053) | Always the containing entity |
+| `GetPlayerObjectID()` | ship_id (93546) | ship_id (93546) | station_id (94053) | **Returns container, NOT avatar** (IDA analysis was wrong) |
+| `GetEnvironmentObject()` | 0 | 0 | 0 | **Always 0** — contradicts IDA analysis (expected room ID) |
+| `GetPlayerID()` | 93553 | 93553 | 93553 | Unique stable entity across all states |
+| `IsPlayerOccupiedShipDocked()` | true (1) | false (0) | false (0) | Only true when piloting a docked ship |
+| `GetPlayerZoneID()` | 93474 | 93474 | 93474 | Stable zone ID across all on-foot states and pilot seat |
+
+### Key Findings
+
+1. **`GetPlayerObjectID()` ≠ avatar.** Despite IDA showing a class-71 parent walk, at runtime it returns the same value as `GetPlayerContainerID()`. The "avatar entity" does not appear as a distinct game object accessible via these APIs.
+
+2. **`GetEnvironmentObject()` = 0 always.** IDA shows it reads `player->data[+29496]`. Either this field is never populated in normal gameplay, or it requires conditions not met in testing (e.g., specific room types, or the player must have entered via a specific path). Needs further investigation.
+
+3. **On-foot detection formula:** `GetPlayerOccupiedShipID() == 0 && GetPlayerContainerID() != 0`. Reliable across ship interior and station on-foot states.
+
+4. **`GetPlayerShipID()` distinguishes location.** Non-zero when on own ship (even on-foot), zero when on station. Useful for determining whether player is in ship or station.
+
+5. **`event_player_changed_activity` unreliable for on-foot.** Only fires for in-ship activities (travel, scan, seta). Does NOT fire for cockpit → on-foot transition. Replaced with 100ms polling.
+
+6. **`GetPlayerID()` is the only unique entity** but **unusable for position.** `GetObjectPositionInSector(GetPlayerID())` returns [0,0,0]. The player entity (93653) has no sector-space position. Only the container (ship/station) has a valid position.
+
+7. **`GetPlayerZoneID()` works.** Returns a stable zone ID (93474) across all states including pilot seat. Consistent even when container changes (ship→station→ship).
+
+8. **No exported API for room-local walking position.** `GetObjectPositionInSector(container)` gives the ship/station's sector position, not the player's position within the interior. Room-local coordinates may require Lua `C.GetPlayerRoom()` or decompiling the first-person camera position source.
