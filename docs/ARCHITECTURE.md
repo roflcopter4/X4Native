@@ -8,7 +8,7 @@ X4Native uses a **proxy + core** two-DLL architecture to enable hot-reloading na
 
 | DLL | Purpose | Locked? | Changes often? |
 |-----|---------|---------|----------------|
-| `x4native_64.dll` (proxy) | Stable entry point, loads/unloads core, owns dispatch table | Yes | Almost never |
+| `x4native_64.dll` (proxy) | Stable entry point, loads/unloads core, owns dispatch table + stash | Yes | Almost never |
 | `x4native_core.dll` (core) | All framework logic: events, extensions, hooks, logger | No (copy-on-load) | Frequently |
 
 **Copy-on-load:** The proxy copies `x4native_core.dll` to `x4native_core_live.dll` and loads the copy. The original is never locked — builds can overwrite it freely.
@@ -95,7 +95,7 @@ sequenceDiagram
 
 The proxy pins itself in `DllMain(DLL_PROCESS_ATTACH)` using `GET_MODULE_HANDLE_EX_FLAG_PIN`. This prevents LuaJIT's `FreeLibrary` (during `lua_close` on save load) from unloading the proxy.
 
-Without pinning, LuaJIT unloads the proxy on save load, destroying all static state and orphaning the locked `core_live.dll`. With pinning, `FreeLibrary` is a no-op — all state survives across Lua state destruction.
+Without pinning, LuaJIT unloads the proxy on save load, destroying all static state and orphaning the locked `core_live.dll`. With pinning, `FreeLibrary` is a no-op — all state survives across Lua state destruction, including the in-memory stash.
 
 Pinning also enables hot-reload: the `core_needs_reload()` check only works when `g_initialized=true` persists across Lua rebuilds.
 
@@ -106,9 +106,10 @@ When the player loads a savegame, X4 performs a **full Lua state teardown and re
 1. `lua_close()` — old Lua state destroyed, `FreeLibrary(proxy)` is a no-op (pinned)
 2. Fresh Lua state created, `x4native.lua` re-executes
 3. `luaopen_x4native`: proxy updates `lua_State*`, extensions re-discovered and re-initialized
-4. Frame poll begins (`GetPlayerID` check each frame)
-5. Game world loads → `GetPlayerID() != 0` → `on_game_loaded` fires
-6. MD cue arrives later → guarded, no duplicate
+4. Stash remains intact — extensions can restore prior state during `x4native_init()`
+5. Frame poll begins (`GetPlayerID` check each frame)
+6. Game world loads → `GetPlayerID() != 0` → `on_game_loaded` fires
+7. MD cue arrives later → guarded, no duplicate
 
 ### Extension Re-Discovery
 
@@ -118,6 +119,8 @@ On Lua state rebuild, `ExtensionManager::discover()` performs a full shutdown cy
 2. `FreeLibrary` each extension DLL, clears all event subscriptions and hooks
 3. Re-scans the extensions directory
 4. Re-loads and re-initializes each extension
+
+> **Stash survives this cycle.** In-memory state set via `x4n::stash` persists in the proxy. Extensions can read it back during `x4native_init()` to restore state without disk I/O.
 
 ### Dual Game-Loaded Detection
 
@@ -156,6 +159,7 @@ sequenceDiagram
 | MD scripts | Yes (on new game/load) | No |
 | Core DLL | **Yes** — copy-on-load | No |
 | Proxy DLL | No — file locked | Yes (rarely changes) |
+| Stash data | **Persists** across reload | No |
 
 ## Proxy DLL
 
@@ -164,6 +168,7 @@ The proxy is intentionally minimal (~200 lines). Its responsibilities:
 - `luaopen_x4native(L)` — entry point called by LuaJIT
 - Copy-on-load the core DLL
 - Own the stable `CoreDispatch` function pointer table
+- Own the in-memory **stash** (key-value store surviving reloads)
 - Forward Lua API calls to core
 - DLL pinning and lifecycle management
 
@@ -186,7 +191,7 @@ Exports `core_init()` and `core_shutdown()`. Contains all subsystems:
 
 The proxy and core communicate through two structs defined in `src/common/x4native_defs.h`:
 
-- **CoreInitContext** — proxy → core: `lua_State*`, mod root path, dispatch table pointer, callback functions
+- **CoreInitContext** — proxy → core: `lua_State*`, mod root path, dispatch table pointer, callback functions, stash function pointers
 - **CoreDispatch** — core fills this with function pointers the proxy forwards to Lua
 
 This indirection allows the core to be swapped at runtime without breaking the proxy's Lua-facing API.

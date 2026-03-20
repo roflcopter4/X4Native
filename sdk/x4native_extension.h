@@ -158,15 +158,36 @@ typedef struct X4NativeAPI {
     // that aren't in X4.exe's export table.
     void* (*resolve_internal)(const char* name);
 
+    // --- Stash (in-memory key-value, survives /reloadui and hot-reload) ---
+    // Data lives in the proxy DLL (pinned in memory for the process lifetime).
+    // Lost on game exit. Namespace isolates keys; by convention use your
+    // extension name. The C++ SDK (x4n::stash) auto-namespaces for you.
+    //
+    // stash_set: copy data into the stash. Returns 1 on success, 0 on error.
+    int         (*stash_set)(const char* ns, const char* key,
+                             const void* data, uint32_t size);
+    // stash_get: returns pointer to internal buffer (valid until next set/remove
+    //            on the same key). Returns NULL if not found.
+    const void* (*stash_get)(const char* ns, const char* key,
+                             uint32_t* out_size);
+    // stash_remove: remove a single key. Returns 1 if found, 0 otherwise.
+    int         (*stash_remove)(const char* ns, const char* key);
+    // stash_clear: remove all keys in a namespace.
+    void        (*stash_clear)(const char* ns);
+
     // Framework-managed slots — do not modify.
-    // [0] const char*           ext name
-    // [1] intptr_t              ext load priority
-    // [2] vector<int>*          event subscription IDs (for auto-cleanup)
-    // [3] HANDLE                per-extension log file handle
-    // [4] fn(int,cstr,ptr)      api_log_ext:   write to extension's own log
-    // [5] fn(cstr,ptr)          api_init_log:  reinitialize log with a new filename
-    // [6] fn(int,cstr,cstr,ptr) api_log_named: one-shot write to a named file in ext folder
-    // [7] ExtensionInfo*        internal framework pointer (used by api_init_log)
+    // Used by SDK wrappers (x4native.h) to access per-extension context.
+    // Post-1.0: new internal features should consume slots here to preserve ABI.
+    //
+    // [0]  const char*           ext name (auto-used by x4n::stash as namespace)
+    // [1]  intptr_t              ext load priority
+    // [2]  vector<int>*          event subscription IDs (for auto-cleanup)
+    // [3]  HANDLE                per-extension log file handle
+    // [4]  fn(int,cstr,ptr)      api_log_ext:   write to extension's own log
+    // [5]  fn(cstr,ptr)          api_init_log:  reinitialize log with a new filename
+    // [6]  fn(int,cstr,cstr,ptr) api_log_named: one-shot write to a named file in ext folder
+    // [7]  ExtensionInfo*        internal framework pointer (used by api_init_log)
+    // [8–19] — free
     void* _reserved[20];
 } X4NativeAPI;
 

@@ -296,13 +296,53 @@ x4n::game_version();  // "9.00"
 x4n::version();       // "0.9.0 (game: 9.00)"
 x4n::path();          // "G:\...\extensions\x4native_mymod\"
 ```
+### Stash (Reload-Safe In-Memory Storage)
 
+The framework provides an in-memory key-value store called **stash** that lives in the proxy DLL. It survives `/reloadui` and extension hot-reload, but is lost on game exit.
+
+Use stash to preserve state across reloads without disk I/O:
+
+```cpp
+// Store/retrieve simple values (auto-namespaced to your extension)
+x4n::stash::set("counter", 42);
+int val = 0;
+if (x4n::stash::get("counter", &val))
+    x4n::log::info("Restored counter: %d", val);
+
+// Strings
+x4n::stash::set_string("name", "my_extension");
+const char* s = x4n::stash::get_string("name");  // returns nullptr if missing
+
+// Raw blobs
+struct MyState { int hp; float x, y, z; };
+MyState state = {100, 1.0f, 2.0f, 3.0f};
+x4n::stash::set("state", &state, sizeof(state));
+
+uint32_t size = 0;
+auto* p = x4n::stash::get("state", &size);  // returns nullptr if missing
+if (p && size == sizeof(MyState))
+    memcpy(&state, p, sizeof(state));
+
+// Remove a key or clear all your keys
+x4n::stash::remove("counter");
+x4n::stash::clear();  // only clears YOUR extension's keys
+```
+
+**Typed helpers** (`set<T>` / `get<T>`) require trivially-copyable types and perform a strict size check — if the stored blob size doesn't match `sizeof(T)`, `get<T>` returns `false`. This protects against reading stale data after struct layout changes during development.
+
+| Property | Value |
+|----------|-------|
+| Lifetime | Game session (lost on game exit) |
+| Survives | `/reloadui`, extension hot-reload, save-load |
+| Namespace | Auto-scoped to extension name |
+| Thread safety | Mutex-protected in proxy |
+| Max size | Process memory (no artificial limit) |
 ## Hot-Reload Workflow
 
 Extension DLLs use the same copy-on-load pattern as the framework core: the original DLL is never locked by the game process. This means you can **rebuild your extension while the game is running** and have it reload automatically.
 
 ### Manual reload
-Trigger `/reloadui` at any time — the framework unloads all extensions, copies the new binaries, and reinitializes everything.
+Trigger `/reloadui` at any time — the framework unloads all extensions, copies the new binaries, and reinitializes everything. Stash data persists across this cycle, so extensions can restore state without disk I/O.
 
 ### Automatic per-extension reload
 Set `"autoreload": true` in your `x4native.json`. The framework polls your DLL's modification time every ~2 seconds (120 frames). When a change is detected, it hot-reloads **only your extension** without disturbing others or triggering a full UI reload:
@@ -320,6 +360,7 @@ Each extension controls its own autoreload independently via its `x4native.json`
 - **Never call game functions before `on_game_loaded`** — the game world isn't ready yet.
 - **All code runs on the UI thread** — no threading required, no thread safety concerns.
 - **Extensions are auto-cleaned on unload** — hooks and event subscriptions are removed automatically, but explicit cleanup in `X4N_SHUTDOWN` is recommended.
+- **Static variables are lost on reload** — Use `x4n::stash` (fast, in-memory, survives reload) or disk files (survives game exit) to preserve state.
 - **Protected UI mode must be OFF** in game settings for native extensions to work.
 - **Game updates may break hooks** — function signatures or addresses can change between patches.
 

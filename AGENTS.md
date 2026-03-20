@@ -6,7 +6,7 @@ X4Native is a native C++ extension framework for **X4: Foundations** (Windows x6
 
 ## Architecture
 
-Two-DLL design: a thin **proxy** (`x4native_64.dll`) that is LoadLibrary-locked by LuaJIT, and a **core** (`x4native_core.dll`) that is copy-on-load hot-reloadable. The proxy owns the stable Lua-facing API table; the core owns all subsystems (logger, event bus, extension manager, hook manager).
+Two-DLL design: a thin **proxy** (`x4native_64.dll`) that is LoadLibrary-locked by LuaJIT, and a **core** (`x4native_core.dll`) that is copy-on-load hot-reloadable. The proxy owns the stable Lua-facing API table and the in-memory stash (key-value store surviving reloads); the core owns all subsystems (logger, event bus, extension manager, hook manager).
 
 The game bridge is: **MD XML cues → Lua events → DLL entry points**. Game lifecycle events (game_loaded, game_saved) flow from Mission Director scripts through `raise_lua_event` into the DLL layer.
 
@@ -20,6 +20,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full design and sequence di
 - Shared types between proxy and core live in `src/common/`
 - Use Logger class (`src/core/logger.h`) for all logging, never raw printf/OutputDebugString
 - Keep the proxy DLL minimal (~200 lines) — complexity belongs in core
+- Proxy also owns the **stash** (in-memory KV store) — function pointers forwarded to core/extensions via `CoreInitContext`
 
 ## Build and Test
 
@@ -125,6 +126,7 @@ When investigating game APIs, events, or behavior:
 - `sn_mod_support_apis` (by bvbohnen) is the reference implementation for DLL loading in X4 — study its patterns when in doubt.
 - Protected UI mode must be **OFF** for `package.loadlib()` to work.
 - Lua files run before the game world initializes — never call game functions until `on_game_loaded` fires.
+- **Stash** (`x4n::stash`) provides in-memory state that survives `/reloadui` and extension hot-reload. Lost on game exit. Lives in the proxy DLL.
 
 ## Conventions
 

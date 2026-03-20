@@ -157,11 +157,11 @@ The core scans every subdirectory of `extensions/` for `x4native.json`, checks i
 | Phase | When | What happens |
 |-------|------|--------------|
 | Discovery | Game start | Core scans `extensions/*/x4native.json` |
-| Init | Game start | `x4native_init(api)` — register events, hooks. No game calls yet. |
+| Init | Game start | `x4native_init(api)` — register events, hooks. Can read stash. No game calls yet. |
 | Game Loaded | Savegame loaded | `on_game_loaded` fires. Game functions safe. |
-| Runtime | Every frame | `on_frame_update`, `on_game_save`, custom events |
-| Shutdown | Game exit / save load | `x4native_shutdown()` — cleanup |
-| Unload | After shutdown | `FreeLibrary`, all hooks and subscriptions auto-cleared |
+| Runtime | Every frame | `on_frame_update`, `on_game_save`, custom events. Stash read/write anytime. |
+| Shutdown | Game exit / save load | `x4native_shutdown()` — cleanup. Write state to stash here. |
+| Unload | After shutdown | `FreeLibrary`, all hooks and subscriptions auto-cleared. Stash persists in proxy. |
 
 ---
 
@@ -200,3 +200,51 @@ Two sinks, no external dependencies:
 - **Debug sink:** `OutputDebugStringA` (visible in debugger / DebugView)
 
 Format uses `std::format` (C++23) with timestamps.
+
+---
+
+## Stash (In-Memory Key-Value Store)
+
+The stash is a namespace-scoped key-value store that lives in the proxy DLL, making it the only extension-accessible state that survives `/reloadui` and extension hot-reload.
+
+### Why the Proxy Owns It
+
+The proxy is the only DLL guaranteed to stay loaded for the entire process lifetime (pinned via `GET_MODULE_HANDLE_EX_FLAG_PIN`). The core DLL is hot-reloaded, and extension DLLs are `FreeLibrary`'d on every reload cycle. Any state in those DLLs is destroyed. The proxy is the natural — and only safe — home.
+
+### Data Flow
+
+```
+Extension             Core DLL            Proxy DLL
+  api->stash_set() →   (pass-through) →   g_stash[ns][key] = blob
+  api->stash_get() →   (pass-through) →   return g_stash[ns][key].data()
+```
+
+Function pointers flow: proxy → `CoreInitContext` → core saves them → `ExtensionManager::fill_api()` writes them into each extension's `X4NativeAPI` struct. Extensions call them directly — no dispatch table indirection.
+
+### Implementation
+
+```cpp
+// In proxy.cpp (static, process-lifetime)
+std::unordered_map<std::string,
+    std::unordered_map<std::string, std::vector<uint8_t>>> g_stash;
+std::mutex g_stash_mutex;
+```
+
+- **Namespace**: typically the extension name (auto-set by `x4n::stash::` helpers via `_reserved[0]`)
+- **Key**: arbitrary string
+- **Value**: opaque byte blob (`vector<uint8_t>`), copied on `set`, pointer returned on `get`
+- **Thread safety**: all operations hold `g_stash_mutex`
+- **Pointer stability**: `get()` returns a pointer into the vector's buffer, valid until the next `set` or `remove` on the same key
+
+### Lifecycle
+
+| Event | Stash behavior |
+|-------|---------------|
+| Game start | Empty |
+| Extension init | Read previous state (if any) |
+| Runtime | Read/write freely |
+| Extension shutdown | Write state to preserve it |
+| `/reloadui` | **Persists** — proxy stays loaded |
+| Extension hot-reload | **Persists** — same mechanism |
+| Save-load | **Persists** — proxy is pinned |
+| Game exit | **Lost** — process terminates |

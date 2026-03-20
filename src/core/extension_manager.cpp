@@ -26,6 +26,10 @@ int  ExtensionManager::s_tick_frame    = 0;
 bool ExtensionManager::s_any_autoreload = false;
 static int (*s_raise_lua_event)(const char*, const char*) = nullptr;
 static int (*s_register_lua_bridge)(const char*, const char*) = nullptr;
+static stash_set_fn    s_stash_set    = nullptr;
+static stash_get_fn    s_stash_get    = nullptr;
+static stash_remove_fn s_stash_remove = nullptr;
+static stash_clear_fn  s_stash_clear  = nullptr;
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -33,11 +37,19 @@ static int (*s_register_lua_bridge)(const char*, const char*) = nullptr;
 
 void ExtensionManager::init(const std::string& ext_root, const std::string& game_version,
                             int (*raise_lua_event)(const char*, const char*),
-                            int (*register_lua_bridge)(const char*, const char*)) {
+                            int (*register_lua_bridge)(const char*, const char*),
+                            stash_set_fn stash_set,
+                            stash_get_fn stash_get,
+                            stash_remove_fn stash_remove,
+                            stash_clear_fn stash_clear) {
     s_ext_root = ext_root;
     s_game_version = game_version;
     s_raise_lua_event = raise_lua_event;
     s_register_lua_bridge = register_lua_bridge;
+    s_stash_set    = stash_set;
+    s_stash_get    = stash_get;
+    s_stash_remove = stash_remove;
+    s_stash_clear  = stash_clear;
     s_extensions.clear();
 }
 
@@ -623,6 +635,10 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
     api._run_after_hooks     = api_run_after_hooks;
     api.resolve_internal     = api_resolve_internal;
     api.register_lua_bridge  = api_register_lua_bridge;
+    api.stash_set            = s_stash_set;
+    api.stash_get            = s_stash_get;
+    api.stash_remove         = s_stash_remove;
+    api.stash_clear          = s_stash_clear;
     memset(api._reserved, 0, sizeof(api._reserved));
     // Slots [0-2]: extension context (read by hook/subscribe implementations)
     api._reserved[0] = const_cast<char*>(ext.name.c_str());

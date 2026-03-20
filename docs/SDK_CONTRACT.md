@@ -67,6 +67,15 @@ struct X4NativeAPI {
                        X4HookCallback callback, void* userdata);
     void (*unhook)(int hook_id);
 
+    // Stash — in-memory key-value, survives /reloadui + hot-reload, lost on game exit
+    // Wrapped by x4n::stash in the C++ SDK.
+    int         (*stash_set)(const char* ns, const char* key,
+                             const void* data, uint32_t size);
+    const void* (*stash_get)(const char* ns, const char* key,
+                             uint32_t* out_size);
+    int         (*stash_remove)(const char* ns, const char* key);
+    void        (*stash_clear)(const char* ns);
+
     void* _reserved[24];  // ABI-compatible expansion
 };
 ```
@@ -93,7 +102,7 @@ The `_reserved` slots allow adding new function pointers without breaking existi
 | Extension crashes game | SEH wrapping + auto-disable of crashing extensions |
 | LuaJIT state corruption | Minimize direct `lua_State` access; prefer event-based communication |
 | Online features disabled | Already happens with Protected UI Mode off; documented clearly |
-| Save corruption | Never write to save data from native code; use Lua/MD bridge |
+| Save corruption | Never write to save data from native code; use Lua/MD bridge or stash for session data |
 | Malicious extensions | Clear documentation that extensions run with full process access |
 
 ---

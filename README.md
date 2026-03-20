@@ -38,6 +38,7 @@ X4Native provides a C++ SDK for building native extensions that run inside the g
 - **Function hooking** — intercept game functions with before/after hooks
 - **Event system** — lifecycle events, custom events, Lua-to-C++ bridges
 - **Hot-reloadable** — `/reloadui` picks up new builds without restarting
+- **Stash** — in-memory state that survives `/reloadui` and extension reloads
 
 ### Getting the SDK
 

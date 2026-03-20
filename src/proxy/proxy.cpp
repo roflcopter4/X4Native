@@ -22,6 +22,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <mutex>
 
 // ---------------------------------------------------------------------------
 // State (persists across /reloadui because the proxy stays mapped)
@@ -94,6 +96,50 @@ static bool core_modified_since_last_check() {
 }
 #endif // NDEBUG
 
+// ---------------------------------------------------------------------------
+// Stash — in-memory key-value that survives /reloadui and core hot-reload
+// Keyed by namespace (typically extension name) + key.
+// ---------------------------------------------------------------------------
+static std::unordered_map<std::string,
+           std::unordered_map<std::string, std::vector<uint8_t>>> g_stash;
+static std::mutex g_stash_mutex;
+
+static int proxy_stash_set(const char* ns, const char* key,
+                           const void* data, uint32_t size) {
+    if (!ns || !key || (!data && size > 0)) return 0;
+    std::lock_guard lock(g_stash_mutex);
+    auto& entry = g_stash[ns][key];
+    entry.assign(static_cast<const uint8_t*>(data),
+                 static_cast<const uint8_t*>(data) + size);
+    return 1;
+}
+
+static const void* proxy_stash_get(const char* ns, const char* key,
+                                   uint32_t* out_size) {
+    if (!ns || !key) return nullptr;
+    std::lock_guard lock(g_stash_mutex);
+    auto ns_it = g_stash.find(ns);
+    if (ns_it == g_stash.end()) return nullptr;
+    auto it = ns_it->second.find(key);
+    if (it == ns_it->second.end()) return nullptr;
+    if (out_size) *out_size = static_cast<uint32_t>(it->second.size());
+    return it->second.data();
+}
+
+static int proxy_stash_remove(const char* ns, const char* key) {
+    if (!ns || !key) return 0;
+    std::lock_guard lock(g_stash_mutex);
+    auto ns_it = g_stash.find(ns);
+    if (ns_it == g_stash.end()) return 0;
+    return ns_it->second.erase(key) > 0 ? 1 : 0;
+}
+
+static void proxy_stash_clear(const char* ns) {
+    if (!ns) return;
+    std::lock_guard lock(g_stash_mutex);
+    g_stash.erase(ns);
+}
+
 // Forward declarations (defined below with Lua-facing functions)
 static int proxy_raise_lua_event(const char* name, const char* param);
 static int proxy_register_lua_bridge(const char* lua_event, const char* cpp_event);
@@ -157,6 +203,10 @@ static bool load_core() {
     ctx.dispatch  = &g_dispatch;
     ctx.raise_lua_event = proxy_raise_lua_event;
     ctx.register_lua_bridge = proxy_register_lua_bridge;
+    ctx.stash_set    = proxy_stash_set;
+    ctx.stash_get    = proxy_stash_get;
+    ctx.stash_remove = proxy_stash_remove;
+    ctx.stash_clear  = proxy_stash_clear;
 
     if (g_core_init(&ctx) != 0) {
         OutputDebugStringA("X4Native proxy: core_init returned error\n");

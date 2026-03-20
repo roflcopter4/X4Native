@@ -39,6 +39,12 @@ static std::string g_version_string;        // cached for get_version()
 static raise_lua_event_fn g_raise_lua_event = nullptr;  // proxy-provided Lua bridge
 static register_lua_bridge_fn g_register_lua_bridge = nullptr;  // proxy-provided Lua→C++ bridge
 
+// Stash — proxy-owned in-memory key-value, forwarded from CoreInitContext
+static stash_set_fn    g_stash_set    = nullptr;
+static stash_get_fn    g_stash_get    = nullptr;
+static stash_remove_fn g_stash_remove = nullptr;
+static stash_clear_fn  g_stash_clear  = nullptr;
+
 // ---------------------------------------------------------------------------
 // Native frame tick hook — fires on_native_frame_update to extensions
 // ---------------------------------------------------------------------------
@@ -213,8 +219,14 @@ int core_init(CoreInitContext* ctx) {
     // 6. Extension manager
     g_raise_lua_event = ctx->raise_lua_event;
     g_register_lua_bridge = ctx->register_lua_bridge;
+    g_stash_set    = ctx->stash_set;
+    g_stash_get    = ctx->stash_get;
+    g_stash_remove = ctx->stash_remove;
+    g_stash_clear  = ctx->stash_clear;
     x4n::ExtensionManager::init(g_ext_root, g_game_version,
-                                g_raise_lua_event, g_register_lua_bridge);
+                                g_raise_lua_event, g_register_lua_bridge,
+                                g_stash_set, g_stash_get,
+                                g_stash_remove, g_stash_clear);
 
     // 6. Fill the proxy's dispatch table
     ctx->dispatch->discover_extensions   = impl_discover_extensions;

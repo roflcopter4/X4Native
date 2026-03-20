@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <x4native_extension.h>
+#include "x4native_defs.h"
 
 namespace x4n {
 
@@ -67,7 +68,11 @@ class ExtensionManager {
 public:
     static void init(const std::string& ext_root, const std::string& game_version,
                      int (*raise_lua_event)(const char*, const char*) = nullptr,
-                     int (*register_lua_bridge)(const char*, const char*) = nullptr);
+                     int (*register_lua_bridge)(const char*, const char*) = nullptr,
+                     stash_set_fn stash_set = nullptr,
+                     stash_get_fn stash_get = nullptr,
+                     stash_remove_fn stash_remove = nullptr,
+                     stash_clear_fn stash_clear = nullptr);
     static void shutdown();
 
     static void discover();

@@ -91,6 +91,8 @@ if (x4n::game()->SomeNewFunction)
     x4n::game()->SomeNewFunction(id);
 ```
 
+**Stash API:** Stash functions (`stash_set`, `stash_get`, `stash_remove`, `stash_clear`) are part of the `X4NativeAPI` struct. Extensions compiled before stash was added still work — they simply don't use it. Extensions compiled with stash require a runtime that includes the stash function pointers.
+
 ### Function History
 
 `native/version_db/func_history.json` tracks per-function lifecycle:
