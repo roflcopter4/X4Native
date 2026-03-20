@@ -164,6 +164,47 @@ graph LR
 
 ---
 
+## 4b. Universe Hierarchy — Zones and Entity Containment
+
+X4's spatial hierarchy for the game universe:
+
+```
+Galaxy (xu_ep2_universe_macro)
+  └── Cluster (cluster_01, cluster_02, ...)
+        └── Sector (cluster_01_sector001_macro, ...)
+              └── Zone (zone001_cluster_01_sector001_macro, ...)
+                    └── Entity (station, ship, asteroid, ...)
+```
+
+### Static vs Dynamic Zones
+
+**Static zones** are pre-defined in the base game universe data. Each sector contains one or more named zones following the pattern `zone{NNN}_cluster_{NN}_sector{NNN}_macro`. These are referenced in `libraries/god.xml` as spawn locations for factions.
+
+**Tempzones** are created dynamically by the engine when an entity is spawned into a sector at a position with no existing zone. All entity creation APIs (`create_station`, `create_ship`, `create_object` in MD; `SpawnStationAtPos`, `SpawnObjectAtPos2` in C++) auto-create tempzones when given a sector + position.
+
+From `common.xsd` (MD action schema), the `sector=` attribute documentation:
+> "Sector to create the station in using position in the sector space. **Creates a tempzone if a zone does not exist at the coordinates**"
+
+This pattern is consistent across all entity creation actions.
+
+### Zone API Functions
+
+| Function | Signature | Use |
+|----------|-----------|-----|
+| `GetZoneAt` | `(UniverseID sectorid, UIPosRot* uioffset) → UniverseID` | Find zone at a position (0 if none) |
+| `GetPlayerZoneID` | `() → UniverseID` | Current player zone |
+| `IsZone` | `(UniverseID componentid) → bool` | Type check |
+| `GetContextByClass` | `(UniverseID componentid, const char* classname, bool includeself) → UniverseID` | Navigate hierarchy: `GetContextByClass(entity, "zone", false)` |
+
+### Zone Creation Rules
+
+- No explicit `CreateZone` or `SpawnZone` API exists (checked all 2,051 exported functions)
+- Zone creation is exclusively implicit — triggered by entity spawn into a zoneless sector position
+- The `zone=` attribute on spawn actions "takes precedence from sector" — use it to place entities in a specific existing zone
+- Component class IDs: sector=86, zone=107, station=96, ship=115
+
+---
+
 ## 5. AnarkLuaEngine — The Lua Bridge Subsystem
 
 The Anark UI engine is the subsystem responsible for all Lua execution. It sits within the BST and is called each frame as part of the subsystem walk.

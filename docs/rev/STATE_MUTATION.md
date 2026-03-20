@@ -283,6 +283,21 @@ Functions that trigger cascading updates or depend on specific subsystem state. 
 | Sector/zone changes | May trigger subsystem-level recalculation |
 | Save/load triggers | Assumes specific lifecycle state |
 
+### Entity Spawning — Zone Auto-Creation
+
+All entity spawn functions that accept a `sectorid` parameter auto-create a **tempzone** at the target position if no zone exists there. This is confirmed by the `common.xsd` MD action schema documentation:
+
+> `create_station` sector attribute: "Creates a tempzone if a zone does not exist at the coordinates"
+
+This applies to all entity creation paths:
+- C++: `SpawnStationAtPos(macro, sectorid, offset, planid, owner)` → auto-creates tempzone
+- C++: `SpawnObjectAtPos2(macro, sectorid, offset, owner)` → auto-creates tempzone
+- MD: `create_station sector=...`, `create_ship sector=...`, `create_object sector=...` → auto-creates tempzone
+
+When using the `zone=` parameter instead, the entity is placed in the specified existing zone (takes precedence over sector).
+
+`GetZoneAt(sectorid, &offset)` can be used to check whether a zone exists at a given position before spawning.
+
 ---
 
 ## 6. Why No Locking?
