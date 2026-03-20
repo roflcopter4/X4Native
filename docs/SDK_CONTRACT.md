@@ -33,15 +33,24 @@ typedef int (*X4HookCallback)(X4HookContext* ctx);
 
 ### X4NativeAPI Struct
 
+> **Source of truth:** `sdk/x4native_extension.h`. This section is a summary; if it disagrees with the header, the header wins.
+
 ```cpp
 struct X4NativeAPI {
     int api_version;
 
     // Event System
     int  (*subscribe)(const char* event_name,
-                      X4NativeEventCallback callback, void* userdata);
+                      X4NativeEventCallback callback, void* userdata,
+                      void* _api_ptr);
     void (*unsubscribe)(int subscription_id);
     void (*raise_event)(const char* event_name, void* data);
+
+    // Lua Bridge (outbound: C++ -> Lua)
+    int  (*raise_lua_event)(const char* event_name, const char* param);
+
+    // Lua Bridge (inbound: Lua -> C++)
+    int  (*register_lua_bridge)(const char* lua_event, const char* cpp_event);
 
     // Logging (routes to global x4native.log; per-extension routing uses _reserved[4])
     void (*log)(int level, const char* message);
@@ -57,15 +66,22 @@ struct X4NativeAPI {
     int game_func_count;
     int game_types_build;
 
-    // Lua Bridge
-    int  (*raise_lua_event)(const char* event_name, const char* param);
-
     // Hook System (wrapped by x4n::hook)
     int  (*hook_before)(const char* function_name,
-                        X4HookCallback callback, void* userdata);
+                        X4HookCallback callback, void* userdata,
+                        void* _api_ptr);
     int  (*hook_after)(const char* function_name,
-                       X4HookCallback callback, void* userdata);
+                       X4HookCallback callback, void* userdata,
+                       void* _api_ptr);
     void (*unhook)(int hook_id);
+
+    // Internal hook plumbing (used by x4n::hook templates, not for direct use)
+    void* (*_ensure_detour)(const char* function_name, void* detour_fn);
+    void  (*_run_before_hooks)(X4HookContext* ctx);
+    void  (*_run_after_hooks)(X4HookContext* ctx);
+
+    // Internal function resolution (non-exported game functions via RVA database)
+    void* (*resolve_internal)(const char* name);
 
     // Stash — in-memory key-value, survives /reloadui + hot-reload, lost on game exit
     // Wrapped by x4n::stash in the C++ SDK.
@@ -76,11 +92,11 @@ struct X4NativeAPI {
     int         (*stash_remove)(const char* ns, const char* key);
     void        (*stash_clear)(const char* ns);
 
-    void* _reserved[24];  // ABI-compatible expansion
+    void* _reserved[20];  // Framework-managed slots (per-extension context)
 };
 ```
 
-The `_reserved` slots allow adding new function pointers without breaking existing extensions.
+The `_reserved` slots are used internally by the framework for per-extension state (log handles, extension name, priority). See `x4native_extension.h` for the slot layout.
 
 ---
 

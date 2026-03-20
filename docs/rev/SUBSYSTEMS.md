@@ -196,6 +196,21 @@ This pattern is consistent across all entity creation actions.
 | `IsZone` | `(UniverseID componentid) → bool` | Type check |
 | `GetContextByClass` | `(UniverseID componentid, const char* classname, bool includeself) → UniverseID` | Navigate hierarchy: `GetContextByClass(entity, "zone", false)` |
 
+### DLC Cluster Ranges
+
+All DLCs add clusters into the same `xu_ep2_universe_macro` galaxy. Cluster numbering by DLC:
+
+| DLC | Cluster Range | Notes |
+|-----|--------------|-------|
+| Base game | 01–49 | Core sectors (Argon, Paranid, Holy Order, etc.) |
+| Cradle of Humanity (Terran) | 100–115 | Terran, Segaris, Sol system |
+| Split Vendetta | 400–414 | Zyarth, Free Families space |
+| Tides of Avarice (Pirate) | 500–502 | Pirate, Vigor space |
+| Kingdom End (Boron) | 600–609 | Boron space |
+| Timelines | 700–703 | Timeline-specific sectors |
+
+If a host and client have different DLCs installed, sectors from missing DLCs will not exist on the client side. The sector macro names exist but the macro data (from DLC files) is required to instantiate them. `AddCluster`/`AddSector` APIs exist for runtime creation but require the DLC data files to be installed.
+
 ### Zone Creation Rules
 
 - No explicit `CreateZone` or `SpawnZone` API exists (checked all 2,051 exported functions)
@@ -862,8 +877,8 @@ The player slot is the per-player data structure accessed via `qword_143C9FA58 +
 | `GetPlayerZoneID` | `0x14016bb40` | Walks `player_slot[+112]` for class 107 (zone) |
 | `GetPlayerOccupiedShipID` | `0x140abb7b0` | Calls helper to find class 115 (ship) in chain |
 | `GetEnvironmentObject` | `0x140ab2e10` | Returns `player->data[+29496]` (cached room entity) |
-| `GetObjectPositionInSector` | `0x1401691c0` | Requires class 71 on entity; walks `entity[+112]` for class 86 (sector) |
-| `SetObjectSectorPos` | `0x14017f630` | Requires class 71 on entity; walks `entity[+112]` for class 107 (zone) |
+| `GetObjectPositionInSector` | `0x1401691c0` | Inner impl (PE thunk: `0x1401685A0`). Requires class 71; walks `entity[+112]` for class 86 (sector) |
+| `SetObjectSectorPos` | `0x14017f630` | Inner impl (PE thunk: `0x14017e850`). Requires class 71; walks `entity[+112]` for class 107 (zone) |
 | `GetContextByClass` | `0x1401519e0` | Generic parent-chain walk. With `includeSelf=false`: skips entity, starts at `entity[+112]` |
 
 ### 13.5 On-Foot Detection Pattern
@@ -878,7 +893,10 @@ UniverseID avatar = g->GetPlayerObjectID();  // NOT GetPlayerID() — GetPlayerO
 UIPosRot pos = g->GetObjectPositionInSector(avatar);  // returns sector-space coordinates
 
 // Room identification:
-UniverseID room = g->GetEnvironmentObject();  // stable cached field, 0 when not on-foot
+// NOTE: GetEnvironmentObject() returns 0 in all tested scenarios (pilot seat,
+// ship interior, station on-foot). The player->data[+29496] field appears to
+// never be populated in normal gameplay. See STATE_MUTATION.md §11 for details.
+// UniverseID room = g->GetEnvironmentObject();  // unreliable — always returns 0 at runtime
 ```
 
 ### 13.6 Proxy NPC Spawning

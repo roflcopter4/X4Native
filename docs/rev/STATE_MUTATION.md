@@ -122,16 +122,17 @@ void __fastcall AddPlayerMoney_Inner(ComponentSystem* sys, __int64 amount) {
 
 ```c
 // Creates an order for a controllable entity
-int __fastcall CreateOrder3(uint64_t controllable, const char* orderid, bool instant) {
+uint32_t __fastcall CreateOrder3(UniverseID controllableid, const char* orderid,
+                                 bool defaultorder, bool isoverride, bool istemp) {
     // 1. Look up entity via component system (qword_146C6B940)
-    void* entity = lookup_component(controllable);
+    void* entity = lookup_component(controllableid);
     if (!entity) return 0;
 
     // 2. Validate player ownership
     if (!is_player_owned(entity)) return 0;
 
     // 3. Create order object — NO LOCKING
-    void* order = sub_140423EA0(entity, orderid, instant);
+    void* order = sub_140423EA0(entity, orderid, defaultorder, isoverride, istemp);
 
     // 4. Returns 1-based order index
     return get_order_index(order);
@@ -206,8 +207,7 @@ The 1-frame delay for event processing is invisible to the player and matches th
 ```mermaid
 graph TD
     subgraph "Tier 1 — Safe: Property Mutations"
-        T1A["AddPlayerMoney"] 
-        T1B["SetPlayerName"]
+        T1A["AddPlayerMoney"]
         T1C["Property setters"]
     end
 
@@ -248,7 +248,6 @@ Functions that directly modify a value and optionally post an event. No ordering
 | Function | What It Does | Post-Frame Safe |
 |----------|-------------|-----------------|
 | `AddPlayerMoney(amount)` | Modifies money, posts MoneyUpdatedEvent | **Yes** |
-| `SetPlayerName(name)` | Sets player name string | **Yes** |
 | Property setters (general) | Write to entity fields | **Yes** |
 
 ### Tier 2 — Safe: Entity Operations
@@ -257,7 +256,7 @@ Functions that create/modify game objects. Results take effect next frame.
 
 | Function | What It Does | Post-Frame Safe |
 |----------|-------------|-----------------|
-| `CreateOrder3(entity, order, flags)` | Creates AI order for entity | **Yes** (executes next frame) |
+| `CreateOrder3(controllable, order, default, override, temp)` | Creates AI order for entity | **Yes** (executes next frame) |
 | Order manipulation functions | Modify order queue | **Yes** |
 
 ### Tier 3 — Safe With Care: Read-Only Queries
@@ -400,6 +399,19 @@ x4n::on("x4online.sector_found", [](const char* id_str) {
     registry.register_sector(sector_id);
 });
 ```
+
+### Component Macro Name — Lua-Only
+
+There is no `GetComponentMacro` function in the PE exports, FFI cdef, or anywhere in the C++ API surface. To retrieve a component's macro name (e.g. a sector's `cluster_01_sector001_macro`), use the Lua bridge:
+
+```lua
+-- In extension Lua:
+local macro = GetComponentData(component_id, "macro")
+```
+
+`GetComponentData` is a Lua-only variadic function that returns named properties. The `"macro"` key returns the component's macro name string. This is the only way to get macro names from C++ — bridge through Lua via `raise_lua_event`.
+
+Note: `GetComponentName(id)` returns the **display name** (e.g. "Argon Prime"), not the macro name. For macro-based identity (used in sector mapping, gamestart configuration, etc.), `GetComponentData` via Lua is required.
 
 ### Ships in Sector — No Direct API
 
@@ -551,7 +563,7 @@ bool paused = x4n::game()->IsGamePaused();  // safe, exported
 | `CreateOrder3` | `0x1401B9060` | `0x1B9060` | Tier 2 entity operation |
 | `GetObjectPositionInSector` | `0x1401685A0` | `0x1685A0` | Reads pos (m) + angles (**radians**) |
 | `SetObjectSectorPos` | `0x14017e850` | `0x17e850` | Sets pos (m) + angles (**degrees**) |
-| `GetAllFactionShips` | — | `0x14D1D0` | Enumerate ships by faction |
+| `GetAllFactionShips` | `0x14014D1D0` | `0x14D1D0` | Enumerate ships by faction |
 | Event bus post | `0x140953650` | `0x953650` | Event dispatch (no lock) |
 | Component lookup | via `0x146C6B940` | — | Entity resolution (no lock) |
 | `IsGamePaused` (thunk) | `0x140178A50` | `0x178A50` | Exported read-only query |
