@@ -2,6 +2,78 @@
   "schema_version": 1,
   "description": "RVA database for non-exported (internal) X4.exe functions, resolved via base + rva at runtime. Example:  \"FunctionName\": { \"900\": { \"rva\": \"0x12345678\" } }",
   "functions": {
+    "CreateDynamicInterior": {
+      "_find_hints": {
+        "method": "unique_string",
+        "steps": [
+          "1. Search for string 'virtual_navcontext_macro' — it has a unique reference inside this function (lazy static init)",
+          "2. The containing function is CreateDynamicInterior (Controllable::CreateDynamicInterior)",
+          "3. Verify: must have exactly 2 callers (MD action handler + one internal), ~928 instructions, 172 basic blocks",
+          "4. Verify: references strings 'window' (connection tag search) and 'Controllable::CreateDynamicInterior()' (error messages)"
+        ],
+        "verify_strings": ["virtual_navcontext_macro", "Controllable::CreateDynamicInterior()"],
+        "verify_callee": "MacroRegistry_Lookup",
+        "byte_sig": "48 8B C4 4C 89 48 20 4C 89 40 18 48 89 50 10 48 89 48 08 55 53 56 57 41 54 41 55 41 56 41 57 48",
+        "byte_sig_note": "First 32 bytes of prologue: mov rax,rsp + save r9/r8/rdx/rcx to home area + push rbp/rbx/rsi/rdi/r12-r15. Stable across minor patches."
+      },
+      "900-600626": { "rva": "0x004153A0" }
+    },
+    "MacroRegistry_Lookup": {
+      "_find_hints": {
+        "method": "unique_string",
+        "steps": [
+          "1. Search for string 'Cannot find XML file component macro' — referenced in this function's error path",
+          "2. Also references 'Attempting to access macro' for venture extension validation",
+          "3. Verify: uses FNV-1a constants 0x811C9DC5 / 0x1000193 for hashing macro name",
+          "4. Verify: accesses global macro registry (BST root) — heavy callee count (200+)"
+        ],
+        "verify_strings": ["Cannot find XML file component macro '%s' in index '%s'"],
+        "byte_sig_note": "Large function (~0x580 bytes) with FNV-1a hash loop. Prologue varies by version."
+      },
+      "900-600626": { "rva": "0x009E72B0" }
+    },
+    "MD_CreateDynamicInterior_Handler": {
+      "_find_hints": {
+        "method": "caller_chain",
+        "steps": [
+          "1. This function is one of exactly 2 callers of CreateDynamicInterior",
+          "2. It is the larger of the two callers (~0xB49 bytes vs ~0x300 for the other)",
+          "3. Verify: extracts MD parameters via sub_140C7FDD0 (macro), sub_140C7F290 (enum), sub_140C10740 (seed)",
+          "4. Verify: passes 14 arguments to CreateDynamicInterior at a single call site"
+        ],
+        "verify_callee": "CreateDynamicInterior",
+        "byte_sig_note": "MD action handler class. Size ~0xB49. Prologue may vary."
+      },
+      "900-600626": { "rva": "0x00B5DCD0" }
+    },
+    "Component_GetCombinedSeed": {
+      "_find_hints": {
+        "method": "caller_chain",
+        "steps": [
+          "1. Called by MD_VariantPropertyEvaluator for property ID 410 (generationseed)",
+          "2. Extremely small function: just 'mov rax,[rcx+3C0h]; retn' (2 instructions)",
+          "3. Verify: single caller path from the variant property dispatcher"
+        ],
+        "verify_strings": [],
+        "byte_sig_note": "2-instruction function. Prologue: 48 8B 81 C0 03 00 00 C3"
+      },
+      "900-600626": { "rva": "0x00315260" }
+    },
+    "ComponentRegistry_Find": {
+      "_find_hints": {
+        "method": "unique_string",
+        "steps": [
+          "1. This function has 1,901 callers — it is the universal UniverseID to Object* converter",
+          "2. Byte signature is distinctive (mask on the jump offset at bytes 15-18)",
+          "3. Verify: first instruction checks a2 (UniverseID) for null, jumps if zero",
+          "4. Verify: uses a3 as access type bitmask (AND with 0x1FFFFFF)"
+        ],
+        "verify_strings": [],
+        "byte_sig": "48 89 5C 24 08 45 8B D8 4C 8B CA 48 85 D2 0F 84",
+        "byte_sig_note": "First 16 bytes. Bytes 15-18 are a conditional jump offset that may vary. Mask: FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF."
+      },
+      "900-600626": { "rva": "0x000CE6B0" }
+    },
     "X4_FrameTick": {
       "_find_hints": {
         "method": "caller_chain",
@@ -11,11 +83,10 @@
           "3. Verify: must call IsGamePaused_0 (named export) and reference QPC error string below"
         ],
         "verify_callee": "IsGamePaused_0",
-        "verify_string": "Failed to read system high-performance counter!",
+        "verify_strings": ["Failed to read system high-performance counter!"],
         "byte_sig": "48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57",
         "byte_sig_note": "First 16 bytes (register-save prologue: mov [rsp+10h],rbx + push rbp/rsi/rdi/r12-r15). Mask all FF. Stable across minor patches; re-verify on major engine changes."
       },
-      "900": { "rva": "0x00F4A2A0" },
       "900-600626": { "rva": "0x00F4D1D0" }
     }
   }
