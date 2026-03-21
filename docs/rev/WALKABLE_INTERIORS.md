@@ -766,3 +766,92 @@ Offsets within a Room entity (class 82) object, as written by `CreateDynamicInte
 | `+0x3A8` | 936 | std::string | Room name | `0x140416132` (via sub_140097170) |
 | `+0x408` | 1032 | byte | Private flag | `0x1404160F6` |
 | `+0x409` | 1033 | byte | Persistent flag | `0x1404160E5` |
+
+---
+
+## 23. CreateDynamicInterior: Randomness Analysis
+
+Two seed-dependent random selections determine corridor layout:
+
+### Door Selection (`0x140415440`)
+
+Selects which door on the corridor macro connects the room.
+
+```
+if (door == NULL):
+    connections = corridor_macro.connections[+0x458..+0x460]
+    count = (end - begin) / 8
+    if (seed != 0):
+        index = seeded_random(seed, count)    // 0x1414839F0: LCG, deterministic
+    else:
+        index = tls_random(count)             // 0x141483CE0: TLS:792, unpredictable
+    door = connections[index]
+```
+
+### Window Placement (`0x140415D2D`)
+
+Selects which station "window" connection to attach the corridor to.
+
+```
+if (seed != 0):
+    index = seeded_random(seed, window_count)
+else:
+    index = tls_random(window_count)
+place_corridor_at(station_windows[index])
+```
+
+**Critical**: `window_count` depends on the `module` parameter's search scope. Different module = different window count = different modulus = different result even with the same seed.
+
+### seeded_random (`0x1414839F0`)
+
+Same LCG as `autoadvanceseed`:
+```
+next = ROR64(0x5851F42D4C957F2D * seed + 0x14057B7EF767814F, 30)
+seed = next  // mutates in-place
+return next % count
+```
+
+### tls_random (`0x141483CE0`)
+
+Same LCG formula but reads/writes from TLS offset 792. Completely unpredictable between processes.
+
+---
+
+## 24. Room Creation Sources and Parameters
+
+Not all rooms are created by `npc_instantiation.xml`. Different MD scripts use different parameters, which critically affects corridor layout replication.
+
+### Source: npc_instantiation.xml (standard rooms)
+
+Standard rooms use: `seed=station.seed+indexof(type)`, `module=NULL`, `door=NULL`.
+
+| Room Type | Seed | Module | Door | Corridor |
+|-----------|------|--------|------|----------|
+| bar | seed+indexof(bar) | NULL | NULL | get_room_definition(seed) |
+| manager | seed+indexof(manager) | NULL | NULL | get_room_definition(seed) |
+| security | seed+indexof(security) | NULL | NULL | get_room_definition(seed) |
+| infrastructure | seed+indexof(infra) | NULL | NULL | get_room_definition(seed) |
+| casino/gambling | seed raw (no offset) | NULL | NULL | get_room_definition(seed) |
+| crewquarters | seed+indexof(crew) | NULL | NULL | get_room_definition(seed) |
+| prison | seed+indexof(prison) | NULL | NULL | get_room_definition(seed) |
+
+### Source: x4ep1_mentor_subscription.xml (player HQ special rooms)
+
+Special rooms use: `seed=NONE` (TLS random), `module=ResearchModule`, hardcoded corridors.
+
+| Room Type | Seed | Module | Door | Corridor |
+|-----------|------|--------|------|----------|
+| playeroffice | NONE | ResearchModule | NULL | hardcoded `_05` |
+| boron tank | NONE | ResearchModule | explicit `Doors.{1}` | get_room_def(no seed) |
+| embassy | NONE | ResearchModule | NULL | hardcoded `_03` |
+| mentor room | NONE | ResearchModule | explicit `Doors.{1}` | get_room_def(no seed) |
+
+### Source: gamestarts (initial setup rooms)
+
+All types: `seed=NONE`, `module=NULL`, `door=NULL`, corridor via get_room_definition(no seed).
+
+### Key Observations
+
+- **npc_instantiation rooms**: deterministic — `seed + roomtype_index` formula, `module=NULL`, `door=NULL`. Same inputs always produce same corridor layout.
+- **Mentor/DLC rooms**: non-deterministic — use TLS random (`seed=NONE`) and/or explicit module scoping. Cannot be reproduced from room type alone. Require the actual `door` connection and `module` to be known.
+- **Passing `door` explicitly** bypasses both random selection paths entirely (the `door != NULL` branch at `0x14041543B`). This is the only way to guarantee identical corridor placement across different game instances.
