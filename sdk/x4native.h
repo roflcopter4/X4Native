@@ -478,7 +478,9 @@ Ret typed_detour(Args... args) {
 
     if (!ctx.skip_original) {
         auto orig = reinterpret_cast<Ret(*)(Args...)>(state<MPtr>::trampoline);
-        result = orig(args...);
+        result = [&]<size_t... I>(std::index_sequence<I...>) {
+            return orig(*static_cast<std::remove_reference_t<Args>*>(arg_ptrs[I])...);
+        }(std::index_sequence_for<Args...>{});
     }
 
     ctx.result = &result;
@@ -502,7 +504,9 @@ void typed_detour_void(Args... args) {
 
     if (!ctx.skip_original) {
         auto orig = reinterpret_cast<void(*)(Args...)>(state<MPtr>::trampoline);
-        orig(args...);
+        [&]<size_t... I>(std::index_sequence<I...>) {
+            orig(*static_cast<std::remove_reference_t<Args>*>(arg_ptrs[I])...);
+        }(std::index_sequence_for<Args...>{});
     }
 
     ::x4n::detail::g_api->_run_after_hooks(&ctx);
