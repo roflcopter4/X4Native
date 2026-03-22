@@ -634,6 +634,7 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
     api._run_before_hooks    = api_run_before_hooks;
     api._run_after_hooks     = api_run_after_hooks;
     api.resolve_internal     = api_resolve_internal;
+    api.exe_base             = GameAPI::exe_base();
     api.register_lua_bridge  = api_register_lua_bridge;
     api.stash_set            = s_stash_set;
     api.stash_get            = s_stash_get;

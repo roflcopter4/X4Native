@@ -129,6 +129,11 @@ typedef struct X4NativeAPI {
     // accessing high-index fields that may not exist at runtime.
     int game_func_count;
 
+    // X4.exe image base address. Use for resolving global RVAs:
+    //   void* ptr = *(void**)(api->exe_base + MY_RVA);
+    // Populated once at framework startup. Always non-zero after init.
+    uintptr_t exe_base;
+
     // Game build number the types/functions were extracted from (e.g. 900).
     int game_types_build;
 

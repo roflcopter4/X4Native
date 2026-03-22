@@ -42,6 +42,9 @@ public:
     // Returns resolved address or nullptr if not found for this game version.
     static void* get_internal(const char* name);
 
+    // X4.exe image base address (for resolving global RVAs)
+    static uintptr_t exe_base();
+
     // Stats
     static int resolved_count();
     static int total_count();

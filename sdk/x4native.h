@@ -168,6 +168,10 @@ inline const char* version() { return detail::g_api->get_x4native_version(); }
 /// Absolute path to the calling extension's folder
 inline const char* path() { return detail::g_api->extension_path; }
 
+/// X4.exe image base address. Use for resolving global RVAs:
+///   auto ptr = *reinterpret_cast<void**>(x4n::exe_base() + MY_RVA);
+inline uintptr_t exe_base() { return detail::g_api->exe_base; }
+
 // ---------------------------------------------------------------------------
 // Logging — x4n::log::info("format %s", arg), etc.
 //

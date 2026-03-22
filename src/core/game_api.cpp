@@ -123,6 +123,10 @@ void* GameAPI::get_internal(const char* name) {
     return nullptr;
 }
 
+uintptr_t GameAPI::exe_base() {
+    return reinterpret_cast<uintptr_t>(s_x4_module);
+}
+
 void GameAPI::load_internal_db(const std::string& ext_root,
                                const std::string& primary_build,
                                const std::string& fallback_build) {
