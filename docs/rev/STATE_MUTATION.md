@@ -576,6 +576,10 @@ bool paused = x4n::game()->IsGamePaused();  // safe, exported
 | `FireEvent_gameUnpaused` | `0x140AEFC90` | `0xAEFC90` | Fires `"gameUnpaused"` Lua event |
 | Rotation matrix builder | `0x14030D010` | `0x30D010` | sin/cos → 4×4 matrix (internal) |
 | Deg-to-rad constant | `0x142C40EE4` | — | `0x3c8efa35` = π/180 |
+| `GetPositionalOffset` | `0x14016BBB0` | `0x16BBB0` | Room-local position read (class 75, spaceid=0) |
+| `SetPositionalOffset` | `0x140180550` | `0x180550` | Room-local position write (class 75, parent-relative) |
+| `Entity_AttachToParent` | `0x140397C50` | `0x397C50` | Core hierarchy reparent (26 callers, NOT exported) |
+| `ClassName_StringToID` | `0x1402D4130` | `0x2D4130` | Maps class name string to numeric ID |
 
 ---
 
@@ -729,3 +733,84 @@ void tick_walk_update() {
 ### What GetFollowCameraBasePos Actually Is
 
 `GetFollowCameraBasePos` (`0x140155BB0`) is **NOT** the walk position. It reads from the camera controller object at `playerMgr+976`, offset 1824. This is the **external follow camera position offset** used in `menu_followcamera.lua` for adjusting the external camera view. The coordinates are relative to the ship's size, not room-local.
+
+---
+
+## 13. Positional Offset APIs and Entity Hierarchy
+
+> **Research date:** 2026-03
+
+### Entity Hierarchy Model
+
+Every entity has a parent pointer at object offset 14 (byte offset `0x70`). Position is stored as a 4x4 transform relative to the parent. The hierarchy determines coordinate space:
+
+| Context | Parent | Position meaning |
+|---------|--------|-----------------|
+| Inside room (on foot) | Room component (class 82) | Room-local coordinates |
+| In sector (ship/station) | Zone (class 107) | Zone-relative coordinates |
+| Free space | Zone (class 107) | Zone-relative coordinates |
+
+**`Entity_AttachToParent`** at `0x140397C50` is the core reparenting function. It is NOT exported — internal to the engine, called from MD action handlers (26 callers).
+
+```cpp
+// Reconstructed signature (from IDA decompilation):
+// char Entity_AttachToParent(entity*, ?, connection, parent*, slot, transform)
+// Steps:
+//   1. Check attachability via vtable+4960
+//   2. Set positional offset via vtable+5176
+//   3. Execute reparent via vtable+4944
+//   4. Update visibility + attention level
+```
+
+### GetPositionalOffset — Full Signature
+
+**Address:** `0x14016BBB0` (RVA `0x16BBB0`)
+
+```cpp
+UIPosRot GetPositionalOffset(UniverseID positionalid, UniverseID spaceid);
+```
+
+- Entity must be class 75 ("positional")
+- `spaceid == 0`: returns position relative to **direct parent component** (room-local for entities inside rooms)
+- `spaceid != 0`: computes relative transform between entity and that space via `GetRelativeTransform` (`0x14039C3F0`)
+- Returns `UIPosRot` (x, y, z, yaw, pitch, roll) — rotation from Euler decomposition of 4x4 matrix
+
+**Tier 3 — Safe read.** No side effects.
+
+### SetPositionalOffset — Full Signature
+
+**Address:** `0x140180550` (RVA `0x180550`)
+
+```cpp
+void SetPositionalOffset(UniverseID positionalid, UIPosRot offset);
+```
+
+- Entity must be class 75 ("positional")
+- Converts `UIPosRot` to 4x4 transform matrix, calls vtable+5176 (SetTransform)
+- Always operates relative to **current parent** (no `spaceid` parameter — there is only one coordinate space: the parent's)
+- Works for ANY class-75 entity (NPCs, player, objects inside rooms)
+
+**Tier 1 — Safe mutation.** Direct transform write + no event posted.
+
+### SetObjectSectorPos — Sector-Only Constraint
+
+**Address:** `0x14017F630` (inner impl, PE thunk `0x14017E850`)
+
+`SetObjectSectorPos` explicitly calls `SectorRegistry_Find` which checks class 86 (sector). Passing a room ID or any non-sector component as the space parameter will fail with `"Failed to retrieve sector with ID"`. It cannot be used for room-local positioning.
+
+**Use `SetPositionalOffset` instead** for positioning entities inside rooms (e.g., NPC proxies walking inside station interiors).
+
+### API Comparison
+
+| API | Coordinate space | Entity class required | Use case |
+|-----|-----------------|----------------------|----------|
+| `GetObjectPositionInSector` | Sector-relative | Class 71 (object) | Ship/station world position |
+| `SetObjectSectorPos` | Sector-relative | Class 71 (object) | Move ship/station in sector |
+| `GetPositionalOffset(id, 0)` | Parent-relative | Class 75 (positional) | Room-local walk position |
+| `SetPositionalOffset(id, pos)` | Parent-relative | Class 75 (positional) | Set position inside room |
+
+### ClassName_StringToID
+
+**Address:** `0x1402D4130`
+
+Maps class name strings (e.g., `"positional"`, `"sector"`, `"room"`) to numeric IDs at runtime. Lookup table at `0x1438D2568` (BSS, populated at startup). This is the same function referenced in SUBSYSTEMS.md Section 13.1. The complete class ID table is in SUBSYSTEMS.md Section 13.2.

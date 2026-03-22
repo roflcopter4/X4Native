@@ -711,6 +711,13 @@ flowchart TD
 | `GameUniverse_CreateNavContext` | `0x140471BE0` | -- | Create navigation context entity |
 | `GameUniverse_CreateRoom` | `0x140467790` | -- | Create room entity in universe |
 | `GetRelativeTransform` | `0x14039C3F0` | -- | Compute relative 4x4 transform between entities |
+| `AddActorToRoomAction_execute` | `0x140BA1620` | 0xBA1620 | MD action handler for `add_actor_to_room` |
+| `AddActorToRoom_RoomSlot` | `0x140686B70` | 0x686B70 | NPC room placement (26 callers, slot-based path) |
+| `AddActorToRoom_Controllable_NPC` | `0x140686520` | 0x686520 | NPC → controllable placement path |
+| `AddActorToRoom_Controllable_NonNPC` | `0x14051C110` | 0x51C110 | Non-NPC → controllable (player character path) |
+| `AddActorToRoom_DockPosition_NPC` | `0x140686950` | 0x686950 | NPC → dock position placement path |
+| `Entity_AttachToParent` | `0x140397C50` | 0x397C50 | Core hierarchy reparent function (26 callers, NOT exported) |
+| `SetPositionalOffset` | `0x140180550` | 0x180550 | Set entity position relative to parent (class 75 required) |
 
 ---
 
@@ -855,3 +862,53 @@ All types: `seed=NONE`, `module=NULL`, `door=NULL`, corridor via get_room_defini
 - **npc_instantiation rooms**: deterministic — `seed + roomtype_index` formula, `module=NULL`, `door=NULL`. Same inputs always produce same corridor layout.
 - **Mentor/DLC rooms**: non-deterministic — use TLS random (`seed=NONE`) and/or explicit module scoping. Cannot be reproduced from room type alone. Require the actual `door` connection and `module` to be known.
 - **Passing `door` explicitly** bypasses both random selection paths entirely (the `door != NULL` branch at `0x14041543B`). This is the only way to guarantee identical corridor placement across different game instances.
+
+---
+
+## 25. add_actor_to_room (MD Action)
+
+### Overview
+
+`add_actor_to_room` is an MD-only action -- there is NO C++ export. The C++ implementation is `AddActorToRoomAction::execute()` at `0x140BA1620`.
+
+**RTTI:** `AddActorToRoomAction@Scripts`
+
+### Dispatch Paths
+
+The execute function dispatches to 4 internal functions based on the class of the actor and target:
+
+| Path | Actor class | Target class | Internal function | Address |
+|------|------------|-------------|-------------------|---------|
+| A (slot-based) | NPC (70) | Room/slot | `AddActorToRoom_RoomSlot` | `0x140686B70` |
+| B1 | NPC (70) | Controllable (110) | `AddActorToRoom_Controllable_NPC` | `0x140686520` |
+| B2 | Non-NPC | Controllable (110) | `AddActorToRoom_Controllable_NonNPC` | `0x14051C110` |
+| B3 | NPC (70) | Dock position (class not specified) | `AddActorToRoom_DockPosition_NPC` | `0x140686950` |
+
+**Path B2** (`0x14051C110`) is the player character path -- used when the actor is not an NPC (e.g., the player entity).
+
+### AddActorToRoom_RoomSlot (Path A)
+
+**Address:** `0x140686B70` — Central NPC room placement function (26 callers including `CreateNPCFromPerson`).
+
+This is the most commonly invoked path. When an NPC is placed into a specific room/slot:
+
+1. Creates a `U::CrossConnectionMovementController` for animated transitions
+2. Calls `Entity_AttachToParent` (`0x140397C50`) for scene graph attachment
+3. Sets up NPC animation and attention level
+4. The NPC becomes a child of the room component in the entity hierarchy
+
+### Usage from MD
+
+```xml
+<add_actor_to_room actor="$npc" room="$room" />
+<add_actor_to_room actor="$npc" object="$station" />
+```
+
+When `room=` is specified, Path A (slot-based) is used. When `object=` is specified with a controllable, Path B1 or B2 is used depending on the actor's class.
+
+### Implications
+
+- No C++ API exists for placing actors into rooms -- must use MD cues
+- `Entity_AttachToParent` is the underlying mechanism that reparents the actor entity to the room component
+- After placement, the actor's position (from `GetPositionalOffset(actorId, 0)`) is relative to the room
+- `SetPositionalOffset` can then be used to move the actor within the room

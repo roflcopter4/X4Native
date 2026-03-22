@@ -482,6 +482,8 @@ This is the same system used by all exported functions that take entity/componen
 | IsNewGame sentinel | `0x143C97650` | — | Global: 0 = new game, non-zero = save ID |
 | U::NewGameAction RTTI | `0x1431c50b8` | — | RTTI for the new-game action object |
 | nosave string | `0x142b37f68` | — | Literal "nosave" parsed by GameStartDB::Import |
+| Entity_AttachToParent | `0x140397C50` | `0x397C50` | Core hierarchy reparent (26 callers, NOT exported) |
+| ClassName_StringToID | `0x1402D4130` | `0x2D4130` | Maps class name string to numeric ID; BST at `0x1438D2568` |
 
 ---
 
@@ -752,7 +754,30 @@ X4's entity component system uses a virtual function at two vtable offsets for h
 | `+4528` (index 566) | Lookup on registered entity (from ID registry) | Exact / self-class check |
 | `+4536` (index 567) | Walk on physics sub-object `entity[+112]` | Parent-chain class check |
 
-Both return `bool` (non-zero = is member of that class). The class system uses numeric IDs resolved from string names via a sorted BST table (`sub_1402D4130` @ `0x1402D4130`).
+Both return `bool` (non-zero = is member of that class). The class system uses numeric IDs resolved from string names via a sorted BST table.
+
+**`ClassName_StringToID`** at `0x1402D4130` — maps class name strings to numeric IDs at runtime. Lookup table at `0x1438D2568` (BSS, populated at startup). Returns 119 (sentinel) when the input string is not found.
+
+### 13.1b Entity Hierarchy and Scene Graph
+
+Every entity has a parent pointer at object offset 14 (byte offset `0x70`). Position is stored as a 4x4 transform relative to the parent.
+
+```
+Galaxy
+  +-- Cluster
+        +-- Sector (class 86)
+              +-- Zone (class 107) — parent for ships/stations
+                    +-- Station (class 96)
+                          +-- WalkableModule (class 118)
+                                +-- Room (class 82) — parent for on-foot entities
+                                      +-- Actor/NPC (class 70/75)
+```
+
+**`Entity_AttachToParent`** at `0x140397C50`:
+- Core hierarchy reparenting function — NOT exported, internal to engine
+- 26 callers including `CreateNPCFromPerson`, `AddActorToRoom_RoomSlot`, MD action handlers
+- Reconstructed signature: `char Entity_AttachToParent(entity*, ?, connection, parent*, slot, transform)`
+- Steps: check attachability (vtable+4960) -> set positional offset (vtable+5176) -> execute reparent (vtable+4944) -> update visibility + attention level
 
 ### 13.2 Complete Class ID Table
 

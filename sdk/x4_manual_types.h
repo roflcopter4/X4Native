@@ -63,6 +63,26 @@ typedef enum X4RoomType {
     X4_ROOMTYPE_NONE              = 21,
 } X4RoomType;
 
+// ---- Engine class IDs (runtime numeric IDs) ----
+// Resolved at runtime by ClassName_StringToID @ 0x1402D4130, lookup table at 0x1438D2568.
+// Source: GetComponentClassMatrix() runtime dump + decompilation of vtable class checks.
+// Full table (119 entries) in docs/rev/SUBSYSTEMS.md Section 13.2.
+// IDs 0-107 are concrete/leaf classes. IDs 108-118 are abstract hierarchy classes.
+// ID 119 is NOT a class — it is the out-of-range sentinel returned on lookup failure.
+// Verified: v9.00 (runtime dump)
+#define X4_CLASS_NPC              70   /* On-foot NPC character */
+#define X4_CLASS_OBJECT           71   /* Base class for all placed 3D entities */
+#define X4_CLASS_POSITIONAL       75   /* Positional entity (required by Get/SetPositionalOffset) */
+#define X4_CLASS_ROOM             82   /* Walkable interior room */
+#define X4_CLASS_SECTOR           86   /* Sector (checked by SetObjectSectorPos) */
+#define X4_CLASS_STATION          96   /* Station entity */
+#define X4_CLASS_ZONE            107   /* Physics zone / movable space subdivision */
+#define X4_CLASS_CONTAINER       109   /* Abstract: stations and ships that contain entities */
+#define X4_CLASS_CONTROLLABLE    110   /* Abstract: entities that accept orders / can be piloted */
+#define X4_CLASS_SHIP            115   /* Abstract ship class */
+#define X4_CLASS_WALKABLE_MODULE 118   /* Abstract: station modules with walkable interiors */
+#define X4_CLASS_SENTINEL        119   /* NOT a class — BST resolver returns this when name not found */
+
 // ---- Room property offsets within Room entity (class 82) ----
 // WARNING: These are raw struct offsets — fragile across builds. Any field
 // added/removed/reordered in the Room class will shift these. Re-verify on
