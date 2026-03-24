@@ -454,6 +454,43 @@ Total size: ~736 bytes. Allocated once at engine startup, never freed during gam
 
 The game fires several high-level lifecycle events during save loading. Their ordering matters for extensions that need to initialize state based on the loaded world.
 
+### Save/NewGame Entry Point: `GameStartOrLoad` at `0x140A68C80`
+
+Two distinct paths:
+
+**NewGame Path:**
+1. `GameInit_LoadUniverse` (`0x1409A6540`) -- creates galaxy, clusters, sectors
+2. Create sectors from gamestart cluster list
+3. `sub_140905EC0` -- create player entity from gamestart definition
+4. `sub_140A73470` -- additional gamestart setup
+5. `FireGameStartedEvent` (`0x1409A7510`) -- dispatches `U::GameStartedEvent`
+6. `sub_140954970` -- signals MD with event ID 197 (`0xC5`)
+7. `sub_1406CBB10` -- final setup
+
+**SavedGame Path:**
+1. `SaveLoader_MultiPass` (`0x1409A77B0`) -- loads entire save (2,152 instructions, synchronous)
+2. `sub_1409A4840` -- post-load processing, flushes event queue
+3. `sub_140954970` -- signals MD with event ID 197 (`0xC5`)
+4. `sub_1406CBB10` -- final setup
+
+Note: For saved games, `FireGameStartedEvent` is NOT called from the parent. `GameLoadedEvent` is fired inside `SaveLoader_MultiPass`.
+
+### Save Loader Phases (`SaveLoader_MultiPass`)
+
+| Pass | Phase | Description |
+|------|-------|-------------|
+| 1 | Parse | Initial save file parsing and validation |
+| 2 | init2 | Component initialization |
+| 3 | scripts | Import script references |
+| 4 | scripts2 | Import script data |
+| 5 | economylog | Economy data |
+| 6 | map2 | Map data |
+| 7 | scripts3 | Final script pass |
+| 8 | **GameLoadedEvent** | Event dispatch at `0x1409A98CB` (89% through). Queued via `EventDispatch_PriorityQueue` with `a4=0` (NOT immediate). |
+| 9 | Version/Signature | Save version checks, pre-release warnings |
+| 10 | Player Setup | `GetPlayerEnvironmentOrFallback`, player iteration |
+| 11 | Finalization | Online manager notification, event cleanup |
+
 ### `event_game_loaded` vs `event_game_started`
 
 | Event | When | Lua State | World Ready |
