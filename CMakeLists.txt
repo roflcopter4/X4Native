@@ -48,17 +48,9 @@ endif()
 # ---------------------------------------------------------------------------
 # Install rules — these define WHAT gets deployed
 # ---------------------------------------------------------------------------
-# Extension manifest
-install(FILES extension/content.xml extension/ui.xml DESTINATION .)
-
-# Lua bootstrap
-install(FILES extension/ui/x4native.lua DESTINATION ui)
-
-# MD scripts
-install(FILES extension/md/x4native_main.xml DESTINATION md)
-
-# Translations
-install(FILES extension/t/0001-L044.xml DESTINATION t)
+# Extension folder — deploy everything except settings (user-editable)
+install(DIRECTORY extension/ DESTINATION .
+    PATTERN "x4native_settings.json" EXCLUDE)
 
 # Framework settings — only deploy if not already present (preserves user edits)
 install(CODE "
