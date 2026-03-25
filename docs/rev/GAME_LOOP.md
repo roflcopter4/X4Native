@@ -390,6 +390,8 @@ classDiagram
 | `0x143139400` | `void*` | Subsystem BST Root | Root of the subsystem update tree |
 | `0x1431393E0` | `void*` | Subsystem BST Sentinel | End/sentinel node |
 | `0x146AD72F4` | `uint32_t[4]` | Auto-Event Hashes | Hash values for the 4 protected events |
+| `0x143C9FA6A` | `byte` | Universe Generated Flag | Set to 1 by `NotifyUniverseGenerated`, reset to 0 before GodEngine runs |
+| `0x143C9F850` | `qword` | Save Loader Context | Non-null during save load, null for new game |
 
 ---
 
@@ -416,6 +418,16 @@ Quick reference for all identified functions.
 | `HashInit_onActivate` | `0x140091C50` | `0x91C50` | — | Computes and stores hash |
 | `HashInit_onDeactivate` | `0x140091C90` | `0x91C90` | — | Computes and stores hash |
 | `HashInit_onUpdate` | `0x140091CD0` | `0x91CD0` | — | Computes and stores hash |
+| `GameStartOrLoad` | `0x140A68C80` | `0xA68C80` | — | Master new game / save load entry point |
+| `PostLoadProcessing` | `0x1409A4840` | `0x9A4840` | 0x151 | GodEngine + event flush + JobEngine init |
+| `NotifyUniverseGenerated` | `0x1409A49A0` | `0x9A49A0` | 0x74D | Sets universe_generated_flag, dispatches UniverseGeneratedEvent |
+| `GodEngine_Init` | `0x14059A200` | `0x59A200` | 0x1925 | Populates universe (NPCs, ships, stations) |
+| `JobEngine_Init` | `0x140EB3800` | `0xEB3800` | 0x34F | Initializes job spawning system |
+| `SignalMDEvent` | `0x140954970` | `0x954970` | ~0x80 | Signals MD cue system with event ID |
+| `FinalPlayerSetup` | `0x1406CBB10` | `0x6CBB10` | ~0x2B0 | Sets up player zone/sector context |
+| `SetUIMode` | `0x140AEE0B0` | `0xAEE0B0` | 0x111 | Transitions UI mode (loading/game/startmenu) |
+| `CUIController_Init` | `0x140AEC7D0` | `0xAEC7D0` | ~0x330 | Full UI controller initialization |
+| `HelperModule_InitializeUI` | `0x140A69B10` | `0xA69B10` | 0x5C9 | Initializes Lua UI system |
 
 ---
 
@@ -462,18 +474,28 @@ Two distinct paths:
 1. `GameInit_LoadUniverse` (`0x1409A6540`) -- creates galaxy, clusters, sectors
 2. Create sectors from gamestart cluster list
 3. `sub_140905EC0` -- create player entity from gamestart definition
-4. `sub_140A73470` -- additional gamestart setup
-5. `FireGameStartedEvent` (`0x1409A7510`) -- dispatches `U::GameStartedEvent`
-6. `sub_140954970` -- signals MD with event ID 197 (`0xC5`)
-7. `sub_1406CBB10` -- final setup
+4. `PostLoadProcessing` (`0x1409A4840`) -- runs GodEngine, flushes events
+   - `GodEngine_Init` (`0x14059A200`) -- populates universe with NPCs/ships/stations
+   - Event flush loop until `byte_143C9FA6A == 1`
+   - `NotifyUniverseGenerated` (`0x1409A49A0`) -- sets flag, dispatches `U::UniverseGeneratedEvent` (MD: `event_universe_generated`)
+   - `JobEngine_Init` (`0x140EB3800`) -- initializes job spawning
+5. `sub_140A73470` -- additional gamestart setup
+6. `FireGameStartedEvent` (`0x1409A7510`) -- dispatches `U::GameStartedEvent` (MD: `event_game_started`) **NEW GAME ONLY**
+7. `SignalMDEvent` (`0x140954970`) -- signals MD with event ID 197 (`0xC5`)
+8. `FinalPlayerSetup` (`0x1406CBB10`) -- sets up player zone/sector context
 
 **SavedGame Path:**
 1. `SaveLoader_MultiPass` (`0x1409A77B0`) -- loads entire save (2,152 instructions, synchronous)
-2. `sub_1409A4840` -- post-load processing, flushes event queue
-3. `sub_140954970` -- signals MD with event ID 197 (`0xC5`)
-4. `sub_1406CBB10` -- final setup
+   - Pass 8: `GameLoadedEvent` dispatched (MD: `event_game_loaded`)
+2. `PostLoadProcessing` (`0x1409A4840`) -- runs GodEngine, flushes events
+   - `GodEngine_Init` (`0x14059A200`) -- repopulates universe
+   - Event flush loop until `byte_143C9FA6A == 1`
+   - `NotifyUniverseGenerated` (`0x1409A49A0`) -- sets flag, dispatches `U::UniverseGeneratedEvent` (MD: `event_universe_generated`)
+   - `JobEngine_Init` (`0x140EB3800`) -- initializes job spawning
+3. `SignalMDEvent` (`0x140954970`) -- signals MD with event ID 197 (`0xC5`)
+4. `FinalPlayerSetup` (`0x1406CBB10`) -- sets up player zone/sector context
 
-Note: For saved games, `FireGameStartedEvent` is NOT called from the parent. `GameLoadedEvent` is fired inside `SaveLoader_MultiPass`.
+Note: For saved games, `FireGameStartedEvent` is NOT called. `GameLoadedEvent` is fired inside `SaveLoader_MultiPass` at pass 8. `UniverseGeneratedEvent` fires for BOTH paths via `NotifyUniverseGenerated`.
 
 ### Save Loader Phases (`SaveLoader_MultiPass`)
 
@@ -491,22 +513,32 @@ Note: For saved games, `FireGameStartedEvent` is NOT called from the parent. `Ga
 | 10 | Player Setup | `GetPlayerEnvironmentOrFallback`, player iteration |
 | 11 | Finalization | Online manager notification, event cleanup |
 
-### `event_game_loaded` vs `event_game_started`
+### Lifecycle Events: `event_game_loaded` vs `event_universe_generated` vs `event_game_started`
 
-| Event | When | Lua State | World Ready |
+| Event | When | Fires For | World Ready |
 |-------|------|-----------|-------------|
-| `event_game_loaded` | Save data loaded, game world initializing | Valid | **Partially** -- entity IDs valid, but not all MD cues have fired. `set_known` cues (from gamestarts) have NOT yet run. |
-| `event_game_started` | Game world fully initialized, all gamestart MD cues complete | Valid | **Yes** -- all `set_known` flags propagated, sector discovery complete. |
+| `event_game_loaded` | Save data loaded (~89% through SaveLoader_MultiPass) | Save load only | **Partially** -- entity IDs valid, but GodEngine has NOT yet populated the universe. |
+| `event_universe_generated` | Universe fully populated (all stations built, all NPCs spawned) | **Both** new game and save load | **Yes** -- GodEngine complete, all sectors initialized, player entity valid. |
+| `event_game_started` | After universe generated + additional gamestart setup | **New game only** | **Yes** -- all gamestart MD cues complete. |
 
-**Key ordering:** `event_game_loaded` fires **BEFORE** `event_game_started`. MD cues that listen to `event_game_started` (e.g., gamestart setup cues that mark sectors as "known") run after `event_game_loaded` callbacks have already executed.
+**Key ordering (new game):** `event_game_loaded` (N/A) -> `event_universe_generated` -> `event_game_started`
+**Key ordering (save load):** `event_game_loaded` -> `event_universe_generated` -> (`event_game_started` does NOT fire)
 
-**Practical impact:** Code that runs on `on_game_loaded` and queries world state influenced by gamestart MD cues (e.g., `GetClusters(false)` which depends on "known" flags) may see stale results. The "known" flags are set by MD cues triggered by `event_game_started`, which fires later. Use `on_game_started` when you need fully-initialized world state including gamestart effects.
+**Practical impact:** `event_game_started` is unreliable for save loads -- it only fires for new games. The correct "world fully ready" signal is **`event_universe_generated`**, which fires for both paths.
+
+**XSD documentation confirms:**
+> `event_universe_generated`: Event for when the universe generation process has been completed (all stations have been built) at game start or when loading a savegame.
+
+**C++ origin:** `NotifyUniverseGenerated` (`0x1409A49A0`) sets the `byte_143C9FA6A` flag and dispatches `U::UniverseGeneratedEvent` via `EventDispatch_PriorityQueue`. This function is called from `PostLoadProcessing` (`0x1409A4840`) after the GodEngine finishes populating the universe.
 
 **X4Native SDK events:**
-- `on_game_loaded` — fires on `event_game_loaded`. Entity IDs valid, but gamestart MD cues have NOT yet run.
-- `on_game_started` — fires on `event_game_started`. World fully initialized, all gamestart MD cues complete.
+- `on_game_loaded` -- fires on `event_game_loaded`. Entity IDs valid, but universe NOT fully populated.
+- `on_game_started` -- fires on `event_game_started`. Gamestart MD cues complete. **New game only** -- does NOT fire for save loads.
+- `on_universe_ready` -- fires on `event_universe_generated`. Universe fully generated, all stations built, player entity valid. Fires for **both** new game and save load. This is the definitive "world ready" signal.
 
-> **Confirmed:** 2026-03-24 via topology discovery bug. Client `TopologyManager` started on `on_game_loaded` but depended on `X4Online_ClientGamestartSetup` MD cue (fires on `event_game_started`) having already marked sectors as "known." Fix: `on_game_started` now available in X4Native SDK.
+> **Updated:** 2026-03-25 via IDA decompilation of `GameStartOrLoad` (`0x140A68C80`), `PostLoadProcessing` (`0x1409A4840`), and `NotifyUniverseGenerated` (`0x1409A49A0`). Added `on_universe_ready` event backed by `event_universe_generated`. See `.claude/reports/save_load_completion_research.md` for full analysis.
+>
+> **Previously confirmed:** 2026-03-24 via topology discovery bug. Client `TopologyManager` started on `on_game_loaded` but depended on `X4Online_ClientGamestartSetup` MD cue having already marked sectors as "known."
 
 ---
 

@@ -6,6 +6,9 @@
 --   Stage 1 (game start):    DLL loads immediately, extensions register via x4native_init()
 --   Stage 2a (save loaded):  MD cue fires raise_lua_event → Lua forwards "on_game_loaded"
 --   Stage 2b (world ready):  MD cue fires raise_lua_event → Lua forwards "on_game_started"
+--                             NOTE: event_game_started only fires for NEW GAME, not save loads
+--   Stage 2c (universe gen):  MD cue fires raise_lua_event → Lua forwards "on_universe_ready"
+--                             event_universe_generated fires for BOTH new game and save loads
 --   Stage 3 (runtime):       MD signals game_saved; per-frame via SetScript("onUpdate")
 --
 -- DLL lifecycle (two-DLL architecture):
@@ -18,9 +21,10 @@
 --   Result: new native code running without restarting X4.
 --
 -- Event wiring:
---   MD → raise_lua_event("x4native.game_loaded")  → RegisterEvent → DLL raise_event("on_game_loaded")
---   MD → raise_lua_event("x4native.game_started") → RegisterEvent → DLL raise_event("on_game_started")
---   MD → raise_lua_event("x4native.game_saved")   → RegisterEvent → DLL raise_event("on_game_save")
+--   MD → raise_lua_event("x4native.game_loaded")    → RegisterEvent → DLL raise_event("on_game_loaded")
+--   MD → raise_lua_event("x4native.game_started")   → RegisterEvent → DLL raise_event("on_game_started")
+--   MD → raise_lua_event("x4native.universe_ready")  → RegisterEvent → DLL raise_event("on_universe_ready")
+--   MD → raise_lua_event("x4native.game_saved")     → RegisterEvent → DLL raise_event("on_game_save")
 --   Per-frame → SetScript("onUpdate") → DLL raise_event("on_frame_update")
 --   UI reload → Lua file re-executes, DLL receives on_ui_reload + fresh lua_State*
 
@@ -100,9 +104,10 @@ load_dll()
 -- raise_lua_event("x4native.game_loaded").
 -- After this, extensions can safely call game functions.
 -- ============================================================
-bridge_forward_lua_event("x4native.game_loaded",  "on_game_loaded")
-bridge_forward_lua_event("x4native.game_started", "on_game_started")
-bridge_forward_lua_event("x4native.game_saved",   "on_game_save")
+bridge_forward_lua_event("x4native.game_loaded",    "on_game_loaded")
+bridge_forward_lua_event("x4native.game_started",   "on_game_started")
+bridge_forward_lua_event("x4native.universe_ready",  "on_universe_ready")
+bridge_forward_lua_event("x4native.game_saved",     "on_game_save")
 
 -- Round-trip echo: C++ sends ping via raise_lua_event, Lua forwards back to C++
 bridge_forward_lua_event("x4native_event_test.ping", "on_event_test_pong")
@@ -127,6 +132,14 @@ if x4native_api then
     --   2. Game just started, no save yet → poll via onUpdate until it becomes true
     --   3. MD cue fires first → guard prevents double-fire
     local game_loaded_fired = false
+    local universe_ready_fired = false
+
+    local function fire_universe_ready(source)
+        if universe_ready_fired then return end
+        universe_ready_fired = true
+        x4native_api.log(1, "on_universe_ready triggered via " .. source)
+        x4native_api.raise_event("on_universe_ready")
+    end
 
     local function fire_game_loaded(source)
         if game_loaded_fired then return end
@@ -157,6 +170,21 @@ if x4native_api then
         if ok_p and pid and tonumber(pid) ~= 0 then
             fire_game_loaded(string.format("poll frame %d (pid=%s)", poll_count, tostring(pid)))
         end
+    end
+
+    -- Override the bridge handler for universe_ready to use the guard.
+    -- event_universe_generated fires for BOTH new game and save loads.
+    -- This is the definitive "world ready" signal (all stations built).
+    local orig_universe_handler = forwarded_events["x4native.universe_ready"]
+    if orig_universe_handler then
+        UnregisterEvent("x4native.universe_ready", orig_universe_handler)
+        local guarded_universe_handler = function(_, arg)
+            if x4native_api then
+                fire_universe_ready("MD cue (event_universe_generated)")
+            end
+        end
+        RegisterEvent("x4native.universe_ready", guarded_universe_handler)
+        forwarded_events["x4native.universe_ready"] = guarded_universe_handler
     end
 
     -- Per-frame handler: fires on_frame_update and handles game_loaded polling

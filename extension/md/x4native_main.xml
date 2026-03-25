@@ -17,8 +17,7 @@
     </cue>
 
     <!-- Stage 2b: Signal Lua when game world is fully initialized (all gamestart MD cues complete).
-         Fires AFTER event_game_loaded. Safe to query world state including set_known flags,
-         sector discovery, faction setup, etc. -->
+         NOTE: event_game_started only fires for NEW GAME, not save loads. -->
     <cue name="x4native_GameStarted" instantiate="true">
       <conditions>
         <event_game_started />
@@ -26,6 +25,22 @@
       <actions>
         <debug_text text="'X4Native: MD signalling game_started to Lua'" filter="general"/>
         <raise_lua_event name="'x4native.game_started'" />
+      </actions>
+    </cue>
+
+    <!-- Stage 2c: Signal Lua when universe generation is complete (all stations built).
+         Fires for BOTH new game and save loads. This is the definitive "world ready" signal.
+         XSD: "Event for when the universe generation process has been completed
+         (all stations have been built) at game start or when loading a savegame."
+         IDA: NotifyUniverseGenerated (0x1409A49A0) dispatches U::UniverseGeneratedEvent
+         after GodEngine completes. -->
+    <cue name="x4native_UniverseReady" instantiate="true">
+      <conditions>
+        <event_universe_generated />
+      </conditions>
+      <actions>
+        <debug_text text="'X4Native: MD signalling universe_ready to Lua'" filter="general"/>
+        <raise_lua_event name="'x4native.universe_ready'" />
       </actions>
     </cue>
 
