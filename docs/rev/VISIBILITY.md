@@ -1,6 +1,6 @@
 # X4 Visibility, Fog of War, and Radar Coverage Systems
 
-> **Binary:** X4.exe v9.00 (build 600626) | **Date:** 2026-03-25
+> **Binary:** X4.exe v9.00 (builds 600626, 602526) | **Date:** 2026-03-26
 >
 > All addresses are absolute (imagebase `0x140000000`). Subtract imagebase to get RVA.
 >
@@ -168,7 +168,7 @@ Diplomacy events can grant gravidar access to the player:
 
 When the player has gravidar access to an NPC object (e.g., via a trade deal or diplomacy), the player can see through that object's gravidar. This is used in `diplomacy.xml` when visiting foreign stations.
 
-### 2.6 `isinliveview` and `cansee` Properties
+### 2.6 `isinliveview` and `cansee` Properties (IDA-Confirmed)
 
 | Property | Meaning |
 |----------|---------|
@@ -176,6 +176,41 @@ When the player has gravidar access to an NPC object (e.g., via a trade deal or 
 | `$object.isinliveview` | True if the object is visible on the player's gravidar or by any player-owned object |
 
 `isinliveview` is the high-level "is this entity currently detected by any player asset" check. It is more comprehensive than the simple `isradarvisible` byte because it accounts for gravidar access grants and player-owned assets.
+
+#### IDA-Confirmed Internals (2026-03-26)
+
+**Handler:** GetComponentData hash `0x32EDC1D9173B5D59` at `0x14023FDE6`. Requires type 71 (Object).
+Calls `IsInLiveView` @ `0x140695B50`, returns boolean.
+
+**`IsInLiveView` is NOT a byte read.** It is a three-branch priority evaluation:
+
+```
+IsInLiveView(component) @ 0x140695B50
+===========================================
+
+Branch 1: IsPlayerOwnedOrTracked(component)?  --> return TRUE
+  |  Checks: owner == player faction
+  |          OR is player's current ship (type 115)
+  |          OR GlobalTrackTable_Lookup finds it (binary tree @ context+28544)
+  |
+Branch 2: vtable+0x1758(component)?  --> return component+968 byte
+  |  (likely "is in same zone as player" spatial check)
+  |  Reads stored byte at offset +0x3C8
+  |
+Branch 3: GetActiveMonitor() non-null?  --> return component+969 byte
+  |  (remote observation/camera system active)
+  |  Reads stored byte at offset +0x3C9
+  |
+Default: return FALSE
+```
+
+**Key offsets:**
+| Offset | Type | Meaning |
+|--------|------|---------|
+| +968 (`0x3C8`) | `BYTE` | Local gravidar visibility (set when entity scanned in player's zone) |
+| +969 (`0x3C9`) | `BYTE` | Remote monitor visibility (set when entity visible via remote observation) |
+
+**Implication:** Cannot replicate `isinliveview` by copying a byte. It is a computed property requiring player ownership state, zone proximity, and tracking table lookups. For replication, evaluate on host and transmit the boolean result.
 
 ---
 
@@ -840,6 +875,7 @@ Reading +1024 therefore tells you "has this entity ever been radar-scanned", not
 currently in radar range." For current-range detection, the holomap rendering system uses live
 gravidar proximity checks internally. There is no public API to query "is entity currently in
 gravidar range of any player asset" from C++. MD scripts can use `$object.isinliveview` for this.
+The C++ implementation is `IsInLiveView` @ `0x140695B50` — see Section 2.6 for the three-branch algorithm.
 
 ### 16.3 Station Ownership and Visibility
 

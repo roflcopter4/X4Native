@@ -12,6 +12,8 @@ native/*.pdb
 pkg/
 
 .github/copilot/**
+.claude/**
 
 # Game reference files (large, machine-specific, not for repo)
 reference/game/
+reference/game_600626/
