@@ -205,12 +205,31 @@ Default: return FALSE
 ```
 
 **Key offsets:**
-| Offset | Type | Meaning |
-|--------|------|---------|
-| +968 (`0x3C8`) | `BYTE` | Local gravidar visibility (set when entity scanned in player's zone) |
-| +969 (`0x3C9`) | `BYTE` | Remote monitor visibility (set when entity visible via remote observation) |
+| Offset | Type | Meaning | Persistence |
+|--------|------|---------|-------------|
+| +968 (`0x3C8`) | `BYTE` | Local gravidar visibility (set when entity scanned in player's zone) | **DYNAMIC** — clears when entity leaves gravidar range |
+| +969 (`0x3C9`) | `BYTE` | Remote monitor visibility (set when entity visible via remote observation) | **DYNAMIC** — clears when remote observation ends |
+
+Unlike the `+0x400` byte (which persists forever once set), these two bytes are **live proximity state** maintained by the gravidar system. They clear when the entity leaves detection range, making them true "currently visible" indicators.
 
 **Implication:** Cannot replicate `isinliveview` by copying a byte. It is a computed property requiring player ownership state, zone proximity, and tracking table lookups. For replication, evaluate on host and transmit the boolean result.
+
+### 2.7 Gravidar C++ Internals (IDA-Confirmed, Build 602526)
+
+The gravidar system runs its own tick loop on a **worker thread**, independent of the UI thread. Key functions:
+
+| Function | Address | Purpose |
+|----------|---------|---------|
+| `Gravidar_Update` | `0x141062030` | Main gravidar tick entry. Runs on worker thread. |
+| `Gravidar_ScanProcessing` | `0x141062170` | Scan processing pass within the gravidar tick. |
+| `Gravidar_UpdateInternal` | `0x141062580` | Internal update — uses **double-buffered state** to avoid tearing. |
+| `Gravidar_ProcessContacts` | `0x14106C080` | Processes the live contact list after scan completes. |
+
+**Threading model:** `Gravidar_Update` acquires a `CriticalSection` at **component+26976** (`0x6960`) before mutating state. This means the gravidar operates independently from the UI thread and must not be called directly from game function hooks.
+
+**Double-buffered state:** `Gravidar_UpdateInternal` maintains two copies of the contact list, swapping them atomically so the holomap renderer always reads a consistent snapshot while the gravidar writes the next frame's results.
+
+**Relationship to +0x400:** The gravidar system does NOT write the `+0x400` (`isradarvisible`) byte. It operates independently, maintaining its own live contact lists that are read directly by the holomap renderer. The `+0x400` byte is a persistent discovery flag managed by MD scripts and save/load (see Section 3.3). The `+0x3C8`/`+0x3C9` bytes (Section 2.6) are the live proximity state that the gravidar system updates.
 
 ---
 
@@ -292,14 +311,28 @@ The `isradarvisible` byte at component+1024 is written by:
    - Entity creation sets +1024 = 0 (default state)
    - Entity teardown/destruction zeros the entire QWORD at +1024 (vtable method at `0x1407429C0`)
 
-3. **Property change handler** (case 378 in `sub_1409575C0`)
-   - Dispatches `RadarVisibilityChangedEvent` via `sub_140A2D810`
-   - May write +1024 through an indirect property mechanism (not confirmed as direct byte write)
+**NOTE (IDA-confirmed, build 602526):** Exhaustive byte-pattern search (all x86-64 register
+encodings for `mov byte/dword/qword [reg + 0x400]`) found exactly these four write sites:
 
-**NOTE:** Exhaustive byte-pattern search (all x86-64 register encodings, byte/dword/qword widths)
-found NO code path that specifically clears +1024 to 0 when an entity leaves radar range.
-The byte appears to persist once set. Entities disappear from the map because the **C++ holomap
-renderer** stops rendering them (see Section 4), not because +1024 is cleared.
+| Address | Function | Action |
+|---------|----------|--------|
+| `0x140513322` | Entity constructor (with source) | Init to 0 |
+| `0x140513930` | Entity constructor (default) | Init to 0 |
+| `0x14068CE76` | `Object_Import` (`0x14068C760`) | Save/load deserialization: reads property 1287 |
+| `0x140B8DDF0` | `SetObjectRadarVisibleAction_Execute` | MD script action write |
+
+**There is NO gravidar/proximity code path that writes +0x400.** The byte is a **persistent
+discovery flag** written ONLY by these three sources:
+1. **Entity constructors** — initialize to 0
+2. **`Object_Import`** — restore from save data (property 1287)
+3. **`SetObjectRadarVisibleAction_Execute`** — MD script action `set_object_radar_visible`
+
+No proximity detection, no gravidar scan, and no radar range check ever writes this byte.
+It is NOT a proximity tracker.
+
+The byte never clears to 0 during gameplay (no clearing code path found). Entities disappear
+from the map because the **C++ holomap renderer** stops rendering them based on live gravidar
+proximity checks (see Section 4), not because +0x400 is cleared.
 
 Only 2 functions READ this byte:
 - `LuaGlobal_GetComponentData` (`0x14023E190`) -- the Lua property dispatcher
@@ -321,6 +354,24 @@ The forced radar visible byte at component+1025 is written by:
 
 3. **MD action `set_object_forced_radar_visible`** (handler: `0x140B8BFA0`)
    - Evaluates condition, calls `SetForcedRadarVisible_Internal`
+
+### 3.5 RadarVisibilityChangedEvent Dispatch Analysis (IDA-Confirmed, Build 602526)
+
+**Vtable:** `RadarVisibilityChangedEvent` vtable at `0x142B40060`.
+
+Only **3 vtable references** found in the entire binary:
+
+| # | Function | Address | Purpose |
+|---|----------|---------|---------|
+| 1 | `RadarVisibilityChanged_BuildEvent` | case 375 in event switch | Serialization/deserialization factory for save/load |
+| 2 | `SetObjectRadarVisibleAction_Execute` | `0x140B8DD80` | MD `set_object_radar_visible` action handler |
+| 3 | `SetForcedRadarVisible_Internal` | `0x1406A50F0` | `SetObjectForcedRadarVisible` FFI internal |
+
+**Critical finding:** Function #1 (`BuildEvent`) is a **serialization factory** used only during save/load event reconstruction. It is **NEVER called during normal gameplay** — it exists solely to rebuild event objects from serialized data.
+
+Functions #2 and #3 create `RadarVisibilityChangedEvent` objects **inline** (stack-allocated, vtable pointer written directly) and dispatch them via `EventSource_DispatchEvent` at `0x140956B50`. There is no centralized "create event" factory for live radar changes.
+
+**WARNING — Dead hook target:** Hooking `RadarVisibilityChanged_BuildEvent` (the case-375 factory) will NOT intercept live radar visibility changes. It only fires during save/load deserialization. To intercept live changes, hook `SetObjectRadarVisibleAction_Execute` and/or `SetForcedRadarVisible_Internal` directly.
 
 ---
 
@@ -359,9 +410,11 @@ ENTITY VISIBILITY LIFECYCLE
         |--- Entity enters player radar range?
         |         |
         |         v
-        |    Game engine sets +1024 = 1
-        |    RadarVisibilityChangedEvent dispatched
-        |    Entity now isradarvisible = true
+        |    Gravidar system detects entity (live contact list)
+        |    +0x3C8 / +0x3C9 bytes set (dynamic, see Section 2.6)
+        |    Holomap renderer sees entity via live proximity check
+        |    NOTE: +1024 byte is NOT written by proximity code.
+        |      It is only set by MD scripts (set_object_radar_visible).
         |         |
         |         v
         |    MAP CHECK: isknown AND isradarvisible
@@ -381,12 +434,12 @@ ENTITY VISIBILITY LIFECYCLE
         |--- Entity leaves radar range?
         |         |
         |         v
-        |    +1024 byte is NOT cleared (no direct write path found in binary)
-        |    RadarVisibilityChangedEvent MAY be dispatched (property handler case 378)
-        |    Entity disappears from MAP because C++ holomap renderer stops
-        |      rendering it (holomap uses live gravidar proximity checks)
-        |    BUT still "known" (known-factions persists)
-        |    +1024 may still be 1 (byte persists)
+        |    +0x3C8 / +0x3C9 bytes CLEAR (dynamic proximity state)
+        |    Holomap renderer stops showing entity (live gravidar check fails)
+        |    +1024 byte is NOT cleared (persists forever, no clearing code path)
+        |    Entity disappears from MAP because renderer uses live proximity,
+        |      NOT the +1024 byte
+        |    Still "known" (known-factions persists)
         |    Entity remains in sector queries, just not displayed on map
         |
         v
@@ -707,6 +760,13 @@ When `cap == 2`, the two faction pointers are stored inline at `known_factions_a
 | `UpdatePlayerOwnedTracking` | `0x14069F290` | | Zone hierarchy known-state (asymmetric: gain=propagate, lose=no-op) |
 | `FNV1_Hash64` | `0x1400EA3B0` | | Property name hash for GetComponentData dispatch |
 | `MD_VariantPropertyEvaluator` | `0x140CA50E0` | 0x1F053 | MD condition/property evaluator (reads `isradarvisible` for conditions) |
+| `Gravidar_Update` | `0x141062030` | | Main gravidar tick (worker thread, CriticalSection at component+26976) |
+| `Gravidar_ScanProcessing` | `0x141062170` | | Scan processing pass within gravidar tick |
+| `Gravidar_UpdateInternal` | `0x141062580` | | Internal update with double-buffered state |
+| `Gravidar_ProcessContacts` | `0x14106C080` | | Processes live contact list after scan |
+| `EventSource_DispatchEvent` | `0x140956B50` | | Generic event dispatch (used by radar visibility events) |
+| `SetObjectRadarVisibleAction_Execute` | `0x140B8DD80` | | MD action execute for `set_object_radar_visible` (dispatches RadarVisibilityChangedEvent) |
+| `IsInLiveView` | `0x140695B50` | | Three-branch priority eval: player-owned/tracked, zone proximity (+0x3C8), remote monitor (+0x3C9) |
 
 ### Known-State Vtable Map
 
@@ -892,7 +952,7 @@ Sectors must have their parent cluster also marked known. Gates and highways nee
 ### 16.6 Hook Opportunities
 
 - **`SetKnownToFaction` (vtable+6016):** Single hook captures ALL discovery from all code paths.
-- **`RadarVisibilityChangedEvent`:** Subscribe via event system for radar changes.
+- **`RadarVisibilityChangedEvent`:** Subscribe via event system for radar changes. **WARNING:** Do NOT hook `RadarVisibilityChanged_BuildEvent` (case 375 in the event switch) — it is a save/load serialization factory and never fires during normal gameplay. Hook `SetObjectRadarVisibleAction_Execute` (`0x140B8DD80`) or `SetForcedRadarVisible_Internal` directly instead. See Section 3.5.
 - **`SetObjectForcedRadarVisible` (FFI):** Hook to intercept forced visibility changes.
 
 ### 16.7 Batch Enumeration

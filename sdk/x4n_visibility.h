@@ -95,10 +95,10 @@ inline bool get_known_to_all(uint64_t id) {
         reinterpret_cast<uintptr_t>(comp) + X4_OBJECT_OFFSET_KNOWN_TO_ALL) != 0;
 }
 
-/// Read the known_factions_count from an Object-class entity (+888).
+/// Read the known_factions_count from an Object-class entity (+904).
 /// Returns the number of factions that know about this entity.
-/// @stability raw memory offset — X4Native handles version updates (888). Re-verify on game updates.
-/// @verified v9.00 build 600626
+/// @stability raw memory offset — X4Native handles version updates (904). Re-verify on game updates.
+/// @verified v9.00 build 602526
 inline size_t get_known_factions_count(uint64_t id) {
     void* comp = entity::find_component(id);
     if (!comp) return 0;

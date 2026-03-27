@@ -82,14 +82,14 @@ typedef struct X4RadarChangedEvent {
 // ---- Global data RVA: Component registry ----
 // Add to imagebase to get absolute address. Dereference to get the actual value.
 // WARNING: data address changes between builds. Re-verify on game updates.
-// Verified: v9.00 builds 600626, 602526
-#define X4_RVA_COMPONENT_REGISTRY       0x06C73D30  /* void** — g_ComponentRegistry */
+// Verified: v9.00 build 602526 (confirmed via ComponentRegistry_Find callers)
+#define X4_RVA_COMPONENT_REGISTRY       0x06C7A148  /* void** — g_ComponentRegistry */
 
 // ---- Component data offsets ----
 // Raw generation seed is at Object+0x08 (uint64). This is the component's OWN seed,
 // before combination with the session seed. Confirmed by 4 independent functions.
 // NOTE: struct offset — update when game build changes.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526 (0x3C0 confirmed by Component_GetCombinedSeed byte sig)
 #define X4_COMPONENT_OFFSET_RAW_SEED       0x08   /* uint64 — raw generation seed */
 #define X4_COMPONENT_OFFSET_COMBINED_SEED  0x3C0  /* int64  — raw_seed + session_seed (= MD $Station.seed) */
 
@@ -101,15 +101,15 @@ typedef struct X4RadarChangedEvent {
 // LCG formula: next = ROR64(seed * multiplier + addend, 30)
 // These are algorithm constants embedded in code, not data references.
 // Likely stable across builds (PRNG design, not tunable), but verify on major engine changes.
-// Found inside MD_EvalSeed_AutoAdvance (0x140C10740 in builds 600626, 602526).
-// Verified: v9.00 builds 600626, 602526
+// Found inside MD_EvalSeed_AutoAdvance (0x140C10590 in build 602526).
+// Verified: v9.00 build 602526 (algorithm constants, stable across builds)
 #define X4_SEED_LCG_MULTIPLIER  0x5851F42D4C957F2DULL
 #define X4_SEED_LCG_ADDEND     0x14057B7EF767814FULL
 #define X4_SEED_LCG_ROTATE     30
 
 // ---- Global data RVA: Session seed ----
 // WARNING: data address changes between builds. Re-verify on game updates.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 #define X4_RVA_SESSION_SEED             0x03C9F9C0  /* uint64* — g_SessionSeed */
 
 // ======== WALKABLE INTERIORS =============================================
@@ -118,7 +118,7 @@ typedef struct X4RadarChangedEvent {
 
 // ---- RoomType enum (see docs/rev/WALKABLE_INTERIORS.md §17) ----
 // Enum init at 0x1407521A0, data table at 0x1424794A0, 22 entries.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 typedef enum X4RoomType {
     X4_ROOMTYPE_BAR               = 0,
     X4_ROOMTYPE_CASINO            = 1,
@@ -149,7 +149,7 @@ typedef enum X4RoomType {
 // added/removed/reordered in the Room class will shift these. Re-verify on
 // every game update. Currently only used for documentation; the hook approach
 // reads these via the game's own code paths, not direct memory access.
-// Verified: v9.00 builds 600626, 602526 (see docs/rev/WALKABLE_INTERIORS.md §22)
+// Verified: v9.00 build 602526 (see docs/rev/WALKABLE_INTERIORS.md §22)
 #define X4_ROOM_OFFSET_ROOMTYPE    0x2C0  /* int32  — X4RoomType enum */
 #define X4_ROOM_OFFSET_UNK_3A0     0x3A0  /* uint8  — purpose unknown, set by CreateDynamicInterior */
 #define X4_ROOM_OFFSET_NAME        0x3A8  /* string — room name (std::string) */
@@ -162,14 +162,14 @@ typedef enum X4RoomType {
 
 // ---- Global data RVAs: Plan and macro registries ----
 // WARNING: data addresses change between builds. Re-verify on game updates.
-// Verified: v9.00 builds 600626, 602526
-#define X4_RVA_CONSTRUCTION_PLAN_DB     0x06C73FA0  /* void** — g_ConstructionPlanRegistry (RB-tree at +16) */
-#define X4_RVA_MACRO_REGISTRY           0x06C73E30  /* void*  — g_MacroRegistry (BST at +64) */
+// Verified: v9.00 build 602526 (confirmed via caller trace + 0x6418 shift)
+#define X4_RVA_CONSTRUCTION_PLAN_DB     0x06C7A3B8  /* void** — g_ConstructionPlanRegistry (RB-tree at +16) */
+#define X4_RVA_MACRO_REGISTRY           0x06C7A248  /* void*  — g_MacroRegistry (BST at +64) */
 
 // ---- MacroData field offsets ----
 // Returned by MacroRegistry_Lookup. Connection array is sorted by FNV-1a hash.
 // WARNING: struct offsets — fragile across builds. Re-verify on game updates.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 #define X4_MACRODATA_OFFSET_CONNECTIONS_BEGIN  0x170  /* void* — start of ConnectionEntry array */
 #define X4_MACRODATA_OFFSET_CONNECTIONS_END    0x178  /* void* — end of ConnectionEntry array */
 
@@ -178,13 +178,13 @@ typedef enum X4RoomType {
 // Name string at +16 is std::string (MSVC SSO: inline if len<16, heap ptr if >=16).
 // Confirmed by GetNumPlannedStationModules (0x14019ce00) which reads ConnectionEntry+16
 // to populate UIConstructionPlanEntry.connectionid.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 #define X4_CONNECTION_ENTRY_SIZE    0x160  /* 352 bytes */
 #define X4_CONNECTION_OFFSET_HASH   0x08   /* uint32 — FNV-1a hash of lowercased name */
 #define X4_CONNECTION_OFFSET_NAME   0x10   /* std::string — connection name (e.g. "connection_room01") */
 
 // ---- Dynamic Interior door selection ----
-// Controllable::CreateDynamicInterior (0x1404153a0) selects a door connection from
+// Controllable::CreateDynamicInterior (0x140416250) selects a door connection from
 // the corridor macro's "room" class MacroDefaults. The connection pointer array is at
 // MacroDefaults offset +1112 (begin) / +1120 (end).
 // Door selection algorithm when door param is NULL:
@@ -204,7 +204,7 @@ typedef enum X4RoomType {
 
 // ---- Construction plan entry (528 bytes) ----
 // Internal plan entry used by the station construction system.
-// Allocate via GameAlloc, init via PlanEntry_Construct (0x140D09C90).
+// Allocate via GameAlloc, init via PlanEntry_Construct (0x140D0C6B0).
 // Transform layout: position (__m128) + 3x3 rotation matrix (3x __m128, row-major).
 //   +48: [pos_x, pos_y, pos_z, 0.0]       -- position relative to station origin
 //   +64: [r0_x,  r0_y,  r0_z,  0.0]       -- rotation matrix row 0
@@ -228,11 +228,11 @@ typedef enum X4RoomType {
 // Station_FindModuleByPlanEntryID (0x140489B20), then Entity_EstablishConnection
 // (0x140399580) links the connection points bidirectionally.
 // Entry IDs only need to be unique within the plan (auto-assigned from atomic
-// counter at 0x1438778A0 if id==0 on construct).
+// counter at 0x14387E8E0 if id==0 on construct).
 //
 // See docs/rev/CONSTRUCTION_PLANS.md for full documentation.
 // NOTE: struct layout — update when game build changes.
-// Verified: v9.00 builds 600626, 602526 (R-Station4 + plan_entry_struct_analysis)
+// Verified: v9.00 build 602526 (R-Station4 + plan_entry_struct_analysis)
 typedef struct alignas(16) X4PlanEntry {
     int64_t   id;                   // +0:   unique ID (auto-assigned from atomic counter if 0)
     void*     macro_ptr;            // +8:   MacroData* (from MacroRegistry_Lookup)
@@ -247,7 +247,7 @@ typedef struct alignas(16) X4PlanEntry {
     float     rot_row0[4];         // +64:  rotation matrix row 0 [r0x, r0y, r0z, 0]
     float     rot_row1[4];         // +80:  rotation matrix row 1 [r1x, r1y, r1z, 0]
     float     rot_row2[4];         // +96:  rotation matrix row 2 [r2x, r2y, r2z, 0]
-    uint8_t   loadout[408];        // +112: equipment loadout (init by sub_1400EEFB0)
+    uint8_t   loadout[408];        // +112: equipment loadout (init by sub_1400EF140)
     uint8_t   is_fixed;            // +520: fixed/immovable flag
     uint8_t   is_modified;         // +521: modified flag
     uint8_t   is_bookmark;         // +522: bookmark flag
@@ -261,13 +261,13 @@ typedef struct alignas(16) X4PlanEntry {
 
 // ---- Object-Class Visibility Offsets (type 71: stations, ships, satellites) ----
 // Full layout documented in docs/rev/VISIBILITY.md Section 9.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 #define X4_OBJECT_OFFSET_OWNER_FACTION_PTR      840    /* void* — owner faction context pointer */
 #define X4_OBJECT_OFFSET_KNOWN_READ             857    /* uint8 — encyclopedia "read" flag */
 #define X4_OBJECT_OFFSET_KNOWN_TO_ALL           858    /* uint8 — global known flag (rarely set) */
-#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_ARR     864    /* 16 bytes — SSO faction pointer array (inline if cap<=2, heap ptr if >2) */
-#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_CAP     880    /* size_t — array capacity (2 = inline) */
-#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_COUNT   888    /* size_t — number of factions in known-to list */
+#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_ARR     864    /* 32 bytes — SSO faction pointer array (inline if cap<=4, heap ptr if >4) */
+#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_CAP     896    /* size_t — array capacity (4 = inline) */
+#define X4_OBJECT_OFFSET_KNOWN_FACTIONS_COUNT   904    /* size_t — number of factions in known-to list */
 #define X4_OBJECT_OFFSET_LIVEVIEW_LOCAL         0x3C8  /* uint8 — local gravidar visibility (set when entity scanned in player's zone) */
 #define X4_OBJECT_OFFSET_LIVEVIEW_MONITOR       0x3C9  /* uint8 — remote monitor visibility (set when entity visible via remote observation) */
 #define X4_OBJECT_OFFSET_MASSTRAFFIC_QUEUE      0x3E0  /* ptr   — mass traffic queue object (null if not in mass traffic) */
@@ -278,15 +278,15 @@ typedef struct alignas(16) X4PlanEntry {
 // Dispatched by the engine when radar visibility changes on an entity.
 // Three dispatchers: SetForcedRadarVisible_Internal, SetObjectRadarVisible_Action,
 // and the engine property change handler (case 378 in sector update pipeline).
-// Verified: v9.00 builds 600626, 602526
-#define X4_RADAR_EVENT_VTABLE_RVA           0x02B39848  /* const U::RadarVisibilityChangedEvent::`vftable' */
+// Verified: v9.00 build 602526 (confirmed via SetObjectRadarVisible_Action LEA)
+#define X4_RADAR_EVENT_VTABLE_RVA           0x02B40060  /* const U::RadarVisibilityChangedEvent::`vftable' */
 #define X4_RADAR_EVENT_OFFSET_ENTITY_ID     24          /* uint64 — ComponentID of affected entity */
 #define X4_RADAR_EVENT_OFFSET_VISIBLE       32          /* uint8  — new visibility state (0=left range, 1=entered range) */
 
 // ---- Space-Class Visibility Offsets (type 15/86/107: clusters, sectors, zones) ----
 // Different offsets from Object-class. No radar bytes (Space entities use known-to only).
 // Full layout documented in docs/rev/VISIBILITY.md Section 9.
-// Verified: v9.00 builds 600626, 602526
+// Verified: v9.00 build 602526
 #define X4_SPACE_OFFSET_OWNER_FACTION_PTR       800    /* void* — owner faction context pointer */
 #define X4_SPACE_OFFSET_KNOWN_READ              817    /* uint8 — encyclopedia "read" flag */
 #define X4_SPACE_OFFSET_KNOWN_TO_ALL            818    /* uint8 — global known flag */

@@ -16,7 +16,7 @@
         "byte_sig_note": "First 32 bytes of prologue: mov rax,rsp + save r9/r8/rdx/rcx to home area + push rbp/rbx/rsi/rdi/r12-r15."
       },
       "900-600626": { "rva": "0x004153A0" },
-      "900-602526": { "rva": "0x004153A0" }
+      "900-602526": { "rva": "0x00416250" }
     },
     "MacroRegistry_Lookup": {
       "_find_hints": {
@@ -31,7 +31,7 @@
         "byte_sig_note": "Large function (~0x580 bytes) with FNV-1a hash loop. Prologue varies by version."
       },
       "900-600626": { "rva": "0x009E72B0" },
-      "900-602526": { "rva": "0x009E72B0" }
+      "900-602526": { "rva": "0x009E8E20" }
     },
     "MD_CreateDynamicInterior_Handler": {
       "_find_hints": {
@@ -45,7 +45,7 @@
         "byte_sig_note": "MD action handler class. Size ~0xB49. Prologue may vary."
       },
       "900-600626": { "rva": "0x00B5DCD0" },
-      "900-602526": { "rva": "0x00B5DCD0" }
+      "900-602526": { "rva": "0x00B5FD30" }
     },
     "Component_GetCombinedSeed": {
       "_find_hints": {
@@ -60,7 +60,7 @@
         "byte_sig_note": "Complete 2-instruction function: mov rax,[rcx+3C0h]; ret. Offset 0x3C0 = combined seed field."
       },
       "900-600626": { "rva": "0x00315260" },
-      "900-602526": { "rva": "0x00315260" }
+      "900-602526": { "rva": "0x003160E0" }
     },
     "ComponentRegistry_Find": {
       "_find_hints": {
@@ -75,7 +75,7 @@
         "byte_sig_note": "First 16 bytes. Bytes 15-18 are a conditional jump offset that may vary."
       },
       "900-600626": { "rva": "0x000CE6B0" },
-      "900-602526": { "rva": "0x000CE6B0" }
+      "900-602526": { "rva": "0x000CE810" }
     },
     "PlanEntry_Construct": {
       "_find_hints": {
@@ -91,7 +91,7 @@
         "byte_sig_note": "First 16 bytes: save rbx+rcx to home area, push rdi, sub rsp 20h."
       },
       "900-600626": { "rva": "0x00D09C90" },
-      "900-602526": { "rva": "0x00D09C90" }
+      "900-602526": { "rva": "0x00D0C6B0" }
     },
     "GameAlloc": {
       "_find_hints": {
@@ -107,7 +107,7 @@
         "byte_sig_note": "First 16 bytes: save rbx+rsi, push rdi, sub rsp 130h."
       },
       "900-600626": { "rva": "0x0145CB90" },
-      "900-602526": { "rva": "0x0145CB90" }
+      "900-602526": { "rva": "0x01460CB0" }
     },
     "ConstructionDB_CreatePlanDirect": {
       "_find_hints": {
@@ -123,7 +123,7 @@
         "byte_sig_note": "First 16 bytes: standard register save (rbx, rbp, rsi to home area). Small function (~0xB4)."
       },
       "900-600626": { "rva": "0x00D0E680" },
-      "900-602526": { "rva": "0x00D0E680" }
+      "900-602526": { "rva": "0x00D110A0" }
     },
     "ConstructionDB_AddPlan": {
       "_find_hints": {
@@ -139,7 +139,7 @@
         "byte_sig_note": "First 16 bytes: save r8 to home area, push rbx, sub rsp 40h, mov rbx=rcx, test r8."
       },
       "900-600626": { "rva": "0x00D0E4E0" },
-      "900-602526": { "rva": "0x00D0E4E0" }
+      "900-602526": { "rva": "0x00D10F00" }
     },
     "RadarVisibilityChanged_BuildEvent": {
       "_find_hints": {
@@ -156,7 +156,7 @@
         "byte_sig_note": "First 25 bytes: mov [rsp+8],rbx; push rdi; sub rsp,30h; mov rdi,rcx; mov [rsp+20h],10h; mov ecx,28h. Verified against binary."
       },
       "900-600626": { "rva": "0x00A2D810" },
-      "900-602526": { "rva": "0x00A2D810" }
+      "900-602526": { "rva": "0x00A2F600" }
     },
     "IsRadarVisible_ReadByte": {
       "_find_hints": {
@@ -172,7 +172,7 @@
         "byte_sig_note": "Complete function. 8 bytes: movzx eax,byte ptr [rcx+400h]; ret."
       },
       "900-600626": { "rva": "0x0011BE30" },
-      "900-602526": { "rva": "0x0011BE30" }
+      "900-602526": { "rva": "0x0011CCF0" }
     },
     "SetObjectRadarVisible_Action": {
       "_find_hints": {
@@ -188,7 +188,7 @@
         "byte_sig_note": "First 21 bytes: REX push rbx; push rsi; push rdi; sub rsp,50h; mov rsi,rcx; lea rdx,[rsp+70h]; add rcx,28h; mov reg,r8. Verified against binary."
       },
       "900-600626": { "rva": "0x00B8BD30" },
-      "900-602526": { "rva": "0x00B8BD30" }
+      "900-602526": { "rva": "0x00B8DD80" }
     },
     "X4_FrameTick": {
       "_find_hints": {
@@ -204,7 +204,7 @@
         "byte_sig_note": "First 16 bytes: mov [rsp+10h],rbx + push rbp/rsi/rdi/r12-r15."
       },
       "900-600626": { "rva": "0x00F4D1D0" },
-      "900-602526": { "rva": "0x00F4D1D0" }
+      "900-602526": { "rva": "0x00F50C70" }
     }
   }
 }
