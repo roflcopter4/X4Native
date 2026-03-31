@@ -17,6 +17,19 @@ X4's simulation is driven by an **Egosoft custom red-black tree of subsystem obj
 ## 2. Red-Black Tree Structure
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 graph TD
     ROOT["RB Tree Root\n<code>0x143148348</code>"] --> A["Subsystem A\n<i style='color:#ff6666'>RED</i>"]
     ROOT --> B["Subsystem B\n<i style='color:#333'>BLACK</i>"]
@@ -129,6 +142,19 @@ void UpdateSubsystems_RBTreeWalk() {
 > **TLS offset note:** The main-thread check reads `TLS + 0x314` (decimal 788). Previous versions of this doc wrote `TLS + 0x788` which is incorrect — `0x788` is 1928 decimal, not 788.
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 graph LR
     subgraph "UpdateSubsystems_RBTreeWalk (0x140EA06E0)"
         START["Leftmost\n(0x143148360)"] --> WALK["In-order walk"]
@@ -303,6 +329,19 @@ The Anark UI engine is the subsystem responsible for all Lua execution. It sits 
 ### Dispatch Chain
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 graph TD
     RBT["UpdateSubsystems_RBTreeWalk\nRB tree in-order walk"] --> ALE["AnarkLuaEngine::vtable[5]\n<code>0x140AB0100</code>"]
     ALE --> UID["UI Event Dispatcher"]
@@ -360,6 +399,19 @@ call lua_setfield            ; register as global in Lua state
 ### Ownership
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 classDiagram
     class CXAnarkController {
         vtable: 0x142b47bf0
@@ -476,6 +528,19 @@ dispatched by `SceneGraph_ProcessCollisions_ThreadPooled` at `0x140E5BE40`.
 ### Event Lifecycle
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 sequenceDiagram
     participant CODE as Game Code / Worker Thread
     participant CS as CriticalSection
@@ -515,6 +580,19 @@ the queue atomically and processing the detached list without holding the lock.
 When `isSuspended == true`, the RB tree walk is skipped. Instead, a flat array of 17 subsystems is iterated:
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 graph LR
     subgraph "Normal Frame"
         RBT["RB Tree Walk\n<i>all subsystems</i>\n<i>full simulation</i>"]
@@ -848,6 +926,19 @@ the binary string table.
 > **FNV-1, not FNV-1a (confirmed 2026-03-28).** Verified at 5 independent call sites via raw disassembly: `imul r9, 1000193h` (multiply) THEN `xor r9, rcx` (XOR). FNV-1a would XOR first, then multiply. Same constants, different algorithm, different output. Non-standard variant — 32-bit offset basis (`0x811C9DC5`) in a 64-bit register. Our SDK's `x4n::math::fnv1a_lower()` is **misnamed but correct** — C operator precedence in `c ^ (prime * hash)` evaluates multiplication first, producing FNV-1. Function should be renamed to `fnv1_lower`.
 
 ```mermaid
+---
+config:
+    layout: dagre
+    theme: 'base'
+    themeVariables:
+        primaryColor: '#a56a6a'
+        primaryTextColor: '#ffffff'
+        primaryBorderColor: '#ffffff'
+        lineColor: '#ffa600'
+        secondaryColor: '#006100'
+        tertiaryColor: '#7d90a1'
+        tertiaryTextColor: '#ffffff'
+---
 graph TD
     FM["FactionManager\n<code>0x146C7A398</code>"] --> SENT["Sentinel (+16)\n<i>nil marker</i>"]
     FM --> ROOT["Root (+24)"]
@@ -905,14 +996,26 @@ is no resize/grow path.
 The game has a native mechanism for toggling factions at runtime. DLC extensions use this
 to unlock factions when content is purchased.
 
-**`SetFactionActiveAction::Execute`** (`0x140B92AB0`) — MD action opcode `0x889`:
+**`SetFactionActiveAction::Execute`** (`0x140B96DE0`) — MD action `set_faction_active`:
+
+> **Address correction (2026-03-28):** Previous doc had `0x140B92AB0`. Re-verified via
+> RTTI vtable lookup: `??_7SetFactionActiveAction@Scripts@@6B@` at `0x142B9FBE0`,
+> execute method is vtable slot 10 → `0x140B96DE0`.
+
 ```
 FactionData + 640 + 744  = active boolean (byte)
-sub_140996B00(faction_manager, faction_ptr)
+FactionManager::UpdateFactionActiveState (0x14099A5D0)
   → adds faction to each space's active-faction list (when activating)
   → removes faction from each space's active-faction list (when deactivating)
-→ fires U::FactionActivatedEvent / U::FactionDeactivatedEvent
+→ fires U::FactionActivatedEvent / U::FactionDeactivatedEvent via EventSource::DispatchEvent
 ```
+
+**Full decompiled logic:**
+1. Resolve faction from MD expression (type check: must be type 73 = faction)
+2. Evaluate `active` attribute as boolean via `EvalConditionToBool`
+3. Compare with current value at `*(faction_data + 744)`
+4. If changed: write new value, call `UpdateFactionActiveState`, dispatch event
+5. If unchanged: no-op (no event, no side effects)
 
 **`SetFactionIdentityAction::Execute`** (`0x140B91D80`) — MD action opcode `0x886`:
 ```
