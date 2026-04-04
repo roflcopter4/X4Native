@@ -25,18 +25,18 @@ namespace x4n { namespace entity {
 
 /// Resolve a UniverseID to its X4Component* via the component registry.
 /// Returns nullptr if the ID is invalid or the registry isn't initialized.
-/// Caches the registry pointer on first call. Only call after on_game_loaded.
+/// Reads the registry pointer from the global each call (the game may
+/// reconstruct the registry on save/load, so caching would go stale).
+/// Only call after on_game_loaded.
 /// @stability MODERATE — depends on X4_RVA_COMPONENT_REGISTRY + ComponentRegistry_Find.
 /// @verified v9.00 build 602526
 inline X4Component* find_component(uint64_t id) {
     auto* g = game();
     if (!g || !g->ComponentRegistry_Find) return nullptr;
-    static X4ComponentRegistry* s_reg = nullptr;
-    if (!s_reg)
-        s_reg = *reinterpret_cast<X4ComponentRegistry**>(exe_base() + X4_RVA_COMPONENT_REGISTRY);
-    if (!s_reg) return nullptr;
+    auto* reg = *reinterpret_cast<X4ComponentRegistry**>(exe_base() + X4_RVA_COMPONENT_REGISTRY);
+    if (!reg) return nullptr;
     return static_cast<X4Component*>(
-        g->ComponentRegistry_Find(s_reg, id, 4));
+        g->ComponentRegistry_Find(reg, id, 4));
 }
 
 /// Get the runtime class ID of a component via its vtable (GetGameClass, slot 566).
