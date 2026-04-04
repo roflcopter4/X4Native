@@ -439,6 +439,13 @@ typedef struct alignas(16) X4PlanEntry {
 #define X4_SPACE_OFFSET_KNOWN_FACTIONS_CAP      840    /* size_t — array capacity */
 #define X4_SPACE_OFFSET_KNOWN_FACTIONS_COUNT    848    /* size_t — number of factions in known-to list */
 
+// ======== ORDER SYSTEM ===================================================
+// Order param value type IDs (from SetOrderParam Lua handler decompilation).
+// The value struct is {int32 type, int32 pad, int64 data}.
+// Internal functions (CreateOrderInternal, SetOrderParamInternal) are resolved
+// via version_db — see x4_internal_func_list.inc and x4n_ship.h.
+#define X4_ORDER_PARAM_TYPE_ENTITY      10  /* data = UniverseID */
+
 #ifdef __cplusplus
 }
 #endif

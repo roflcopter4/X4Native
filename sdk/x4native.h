@@ -69,4 +69,5 @@
 #include "x4n_galaxy.h"
 #include "x4n_module.h"
 #include "x4n_station.h"
+#include "x4n_ship.h"
 

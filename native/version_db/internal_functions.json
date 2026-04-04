@@ -218,6 +218,36 @@
       "900-600626": { "rva": "0x00F4D1D0" },
       "900-602526": { "rva": "0x00F50C70" },
       "900-603098": { "rva": "0x00F55670" }
+    },
+    "CreateOrderInternal": {
+      "_find_hints": {
+        "method": "caller_chain",
+        "steps": [
+          "1. Find exported CreateOrder3 (PE export table)",
+          "2. CreateOrder3 has a player-ownership check ('is not player-owned! Aborting call.')",
+          "3. After the check, it calls CreateOrderInternal — the only non-trivial callee that receives the entity pointer",
+          "4. Verify: references string 'CreateOrderFromUI(): Unknown order definition ID' in the error path",
+          "5. Verify: takes 4 params (entity*, string_view*, int mode, char override)"
+        ],
+        "verify_strings": ["CreateOrderFromUI(): Unknown order definition ID"],
+        "byte_sig_note": "Called by CreateOrder3 after ownership validation. ~0x1F0 bytes."
+      },
+      "900-603098": { "rva": "0x00424A90" }
+    },
+    "SetOrderParamInternal": {
+      "_find_hints": {
+        "method": "caller_chain",
+        "steps": [
+          "1. Find Lua global registration function (largest function, ~15700 bytes, registers all Lua C closures)",
+          "2. Search for 'SetOrderParam' string — the preceding lua_pushcclosure call has the native handler address",
+          "3. The native handler (~0x460 bytes) validates args, gets entity+order, then calls SetOrderParamInternal",
+          "4. SetOrderParamInternal is the callee that receives (order*, param_idx, value*)",
+          "5. Verify: references U::AIOrderParamEditedEvent vtable string in RTTI"
+        ],
+        "verify_strings": [],
+        "byte_sig_note": "Dispatches AIOrderParamEditedEvent on param change. ~0x250 bytes."
+      },
+      "900-603098": { "rva": "0x0102BEE0" }
     }
   }
 }

@@ -91,6 +91,27 @@ X4_FUNC(void*, RadarVisibilityChanged_BuildEvent, (void* property_data))
 // Verified: v9.00 build 600626, RVA 0x0011BE30
 X4_FUNC(uint8_t, IsRadarVisible_ReadByte, (void* component))
 
+// CreateOrderInternal — creates an AI order on a Controllable entity.
+// Bypasses the player-ownership check in the exported CreateOrder3.
+// entity = X4Component* (must be Controllable-derived, from ComponentRegistry_Find)
+// string_view = pointer to {const char* data, size_t length} struct with order ID
+// mode = 3 (default order), 1 (regular), 0 (temp)
+// override = bool (is override order)
+// Returns order object pointer (nullptr on failure).
+// Called by exported CreateOrder3 after the ownership check.
+// Verified: v9.00 build 603098, RVA 0x00424A90
+X4_FUNC(void*, CreateOrderInternal, (void* entity, void* string_view, int mode, char override_flag))
+
+// SetOrderParamInternal — sets a parameter value on an order object.
+// order = order object pointer (from CreateOrderInternal)
+// param_idx = 0-based parameter index within the order definition
+// value = pointer to OrderParamValue struct {int32 type, int32 pad, int64 data}
+// Known types: 10 = entity (data = UniverseID)
+// Returns bool success.
+// Called by Lua SetOrderParam handler at sub_1402897D0.
+// Verified: v9.00 build 603098, RVA 0x0102BEE0
+X4_FUNC(char, SetOrderParamInternal, (void* order, size_t param_idx, void* value))
+
 // SetObjectRadarVisible_Action — MD action handler for `set_object_radar_visible`.
 // Writes bool to component+0x400, dispatches RadarVisibilityChangedEvent, propagates to children.
 // This is the SCRIPT writer (story missions). The engine writes +0x400 via the property system.
