@@ -126,3 +126,16 @@ X4_FUNC(void, SetObjectRadarVisible_Action, (void* action_ctx, void* param2, voi
 // See docs/rev/WALKABLE_INTERIORS.md §14 for full analysis.
 // Verified: v9.00 build 600626, RVA 0x004153A0
 X4_FUNC(void, CreateDynamicInterior, (void* station, void* output, void* corridor_macro, void* door_conn, void* room_macro, int roomtype, void* interior_name, void* module, int64_t reserved, int64_t seed, uint8_t persistent, uint8_t private_flag, uint8_t unknown_flag, void* display_name))
+
+// SetCommander — assigns a ship as subordinate to a commander with a role.
+// PE export with no FFI signature. Signature derived via IDA decompilation.
+// controllableid = ship to assign, commanderid = station or capital ship,
+// assignment = role string ("defence", "trade", "mining", "attack", etc.)
+// Returns true on success. No ownership check — safe for NPC factions.
+// Verified: v9.00 build 603098, RVA 0x001C61F0
+X4_FUNC(bool, SetCommander, (UniverseID controllableid, UniverseID commanderid, const char* assignment))
+
+// SetAssignment — change subordinate role without changing commander.
+// PE export with no FFI signature. Signature derived via IDA decompilation.
+// Verified: v9.00 build 603098, RVA 0x001C5FC0
+X4_FUNC(void, SetAssignment, (UniverseID controllableid, const char* assignment))

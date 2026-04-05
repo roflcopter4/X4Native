@@ -441,10 +441,25 @@ typedef struct alignas(16) X4PlanEntry {
 
 // ======== ORDER SYSTEM ===================================================
 // Order param value type IDs (from SetOrderParam Lua handler decompilation).
+// Runtime lookup table at 0x1426F6FB0, populated by sub_141076080.
 // The value struct is {int32 type, int32 pad, int64 data}.
 // Internal functions (CreateOrderInternal, SetOrderParamInternal) are resolved
 // via version_db — see x4_internal_func_list.inc and x4n_ship.h.
+#define X4_ORDER_PARAM_TYPE_NULL        0   /* unset parameter */
+#define X4_ORDER_PARAM_TYPE_INTERNAL    1   /* varies by uitype (ScriptValue) */
+#define X4_ORDER_PARAM_TYPE_BOOL        2   /* data = int32 (0/1) */
+#define X4_ORDER_PARAM_TYPE_NUMBER      3   /* data = int64 */
+#define X4_ORDER_PARAM_TYPE_LENGTH      4   /* data = float (low 32 bits) */
+#define X4_ORDER_PARAM_TYPE_TIME        5   /* data = float (low 32 bits) */
+#define X4_ORDER_PARAM_TYPE_POSITION    7   /* nested list [[x,y,z], entity] */
+#define X4_ORDER_PARAM_TYPE_WARE        8   /* data = void* (game hash lookup) */
+#define X4_ORDER_PARAM_TYPE_DOUBLE      9   /* data = double as bits */
 #define X4_ORDER_PARAM_TYPE_ENTITY      10  /* data = UniverseID */
+#define X4_ORDER_PARAM_TYPE_MONEY       11  /* data = int64 */
+#define X4_ORDER_PARAM_TYPE_FORMATION   12  /* data = uint32 enum */
+#define X4_ORDER_PARAM_TYPE_LIST        13  /* data = vector of OrderParamValue */
+#define X4_ORDER_PARAM_TYPE_MACRO       14  /* data = void* (game hash lookup) */
+#define X4_ORDER_PARAM_TYPE_SECTOR      15  /* data = UniverseID */
 
 #ifdef __cplusplus
 }
