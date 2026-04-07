@@ -37,6 +37,7 @@ X4Native provides a C++ SDK for building native extensions that run inside the g
 - **Full game API access** — call any of X4's exported game functions, fully typed
 - **Function hooking** — intercept game functions with before/after hooks
 - **Event system** — lifecycle events, custom events, Lua-to-C++ bridges
+- **MD event interception** — typed subscriptions internal game events (destroyed, ownership changes, faction relations, etc.), usually accessed by MD only 
 - **Hot-reloadable** — `/reloadui` picks up new builds without restarting
 - **Stash** — in-memory state that survives `/reloadui` and extension reloads
 
@@ -44,7 +45,7 @@ X4Native provides a C++ SDK for building native extensions that run inside the g
 
 Download the **X4Native SDK** from the [latest release](https://github.com/eg3r/X4Native/releases). The SDK package contains everything you need:
 
-- `sdk/` — header files (`x4native.h` umbrella, core headers `x4n_core.h`/`x4n_events.h`/`x4n_log.h`/`x4n_stash.h`/`x4n_hooks.h`, domain helpers `x4n_entity.h`/`x4n_math.h`/`x4n_memory.h`/`x4n_rooms.h`/`x4n_plans.h`/`x4n_visibility.h`, game type headers)
+- `sdk/` — header files (`x4native.h` umbrella, core headers `x4n_core.h`/`x4n_events.h`/`x4n_log.h`/`x4n_stash.h`/`x4n_hooks.h`, `x4_md_events.h` (typed MD event subscriptions), domain helpers `x4n_entity.h`/`x4n_math.h`/`x4n_memory.h`/`x4n_rooms.h`/`x4n_plans.h`/`x4n_visibility.h`, game type headers)
 - `CMakeLists.txt` — ready-to-use CMake template for your extension
 
 Point your CMake project at the SDK `include` path and you're ready to build. See [docs/EXTENSION_GUIDE.md](docs/EXTENSION_GUIDE.md) for the full developer guide — project setup, API reference, and all available features.
@@ -74,7 +75,7 @@ X4N_SHUTDOWN {
 | Example | What it shows |
 |---------|---------------|
 | [hello](examples/hello) | Lifecycle events, game function calls |
-| [event_test](examples/event_test) | Event round-trips (C++→Lua→C++) |
+| [event_test](examples/event_test) | Event round-trips (C++→Lua→C++), direct MD event subscriptions |
 | [hook_test](examples/hook_test) | Before/after hooks on game functions |
 | [lua_bridge](examples/lua_bridge) | Dynamic Lua→C++ event forwarding |
 

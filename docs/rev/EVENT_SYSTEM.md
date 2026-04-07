@@ -280,3 +280,37 @@ All addresses (functions, vtables) are version-specific and shift with game patc
 Event type ID values are historically stable across minor versions but should be verified.
 Struct layouts (field offsets) are stable within a major version but could change if fields
 are added. MD bridge via `<raise_lua_event>` avoids all version sensitivity.
+
+---
+
+## X4Native Implementation
+
+This reverse engineering analysis directly enables X4Native's typed MD event subscription API.
+
+### Hook
+
+X4Native hooks `EventQueue_InsertOrDispatch` (single central hook approach). The detour extracts
+`type_id` from each event object's vtable, constructs an `X4MdEvent` payload, and fires
+before/after subscriber chains via `EventSystem::md_fire_before/after()`. See `src/core/core.cpp`.
+
+### Auto-Generated API
+
+The struct layouts documented above are encoded in `reference/event_layouts.csv` (discovered at
+runtime by the `event_probe` example extension). The code generator (`scripts/generate_event_type_ids.ps1`)
+combines this with `event_type_ids.csv` and `common.xsd` field names to produce `sdk/x4_md_events.h`:
+
+- **261 typed data structs** (e.g., `KilledData`, `SectorChangedOwnerData`)
+- **522 subscription functions** (`on_{event}_before/after`)
+- Zero-copy trampoline extraction from raw event objects
+
+### Public API
+
+```cpp
+#include <x4_md_events.h>
+
+x4n::md::on_killed_after([](const x4n::md::KilledData& e) {
+    // e.source_id, e.killer, e.kill_method, e.was_parent_killed
+});
+```
+
+See `docs/EXTENSION_GUIDE.md` → "Direct MD Event Subscriptions" for full usage guide.

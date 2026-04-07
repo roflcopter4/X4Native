@@ -87,6 +87,7 @@ X4N_SHUTDOWN {
 ```cpp
 #include <x4n_core.h>        // x4n::game(), exe_base(), X4N_EXTENSION/X4N_SHUTDOWN macros
 #include <x4n_events.h>      // x4n::on/off/raise/bridge_lua_event
+#include <x4_md_events.h>   // x4n::md::on_*_before/after (typed MD event subscriptions)
 #include <x4n_log.h>         // x4n::log::info/warn/error/debug
 #include <x4n_stash.h>       // x4n::stash::set/get (survives /reloadui)
 #include <x4n_hooks.h>       // x4n::hook::before/after/remove
@@ -223,6 +224,127 @@ X4N_EXTENSION {
 ```
 
 The full flow is: **Game Engine → MD cue → `raise_lua_event` → Lua bridge → C++ event**. This is the same pattern X4Native itself uses for `on_game_loaded`, `on_game_started`, and `on_game_saved`.
+
+### Direct MD Event Subscriptions
+
+X4Native hooks the game's internal event dispatch (`EventQueue_InsertOrDispatch`) and provides **typed, zero-bridge subscriptions** to all 551 MD event types. No MD cue XML, no Lua bridge, no string matching — just a direct C++ callback with a typed struct.
+
+Include `<x4_md_events.h>` (auto-generated, included by `<x4native.h>`):
+
+```cpp
+#include <x4_md_events.h>
+```
+
+Every MD event type has a data struct and a pair of subscription functions:
+
+```cpp
+// Subscribe to events — returns subscription ID
+int id = x4n::md::on_killed_after([](const x4n::md::KilledData& e) {
+    x4n::log::info("Entity %llu destroyed by %llu", e.source_id, e.killer);
+});
+
+int id2 = x4n::md::on_faction_relation_changed_after(
+    [](const x4n::md::FactionRelationChangedData& e) {
+        x4n::log::info("Faction relation changed at t=%.1f", e.timestamp);
+    });
+
+// Unsubscribe (same as named events)
+x4n::off(id);
+```
+
+#### Before vs After
+
+Each event has two subscription points:
+
+| Variant | When it fires | Use case |
+|---------|---------------|----------|
+| `on_{event}_before` | Before the game processes the event (MD cues haven't fired yet) | Observe or log pre-dispatch state |
+| `on_{event}_after` | After the game has dispatched to all MD cue listeners | React to fully-processed events |
+
+Most extensions should use the `_after` variant.
+
+#### Data Structs
+
+Every struct contains at minimum:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source_id` | `uint64_t` | Universe ID of the entity that raised the event |
+| `timestamp` | `double` | Game time when the event occurred |
+
+Additional fields are event-specific. Examples:
+
+```cpp
+// KilledData (type_id 233) — entity destroyed
+struct KilledData {
+    uint64_t source_id;          // destroyed entity
+    double   timestamp;
+    uint64_t killer;             // killer entity ID
+    uint64_t kill_method;        // kill method enum
+    uint64_t was_parent_killed;  // parent also destroyed?
+};
+
+// FactionRelationChangedData (type_id 184) — faction relations shifted
+struct FactionRelationChangedData {
+    uint64_t source_id;
+    double   timestamp;
+    uint64_t faction1;           // faction descriptor pointer
+    uint64_t faction2;           // other faction descriptor pointer
+    uint64_t new_relation;       // new relation value (reinterpret as float)
+    uint32_t old_relation;       // old relation value (reinterpret as float)
+    uint32_t reason;             // relation change reason
+};
+
+// SectorChangedOwnerData (type_id 409) — sector ownership changed
+struct SectorChangedOwnerData {
+    uint64_t source_id;
+    double   timestamp;
+    uint64_t sector_changing_ownership;
+    uint64_t new_owner_faction;
+    uint64_t previous_owner_faction;
+};
+```
+
+Browse `sdk/x4_md_events.h` for all 261 typed event definitions.
+
+#### Practical Example
+
+```cpp
+#include <x4_md_events.h>
+
+static int g_sub_killed = 0;
+static int g_sub_owner  = 0;
+
+X4N_EXTENSION {
+    x4n::on("on_game_loaded", [] {
+        g_sub_killed = x4n::md::on_killed_after(
+            [](const x4n::md::KilledData& e) {
+                x4n::log::info("Destroyed: entity %llu by %llu", e.source_id, e.killer);
+            });
+
+        g_sub_owner = x4n::md::on_sector_changed_owner_after(
+            [](const x4n::md::SectorChangedOwnerData& e) {
+                x4n::log::info("Sector %llu changed owner", e.sector_changing_ownership);
+            });
+    });
+}
+
+X4N_SHUTDOWN {
+    x4n::off(g_sub_killed);
+    x4n::off(g_sub_owner);
+}
+```
+
+#### Direct MD Events vs MD Bridge — When to Use Which
+
+| | Direct MD (`x4n::md::on_*`) | MD Bridge (`raise_lua_event`) |
+|---|---|---|
+| **Setup** | One C++ call, no XML/Lua needed | Requires MD cue XML + Lua bridge |
+| **Type safety** | Typed struct with named fields | String parameter only |
+| **Performance** | Minimal — direct hook, no scripting layers | Multiple scripting layer crossings |
+| **Version sensitivity** | Event struct layouts may shift between game patches | Stable (uses MD scripting layer) |
+| **Available events** | All 551 internal MD event types | Only events with MD cue conditions |
+| **Best for** | High-frequency events, structured data, performance-critical paths | Simple notifications, forward-compatible mods |
 
 ### Logging
 
@@ -450,6 +572,6 @@ See the `examples/` folder for working extensions:
 | Example | Demonstrates |
 |---------|-------------|
 | `hello` | Lifecycle events, game function calls, logging |
-| `event_test` | Event round-trips (C++→Lua→C++), frame updates |
+| `event_test` | Event round-trips (C++→Lua→C++), frame updates, direct MD event subscriptions |
 | `hook_test` | Before/after hooks on a game function |
 | `lua_bridge` | Dynamic Lua→C++ event forwarding |

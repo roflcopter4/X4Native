@@ -90,6 +90,21 @@ inline uint64_t get_component_id(const X4Component* component) {
     return component->id;
 }
 
+/// Resolve a raw uint64_t (from MD event fields) to a typed X4Component*.
+/// MD event params often contain raw component pointers stored as uint64_t.
+/// SEH-guarded: validates the pointer is readable by probing ->id.
+/// Returns nullptr if the value is null or not a valid component pointer.
+inline X4Component* resolve_component(uint64_t raw_ptr) {
+    if (raw_ptr == 0) return nullptr;
+    __try {
+        auto* comp = reinterpret_cast<X4Component*>(raw_ptr);
+        (void)comp->id;  // probe — triggers SEH if invalid
+        return comp;
+    } __except(1) {
+        return nullptr;
+    }
+}
+
 /// Read the macro name string from any component (sector, cluster, station, ship).
 /// Uses the embedded interface at component+0x30, vtable slot 4 (GetMacroName).
 /// Returns nullptr if the component is invalid or has no macro name.
