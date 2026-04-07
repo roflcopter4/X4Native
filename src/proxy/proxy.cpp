@@ -480,7 +480,15 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
             reinterpret_cast<LPCSTR>(hModule),
             &pinned);
     } else if (reason == DLL_PROCESS_DETACH) {
-        // Process exit: clean up the core DLL
+        if (reserved != nullptr) {
+            // Process is terminating. Other DLLs' statics may already be
+            // destroyed, all threads killed, heap potentially corrupted.
+            // The OS reclaims all memory, handles, pipes, and file locks.
+            // Companion detects broken pipe and exits on its own.
+            return TRUE;
+        }
+        // Dynamic unload (FreeLibrary): safe to clean up.
+        // Unreachable while pinned, but correct if pinning is ever removed.
         if (g_core_shutdown)
             g_core_shutdown();
         if (g_core_module) {
