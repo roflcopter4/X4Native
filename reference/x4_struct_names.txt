@@ -171,7 +171,7 @@ POIDetails
 Position2D
 PosRot
 ProductionMethodInfo
-ProductionMethodInfo2
+ProductionMethodInfo3
 RaceInfo
 RegionBoundary
 RegionDefinition

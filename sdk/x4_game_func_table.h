@@ -1,7 +1,7 @@
 // ==========================================================================
 // x4_game_func_table.h - X4 Game Function Pointer Table
 // ==========================================================================
-// Auto-generated from X4 v9.00-603098 FFI declarations.
+// Auto-generated from X4 v9.00-603990 FFI declarations.
 //
 // The X4GameFunctions struct provides compile-time type-safe access to
 // resolved game function pointers. Populated at runtime via GetProcAddress.
@@ -38,7 +38,7 @@ typedef struct X4GameFunctions {
 typedef void* (*X4GetGameFunctionFn)(const char* name);
 
 // --------------------------------------------------------------------------
-// Untyped Exports (310)
+// Untyped Exports (311)
 // --------------------------------------------------------------------------
 // These functions exist in X4.exe's export table but have no known
 // C signature from FFI data. Resolve with X4GetGameFunctionFn and cast.
@@ -140,6 +140,7 @@ typedef void* (*X4GetGameFunctionFn)(const char* name);
 //   GetPlayerAlerts                                           (see GetPlayerAlerts2)
 //   GetPlayerAlertSounds                                      (see GetPlayerAlertSounds2)
 //   GetPresentModeOption                                      (see GetPresentModeOption2)
+//   GetProductionMethodInfo                                   (see GetProductionMethodInfo2)
 //   GetRelationStatus                                         (see GetRelationStatus3)
 //   GetRelationStatus2                                        (see GetRelationStatus3)
 //   GetRemovedConstructionPlanModules                         (see GetRemovedConstructionPlanModules2)

@@ -5,7 +5,8 @@
         "900",
         "900-600626",
         "900-602526",
-        "900-603098"
+        "900-603098",
+        "900-603990"
     ],
     "functions": {
         "AbortActiveDiplomacyActionOperation": {
@@ -3026,7 +3027,8 @@
             "added": "900"
         },
         "GetProductionMethodInfo": {
-            "added": "900"
+            "added": "900",
+            "removed": "900-603990"
         },
         "GetProductionMethodResources": {
             "added": "900"
@@ -6174,6 +6176,9 @@
         },
         "GetNumAllEquipment2": {
             "added": "900-600626"
+        },
+        "GetProductionMethodInfo2": {
+            "added": "900-603990"
         }
     }
 }

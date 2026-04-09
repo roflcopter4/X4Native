@@ -12,7 +12,6 @@
 #include <x4n_core.h>
 #include <x4n_events.h>
 #include <x4_md_events.h>
-#include <x4n_entity.h>
 #include <x4n_log.h>
 
 // Subscription handles — lifecycle & custom events
@@ -67,8 +66,8 @@ static void on_game_loaded() {
         [](const x4n::md::KilledData& e) {
             g_md_killed_count++;
             if (g_md_killed_count <= 3)
-                x4n::log::info("event_test: [md:killed] entity %llu killer=%llu",
-                    e.source_id, x4n::entity::get_component_id(x4n::entity::resolve_component(e.killer)));
+                x4n::log::info("event_test: [md:killed] entity %llu killer=%llu method=%llu",
+                    e.source_id, e.killer, e.kill_method);
         });
 
     g_sub_md_relation = x4n::md::on_faction_relation_changed_after(
@@ -83,9 +82,7 @@ static void on_game_loaded() {
         [](const x4n::md::SectorChangedOwnerData& e) {
             g_md_sector_owner_count++;
             x4n::log::info("event_test: [md:sector_owner] sector %llu new_owner %llu (prev %llu)",
-                x4n::entity::get_component_id(x4n::entity::resolve_component(e.sector_changing_ownership)),
-                x4n::entity::get_component_id(x4n::entity::resolve_component(e.new_owner_faction)),
-                x4n::entity::get_component_id(x4n::entity::resolve_component(e.previous_owner_faction)));
+                e.sector_changing_ownership, e.new_owner_faction, e.previous_owner_faction);
         });
 
     g_sub_md_assignment = x4n::md::on_changed_assignment_after(
@@ -93,17 +90,15 @@ static void on_game_loaded() {
             g_md_assignment_count++;
             if (g_md_assignment_count <= 5)
                 x4n::log::info("event_test: [md:assignment68] subordinate=%llu src=%llu",
-                    x4n::entity::get_component_id(x4n::entity::resolve_component(e.subordinate)), e.source_id);
+                    e.subordinate, e.source_id);
         });
 
     g_sub_md_build = x4n::md::on_build_finished_after(
         [](const x4n::md::BuildFinishedData& e) {
             g_md_build_count++;
-            const char* cls = x4n::entity::get_class_name(e.source_id);
-            if (!cls || !cls[0]) cls = "?";
             if (g_md_build_count <= 20)
-                x4n::log::info("event_test: [md:build_finished] #%d source=%llu class=%s",
-                    g_md_build_count, e.source_id, cls);
+                x4n::log::info("event_test: [md:build_finished] #%d source=%llu buildprocessor=%llu",
+                    g_md_build_count, e.source_id, e.buildprocessor);
         });
 
     g_sub_md_sub_added = x4n::md::on_subordinate_added_after(
@@ -111,8 +106,7 @@ static void on_game_loaded() {
             g_md_sub_added_count++;
             if (g_md_sub_added_count <= 10)
                 x4n::log::info("event_test: [md:sub_added] #%d sub=%llu commander=%llu",
-                    g_md_sub_added_count,
-                    x4n::entity::get_component_id(x4n::entity::resolve_component(e.subordinate)), e.source_id);
+                    g_md_sub_added_count, e.subordinate, e.source_id);
         });
 
     g_sub_md_sub_removed = x4n::md::on_subordinate_removed_after(
@@ -120,8 +114,7 @@ static void on_game_loaded() {
             g_md_sub_removed_count++;
             if (g_md_sub_removed_count <= 10)
                 x4n::log::info("event_test: [md:sub_removed] #%d sub=%llu old_cmdr=%llu",
-                    g_md_sub_removed_count,
-                    x4n::entity::get_component_id(x4n::entity::resolve_component(e.subordinate)), e.source_id);
+                    g_md_sub_removed_count, e.subordinate, e.source_id);
         });
 
     x4n::log::info("event_test: [on_game_loaded] subscribed to 7 MD events");

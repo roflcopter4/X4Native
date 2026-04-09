@@ -2,7 +2,7 @@
 // x4_md_events.h - Typed MD Event Subscription API
 // ==========================================================================
 // Auto-generated from event_type_ids.csv + event_layouts.csv + common.xsd
-// Game version: 900-603098
+// Game version: 900-603990
 //
 // Usage:
 //   x4n::md::on_sector_changed_owner_before([](const x4n::md::SectorChangedOwnerData& e) {
@@ -5654,7 +5654,7 @@ namespace x4n::md
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
                 *reinterpret_cast<const uint32_t*>(p + 0x20),
                 *reinterpret_cast<const uint64_t*>(p + 0x40),
-                *reinterpret_cast<const uint32_t*>(p + 0x48)
+                *reinterpret_cast<const uint32_t*>(p + 0x58)
             };
         }
     };
@@ -6242,7 +6242,7 @@ namespace x4n::md
         double   timestamp;         // Game time (X4MdEvent)
         uint64_t project_id;
         uint64_t were_there_positive_sideeffect;
-        uint64_t were_there_negative_sideeffect;
+        uint32_t were_there_negative_sideeffect;
 
         static TerraformingProjectFailedData from(const X4MdEvent* ev) {
             auto* p = static_cast<const uint8_t*>(ev->raw_event);
@@ -6250,8 +6250,8 @@ namespace x4n::md
                 ev->source_id,
                 ev->timestamp,
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
-                *reinterpret_cast<const uint64_t*>(p + 0x30),
-                *reinterpret_cast<const uint64_t*>(p + 0x48)
+                *reinterpret_cast<const uint64_t*>(p + 0x48),
+                *reinterpret_cast<const uint32_t*>(p + 0x6A)
             };
         }
     };

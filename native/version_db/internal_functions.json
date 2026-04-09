@@ -17,7 +17,8 @@
       },
       "900-600626": { "rva": "0x004153A0" },
       "900-602526": { "rva": "0x00416250" },
-      "900-603098": { "rva": "0x00415F40" }
+      "900-603098": { "rva": "0x00415F40" },
+      "900-603990": { "rva": "0x00415F20" }
     },
     "MacroRegistry_Lookup": {
       "_find_hints": {
@@ -26,14 +27,15 @@
           "1. Search for string 'Cannot find XML file component macro' — referenced in this function's error path",
           "2. Also references 'Attempting to access macro' for venture extension validation",
           "3. Verify: uses FNV-1a constants 0x811C9DC5 / 0x1000193 for hashing macro name",
-          "4. Verify: heavy callee count (200+), large function (~0x580 bytes)"
+          "4. Verify: heavy callee count (200+), large function (~0x580 bytes in 603098, ~0xB40 bytes in 603990)"
         ],
         "verify_strings": ["Cannot find XML file component macro '%s' in index '%s'"],
         "byte_sig_note": "Large function (~0x580 bytes) with FNV-1a hash loop. Prologue varies by version."
       },
       "900-600626": { "rva": "0x009E72B0" },
       "900-602526": { "rva": "0x009E8E20" },
-      "900-603098": { "rva": "0x009EA820" }
+      "900-603098": { "rva": "0x009EA820" },
+      "900-603990": { "rva": "0x009EC130" }
     },
     "MD_CreateDynamicInterior_Handler": {
       "_find_hints": {
@@ -48,7 +50,8 @@
       },
       "900-600626": { "rva": "0x00B5DCD0" },
       "900-602526": { "rva": "0x00B5FD30" },
-      "900-603098": { "rva": "0x00B63C50" }
+      "900-603098": { "rva": "0x00B63C50" },
+      "900-603990": { "rva": "0x00B65BD0" }
     },
     "Component_GetCombinedSeed": {
       "_find_hints": {
@@ -64,7 +67,8 @@
       },
       "900-600626": { "rva": "0x00315260" },
       "900-602526": { "rva": "0x003160E0" },
-      "900-603098": { "rva": "0x00316220" }
+      "900-603098": { "rva": "0x00316220" },
+      "900-603990": { "rva": "0x003160B0" }
     },
     "ComponentRegistry_Find": {
       "_find_hints": {
@@ -80,7 +84,8 @@
       },
       "900-600626": { "rva": "0x000CE6B0" },
       "900-602526": { "rva": "0x000CE810" },
-      "900-603098": { "rva": "0x000CE890" }
+      "900-603098": { "rva": "0x000CE890" },
+      "900-603990": { "rva": "0x000CE780" }
     },
     "PlanEntry_Construct": {
       "_find_hints": {
@@ -97,7 +102,8 @@
       },
       "900-600626": { "rva": "0x00D09C90" },
       "900-602526": { "rva": "0x00D0C6B0" },
-      "900-603098": { "rva": "0x00D10960" }
+      "900-603098": { "rva": "0x00D10960" },
+      "900-603990": { "rva": "0x00D12900" }
     },
     "GameAlloc": {
       "_find_hints": {
@@ -114,7 +120,8 @@
       },
       "900-600626": { "rva": "0x0145CB90" },
       "900-602526": { "rva": "0x01460CB0" },
-      "900-603098": { "rva": "0x01467550" }
+      "900-603098": { "rva": "0x01467550" },
+      "900-603990": { "rva": "0x01466160" }
     },
     "ConstructionDB_CreatePlanDirect": {
       "_find_hints": {
@@ -131,7 +138,8 @@
       },
       "900-600626": { "rva": "0x00D0E680" },
       "900-602526": { "rva": "0x00D110A0" },
-      "900-603098": { "rva": "0x00D15350" }
+      "900-603098": { "rva": "0x00D15350" },
+      "900-603990": { "rva": "0x00D172F0" }
     },
     "ConstructionDB_AddPlan": {
       "_find_hints": {
@@ -148,7 +156,8 @@
       },
       "900-600626": { "rva": "0x00D0E4E0" },
       "900-602526": { "rva": "0x00D10F00" },
-      "900-603098": { "rva": "0x00D151B0" }
+      "900-603098": { "rva": "0x00D151B0" },
+      "900-603990": { "rva": "0x00D17150" }
     },
     "RadarVisibilityChanged_BuildEvent": {
       "_find_hints": {
@@ -158,7 +167,7 @@
           "2. From the RTTI type_info, find the vtable in .rdata (follow RTTI hierarchy: R0 → R4 → vtable)",
           "3. Find all code xrefs to the vtable — should be exactly 3 functions",
           "4. This is the SMALLEST of the 3 (~0xE8 bytes), called from a single massive jump-table function (~0x3AD8 bytes)",
-          "5. Verify: allocates 0x28 bytes, searches a property array for integer ID 714, reads property 1281 as bool"
+          "5. Verify: allocates 0x28 bytes, searches a property array for an integer ID (714 in 603098, 721 in 603990), reads a bool property (1281 in 603098, 1289 in 603990)"
         ],
         "verify_strings": ["RadarVisibilityChangedEvent@U"],
         "byte_sig": "48 89 5C 24 08 57 48 83 EC 30 48 8B F9 C7 44 24 20 10 00 00 00 B9 28 00 00 00",
@@ -166,7 +175,8 @@
       },
       "900-600626": { "rva": "0x00A2D810" },
       "900-602526": { "rva": "0x00A2F600" },
-      "900-603098": { "rva": "0x00A310E0" }
+      "900-603098": { "rva": "0x00A310E0" },
+      "900-603990": { "rva": "0x00A329F0" }
     },
     "IsRadarVisible_ReadByte": {
       "_find_hints": {
@@ -183,7 +193,8 @@
       },
       "900-600626": { "rva": "0x0011BE30" },
       "900-602526": { "rva": "0x0011CCF0" },
-      "900-603098": { "rva": "0x0011CD90" }
+      "900-603098": { "rva": "0x0011CD90" },
+      "900-603990": { "rva": "0x0011CC80" }
     },
     "SetObjectRadarVisible_Action": {
       "_find_hints": {
@@ -200,7 +211,8 @@
       },
       "900-600626": { "rva": "0x00B8BD30" },
       "900-602526": { "rva": "0x00B8DD80" },
-      "900-603098": { "rva": "0x00B91CA0" }
+      "900-603098": { "rva": "0x00B91CA0" },
+      "900-603990": { "rva": "0x00B93D50" }
     },
     "X4_FrameTick": {
       "_find_hints": {
@@ -217,7 +229,8 @@
       },
       "900-600626": { "rva": "0x00F4D1D0" },
       "900-602526": { "rva": "0x00F50C70" },
-      "900-603098": { "rva": "0x00F55670" }
+      "900-603098": { "rva": "0x00F55670" },
+      "900-603990": { "rva": "0x00F56820" }
     },
     "CreateOrderInternal": {
       "_find_hints": {
@@ -233,7 +246,8 @@
         "byte_sig": "48 89 5C 24 08 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 83 EC 50 45 0F B6 E9",
         "byte_sig_note": "First 32 bytes: mov [rsp+8],rbx; mov [rsp+18h],rbp; mov [rsp+20h],rsi; push rdi; push r12; push r13; push r14; push r15; sub rsp,50h; movzx r13d,r9b."
       },
-      "900-603098": { "rva": "0x00424A90" }
+      "900-603098": { "rva": "0x00424A90" },
+      "900-603990": { "rva": "0x00424A70" }
     },
     "SetOrderParamInternal": {
       "_find_hints": {
@@ -249,7 +263,8 @@
         "byte_sig": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 56 41 57 48 83 EC 60 0F 29 74 24 50 4D 8B F0",
         "byte_sig_note": "First 32 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; push rdi; push r14; push r15; sub rsp,60h; movaps [rsp+50h],xmm6; mov r14,r8."
       },
-      "900-603098": { "rva": "0x0102BEE0" }
+      "900-603098": { "rva": "0x0102BEE0" },
+      "900-603990": { "rva": "0x0102AB30" }
     },
     "SetCommander": {
       "_find_hints": {
@@ -264,7 +279,8 @@
         "byte_sig": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 56 41 57 48 83 EC 20 48 8B F2 49 8B F8 48 8B",
         "byte_sig_note": "First 31 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; push rdi; push r14; push r15; sub rsp,20h; mov rsi,rdx; mov rdi,r8; mov rdx,rcx (partial)."
       },
-      "900-603098": { "rva": "0x001C61F0" }
+      "900-603098": { "rva": "0x001C61F0" },
+      "900-603990": { "rva": "0x001C6070" }
     },
     "SetAssignment": {
       "_find_hints": {
@@ -278,7 +294,8 @@
         "byte_sig": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 60 48 8B DA 48 8B F9",
         "byte_sig_note": "First 30 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; mov [rsp+20h],rdi; push r14; sub rsp,60h; mov rbx,rdx; mov rdi,rcx."
       },
-      "900-603098": { "rva": "0x001C5FC0" }
+      "900-603098": { "rva": "0x001C5FC0" },
+      "900-603990": { "rva": "0x001C5E40" }
     },
     "GetFactionBuildMethod": {
       "_find_hints": {
@@ -293,7 +310,8 @@
         "byte_sig": "48 83 EC 28 4C 8B C9 48 85 C9 75 18 48 8D 0D",
         "byte_sig_note": "First 15 bytes of prologue: sub rsp,28h; mov r9,rcx; test rcx,rcx; jne +18h; lea rcx,[rip+...]. Null-check guard on factionid param."
       },
-      "900-603098": { "rva": "0x00194D40" }
+      "900-603098": { "rva": "0x00194D40" },
+      "900-603990": { "rva": "0x00194BC0" }
     },
     "EventQueue_InsertOrDispatch": {
       "_find_hints": {
@@ -305,13 +323,14 @@
           "4. The target function takes 4 args: (event_source* rcx, event_object* rdx, double xmm2 timestamp, char r9 immediate)",
           "5. If immediate && timestamp <= current_time + 0.0001: calls ImmediateDispatch, else inserts into priority queue",
           "6. ImmediateDispatch (called from this function) iterates up to 2048 registered cue listeners",
-          "7. Verify: function size ~200 bytes, contains ucomisd + jbe for the timestamp check"
+          "7. Verify: function size ~200 bytes in 603098, ~0x327 bytes in 603990. Contains timestamp + 0.0001 comparison"
         ],
         "verify_strings": [],
-        "byte_sig": "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20",
-        "byte_sig_note": "Prologue: saves rbx/rbp/rsi, push rdi, sub rsp 20h. Event_source in rcx, event_object in rdx, timestamp in xmm2, immediate in r9b."
+        "byte_sig": "48 85 D2 0F 84 ?? ?? ?? ?? 48 89 5C 24 08 48 89 74 24 20 F2 0F 11 54 24 18 57 48 83 EC 60",
+        "byte_sig_note": "Prologue (603990): test rdx,rdx; jz end; save rbx/rsi; movsd [rsp+18h],xmm2 (timestamp); push rdi; sub rsp,60h. Unique match. Old sig (603098) was generic 20-byte prologue with 146 matches — do not use."
       },
-      "900-603098": { "rva": "0x00958390" }
+      "900-603098": { "rva": "0x00958390" },
+      "900-603990": { "rva": "0x00959960" }
     }
   }
 }

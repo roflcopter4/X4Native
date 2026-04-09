@@ -1020,7 +1020,6 @@ X4_FUNC(UIPosRot, GetPositionalOffset, (UniverseID positionalid, UniverseID spac
 X4_FUNC(const char*, GetPresentModeOption2, (bool useconfig))
 X4_FUNC(WeaponDetails, GetPrimaryWeapon, (size_t weaponnum))
 X4_FUNC(int, GetPriorityMissiontargetPOSID, (void))
-X4_FUNC(ProductionMethodInfo2, GetProductionMethodInfo, (const char* wareid, const char* productionmethod))
 X4_FUNC(uint32_t, GetProductionMethodResources, (UIWareAmount* result, uint32_t resultlen, const char* wareid, const char* productionmethod))
 X4_FUNC(uint32_t, GetPurchasableCargo, (UniverseID containerid, const char*))
 X4_FUNC(const char*, GetPurposeName, (const char* purposeid))
@@ -2077,3 +2076,10 @@ X4_FUNC(uint32_t, GetNumAllEquipment2, (bool playerblueprint, bool customgamesta
 // Functions removed in v9.00-600626:
 //   GetAllEquipment
 //   GetNumAllEquipment
+
+// ======== Game v9.00-603990 - Added (1 functions) ========
+
+X4_FUNC(ProductionMethodInfo3, GetProductionMethodInfo2, (const char* wareid, const char* productionmethod))
+
+// Functions removed in v9.00-603990:
+//   GetProductionMethodInfo

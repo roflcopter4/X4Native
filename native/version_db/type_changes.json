@@ -5,7 +5,8 @@
         "900",
         "900-600626",
         "900-602526",
-        "900-603098"
+        "900-603098",
+        "900-603990"
     ],
     "struct_count": 283,
     "structs": {
@@ -595,7 +596,8 @@
         },
         "ProductionMethodInfo2": {
             "added": "900",
-            "fingerprint": "const char* id; const char* name; double productiontime; double productionamount;"
+            "fingerprint": "const char* id; const char* name; double productiontime; double productionamount;",
+            "removed": "900-603990"
         },
         "RaceInfo": {
             "added": "900",
@@ -1140,6 +1142,10 @@
         "YieldInfo": {
             "added": "900",
             "fingerprint": "const char* wareid; int32_t amount;"
+        },
+        "ProductionMethodInfo3": {
+            "added": "900-603990",
+            "fingerprint": "const char* id; const char* name; const char* tags; double productiontime; double productionamount;"
         }
     }
 }
