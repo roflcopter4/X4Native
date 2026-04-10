@@ -18,7 +18,8 @@
       "900-600626": { "rva": "0x004153A0" },
       "900-602526": { "rva": "0x00416250" },
       "900-603098": { "rva": "0x00415F40" },
-      "900-603990": { "rva": "0x00415F20" }
+      "900-603990": { "rva": "0x00415F20" },
+      "900-604402": { "rva": "0x00415F20" }
     },
     "MacroRegistry_Lookup": {
       "_find_hints": {
@@ -35,7 +36,8 @@
       "900-600626": { "rva": "0x009E72B0" },
       "900-602526": { "rva": "0x009E8E20" },
       "900-603098": { "rva": "0x009EA820" },
-      "900-603990": { "rva": "0x009EC130" }
+      "900-603990": { "rva": "0x009EC130" },
+      "900-604402": { "rva": "0x009EC190" }
     },
     "MD_CreateDynamicInterior_Handler": {
       "_find_hints": {
@@ -51,7 +53,8 @@
       "900-600626": { "rva": "0x00B5DCD0" },
       "900-602526": { "rva": "0x00B5FD30" },
       "900-603098": { "rva": "0x00B63C50" },
-      "900-603990": { "rva": "0x00B65BD0" }
+      "900-603990": { "rva": "0x00B65BD0" },
+      "900-604402": { "rva": "0x00B65C30" }
     },
     "Component_GetCombinedSeed": {
       "_find_hints": {
@@ -68,7 +71,8 @@
       "900-600626": { "rva": "0x00315260" },
       "900-602526": { "rva": "0x003160E0" },
       "900-603098": { "rva": "0x00316220" },
-      "900-603990": { "rva": "0x003160B0" }
+      "900-603990": { "rva": "0x003160B0" },
+      "900-604402": { "rva": "0x003160B0" }
     },
     "ComponentRegistry_Find": {
       "_find_hints": {
@@ -85,7 +89,8 @@
       "900-600626": { "rva": "0x000CE6B0" },
       "900-602526": { "rva": "0x000CE810" },
       "900-603098": { "rva": "0x000CE890" },
-      "900-603990": { "rva": "0x000CE780" }
+      "900-603990": { "rva": "0x000CE780" },
+      "900-604402": { "rva": "0x000CE780" }
     },
     "PlanEntry_Construct": {
       "_find_hints": {
@@ -103,7 +108,8 @@
       "900-600626": { "rva": "0x00D09C90" },
       "900-602526": { "rva": "0x00D0C6B0" },
       "900-603098": { "rva": "0x00D10960" },
-      "900-603990": { "rva": "0x00D12900" }
+      "900-603990": { "rva": "0x00D12900" },
+      "900-604402": { "rva": "0x00D12960" }
     },
     "GameAlloc": {
       "_find_hints": {
@@ -121,7 +127,8 @@
       "900-600626": { "rva": "0x0145CB90" },
       "900-602526": { "rva": "0x01460CB0" },
       "900-603098": { "rva": "0x01467550" },
-      "900-603990": { "rva": "0x01466160" }
+      "900-603990": { "rva": "0x01466160" },
+      "900-604402": { "rva": "0x014661C0" }
     },
     "ConstructionDB_CreatePlanDirect": {
       "_find_hints": {
@@ -139,7 +146,8 @@
       "900-600626": { "rva": "0x00D0E680" },
       "900-602526": { "rva": "0x00D110A0" },
       "900-603098": { "rva": "0x00D15350" },
-      "900-603990": { "rva": "0x00D172F0" }
+      "900-603990": { "rva": "0x00D172F0" },
+      "900-604402": { "rva": "0x00D17350" }
     },
     "ConstructionDB_AddPlan": {
       "_find_hints": {
@@ -157,7 +165,8 @@
       "900-600626": { "rva": "0x00D0E4E0" },
       "900-602526": { "rva": "0x00D10F00" },
       "900-603098": { "rva": "0x00D151B0" },
-      "900-603990": { "rva": "0x00D17150" }
+      "900-603990": { "rva": "0x00D17150" },
+      "900-604402": { "rva": "0x00D171B0" }
     },
     "RadarVisibilityChanged_BuildEvent": {
       "_find_hints": {
@@ -176,7 +185,8 @@
       "900-600626": { "rva": "0x00A2D810" },
       "900-602526": { "rva": "0x00A2F600" },
       "900-603098": { "rva": "0x00A310E0" },
-      "900-603990": { "rva": "0x00A329F0" }
+      "900-603990": { "rva": "0x00A329F0" },
+      "900-604402": { "rva": "0x00A32A50" }
     },
     "IsRadarVisible_ReadByte": {
       "_find_hints": {
@@ -194,7 +204,8 @@
       "900-600626": { "rva": "0x0011BE30" },
       "900-602526": { "rva": "0x0011CCF0" },
       "900-603098": { "rva": "0x0011CD90" },
-      "900-603990": { "rva": "0x0011CC80" }
+      "900-603990": { "rva": "0x0011CC80" },
+      "900-604402": { "rva": "0x0011CC80" }
     },
     "SetObjectRadarVisible_Action": {
       "_find_hints": {
@@ -212,7 +223,8 @@
       "900-600626": { "rva": "0x00B8BD30" },
       "900-602526": { "rva": "0x00B8DD80" },
       "900-603098": { "rva": "0x00B91CA0" },
-      "900-603990": { "rva": "0x00B93D50" }
+      "900-603990": { "rva": "0x00B93D50" },
+      "900-604402": { "rva": "0x00B93DB0" }
     },
     "X4_FrameTick": {
       "_find_hints": {
@@ -230,7 +242,8 @@
       "900-600626": { "rva": "0x00F4D1D0" },
       "900-602526": { "rva": "0x00F50C70" },
       "900-603098": { "rva": "0x00F55670" },
-      "900-603990": { "rva": "0x00F56820" }
+      "900-603990": { "rva": "0x00F56820" },
+      "900-604402": { "rva": "0x00F56880" }
     },
     "CreateOrderInternal": {
       "_find_hints": {
@@ -247,7 +260,8 @@
         "byte_sig_note": "First 32 bytes: mov [rsp+8],rbx; mov [rsp+18h],rbp; mov [rsp+20h],rsi; push rdi; push r12; push r13; push r14; push r15; sub rsp,50h; movzx r13d,r9b."
       },
       "900-603098": { "rva": "0x00424A90" },
-      "900-603990": { "rva": "0x00424A70" }
+      "900-603990": { "rva": "0x00424A70" },
+      "900-604402": { "rva": "0x00424A70" }
     },
     "SetOrderParamInternal": {
       "_find_hints": {
@@ -264,7 +278,8 @@
         "byte_sig_note": "First 32 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; push rdi; push r14; push r15; sub rsp,60h; movaps [rsp+50h],xmm6; mov r14,r8."
       },
       "900-603098": { "rva": "0x0102BEE0" },
-      "900-603990": { "rva": "0x0102AB30" }
+      "900-603990": { "rva": "0x0102AB30" },
+      "900-604402": { "rva": "0x0102AB90" }
     },
     "SetCommander": {
       "_find_hints": {
@@ -280,7 +295,8 @@
         "byte_sig_note": "First 31 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; push rdi; push r14; push r15; sub rsp,20h; mov rsi,rdx; mov rdi,r8; mov rdx,rcx (partial)."
       },
       "900-603098": { "rva": "0x001C61F0" },
-      "900-603990": { "rva": "0x001C6070" }
+      "900-603990": { "rva": "0x001C6070" },
+      "900-604402": { "rva": "0x001C6070" }
     },
     "SetAssignment": {
       "_find_hints": {
@@ -295,7 +311,8 @@
         "byte_sig_note": "First 30 bytes: mov [rsp+8],rbx; mov [rsp+10h],rbp; mov [rsp+18h],rsi; mov [rsp+20h],rdi; push r14; sub rsp,60h; mov rbx,rdx; mov rdi,rcx."
       },
       "900-603098": { "rva": "0x001C5FC0" },
-      "900-603990": { "rva": "0x001C5E40" }
+      "900-603990": { "rva": "0x001C5E40" },
+      "900-604402": { "rva": "0x001C5E40" }
     },
     "GetFactionBuildMethod": {
       "_find_hints": {
@@ -311,7 +328,8 @@
         "byte_sig_note": "First 15 bytes of prologue: sub rsp,28h; mov r9,rcx; test rcx,rcx; jne +18h; lea rcx,[rip+...]. Null-check guard on factionid param."
       },
       "900-603098": { "rva": "0x00194D40" },
-      "900-603990": { "rva": "0x00194BC0" }
+      "900-603990": { "rva": "0x00194BC0" },
+      "900-604402": { "rva": "0x00194BC0" }
     },
     "EventQueue_InsertOrDispatch": {
       "_find_hints": {
@@ -330,7 +348,8 @@
         "byte_sig_note": "Prologue (603990): test rdx,rdx; jz end; save rbx/rsi; movsd [rsp+18h],xmm2 (timestamp); push rdi; sub rsp,60h. Unique match. Old sig (603098) was generic 20-byte prologue with 146 matches — do not use."
       },
       "900-603098": { "rva": "0x00958390" },
-      "900-603990": { "rva": "0x00959960" }
+      "900-603990": { "rva": "0x00959960" },
+      "900-604402": { "rva": "0x009599C0" }
     }
   }
 }

@@ -20,14 +20,14 @@ File Type: EXECUTABLE IMAGE
           1    0 001EBED0 AbortActiveDiplomacyActionOperation
           2    1 00221280 AbortActiveTerraformingProject
           3    2 001DDDB0 AbortBoardingOperation
-          4    3 00AB85C0 AbortCurrentNotification
+          4    3 00AB8620 AbortCurrentNotification
           5    4 0013D7E0 AbortMission
-          6    5 00AB85E0 ActivateDirectInput
-          7    6 00ABED20 ActivateDirectKeyInput
-          8    7 00ABED60 ActivateMouseEmulation
+          6    5 00AB8640 ActivateDirectInput
+          7    6 00ABED80 ActivateDirectKeyInput
+          8    7 00ABEDC0 ActivateMouseEmulation
           9    8 0013D8B0 ActivateObject
          10    9 0013D980 ActivatePlayerControls
-         11    A 00ABED70 ActivateSliderCellInput
+         11    A 00ABEDD0 ActivateSliderCellInput
          12    B 001DDF30 AddAttackerToBoardingOperation
          13    C 001879C0 AddBuildTask
          14    D 001872B0 AddBuildTask2
@@ -66,7 +66,7 @@ File Type: EXECUTABLE IMAGE
          47   2E 001B9E60 AssignHiredActor
          48   2F 00221380 CanAbortActiveTerraformingProject
          49   30 001BA230 CanAcceptSubordinate
-         50   31 00AB86C0 CanActivateSeta
+         50   31 00AB8720 CanActivateSeta
          51   32 00189E10 CanApplyKnownLoadout
          52   33 0013E870 CanBeCollectedBy
          53   34 0013EA70 CanBeDismantled
@@ -86,7 +86,7 @@ File Type: EXECUTABLE IMAGE
          67   42 001A5F40 CanDockAtDockingBay
          68   43 0018AB90 CanGenerateValidKnownLoadout
          69   44 0018AF60 CanGenerateValidLoadout
-         70   45 00ABEE30 CanHaveCountermeasures
+         70   45 00ABEE90 CanHaveCountermeasures
          71   46 0009C4B0 CanOpenWebBrowser
          72   47 0013EBB0 CanPerformLongRangeScan
          73   48 0013F430 CanPlayerActivateCoverAbility
@@ -120,7 +120,7 @@ File Type: EXECUTABLE IMAGE
         101   64 001F3090 ClearBuildMapSelection
         102   65 001A6700 ClearContainerBuyLimitOverride
         103   66 001A6840 ClearContainerSellLimitOverride
-        104   67 00AB8710 ClearErrorLog
+        104   67 00AB8770 ClearErrorLog
         105   68 001F3130 ClearMapBehaviour
         106   69 0018B6C0 ClearMapBuildPlot
         107   6A 001F31B0 ClearMapObjectFilter
@@ -140,10 +140,10 @@ File Type: EXECUTABLE IMAGE
         121   78 0013FCF0 CompassMenuButtonPressed
         122   79 0013FE30 CompassMenuButtonReleased
         123   7A 0013FF60 ConnectToMultiplayerGame
-        124   7B 00A7FAF0 ContinueGameStart
-        125   7C 00ABEEC0 ConvertInputString
+        124   7B 00A7FB50 ContinueGameStart
+        125   7C 00ABEF20 ConvertInputString
         126   7D 00140020 ConvertStringTo64Bit
-        127   7E 00AB8720 CopyToClipboard
+        127   7E 00AB8780 CopyToClipboard
         128   7F 00140240 CreateBlacklist
         129   80 00140770 CreateBlacklist2
         130   81 001DE920 CreateBoardingOperation
@@ -153,22 +153,22 @@ File Type: EXECUTABLE IMAGE
         134   85 001BAD10 CreateOrder
         135   86 001BACF0 CreateOrder2
         136   87 001BAB20 CreateOrder3
-        137   88 01A5E480 CreatePlugin
+        137   88 01A5E4E0 CreatePlugin
         138   89 001412A0 CreateTradeRule
-        139   8A 00ABF0E0 CycleNextDroneMode
-        140   8B 00ABF140 CycleTurretMissile
-        141   8C 00ABF260 CycleTurretMode
-        142   8D 00AB87D0 DeactivateDirectInput
-        143   8E 00ABF400 DeactivateDirectKeyInput
-        144   8F 00ABF440 DeactivateMouseEmulation
+        139   8A 00ABF140 CycleNextDroneMode
+        140   8B 00ABF1A0 CycleTurretMissile
+        141   8C 00ABF2C0 CycleTurretMode
+        142   8D 00AB8830 DeactivateDirectInput
+        143   8E 00ABF460 DeactivateDirectKeyInput
+        144   8F 00ABF4A0 DeactivateMouseEmulation
         145   90 00141520 DeactivatePlayerControls
-        146   91 00ABF4B0 DeactivateSliderCellInput
+        146   91 00ABF510 DeactivateSliderCellInput
         147   92 001FFEF0 DeleteSavegame
         148   93 001F3890 DeselectMacroForConstructionMap
-        149   94 00AB8820 DisableAsserts
-        150   95 00ABF4D0 DisableAutoMouseEmulation
-        151   96 00ABF520 DisableEncryptedDirectInputMode
-        152   97 00AB8B00 DisableOptionalAsserts
+        149   94 00AB8880 DisableAsserts
+        150   95 00ABF530 DisableAutoMouseEmulation
+        151   96 00ABF580 DisableEncryptedDirectInputMode
+        152   97 00AB8B60 DisableOptionalAsserts
         153   98 00141560 DisableScenarioLoading
         154   99 00141570 DismantleEngineMod
         155   9A 001DEAF0 DismantleGroupedWeaponMod
@@ -183,15 +183,15 @@ File Type: EXECUTABLE IMAGE
         164   A3 001A6AC0 DropCargo
         165   A4 001418F0 DropInventory
         166   A5 00095ED0 EnableAllCheats
-        167   A6 00AB8DE0 EnableAsserts
-        168   A7 00ABF540 EnableAutoMouseEmulation
-        169   A8 00ABF550 EnableEncryptedDirectInputMode
-        170   A9 00AB90A0 EnableOptionalAsserts
+        167   A6 00AB8E40 EnableAsserts
+        168   A7 00ABF5A0 EnableAutoMouseEmulation
+        169   A8 00ABF5B0 EnableEncryptedDirectInputMode
+        170   A9 00AB9100 EnableOptionalAsserts
         171   AA 001BAD30 EnableOrder
         172   AB 001BAE00 EnablePlannedDefaultOrder
         173   AC 00141F90 EnableScenarioLoading
         174   AD 00142180 EndGuidance
-        175   AE 00AB9360 EnterInteractMenu
+        175   AE 00AB93C0 EnterInteractMenu
         176   AF 00200340 ExportColorMap
         177   B0 002003F0 ExportColorProfile
         178   B1 001C90C0 ExportCustomGameStart
@@ -248,19 +248,19 @@ File Type: EXECUTABLE IMAGE
         229   E4 00148570 GetActiveMissionComponentID
         230   E5 00148620 GetActiveMissionID
         231   E6 00148630 GetActiveObjectiveType
-        232   E7 00ABF570 GetActivePrimaryWeaponGroup
-        233   E8 00ABF610 GetActiveSecondaryWeaponGroup
+        232   E7 00ABF5D0 GetActivePrimaryWeaponGroup
+        233   E8 00ABF670 GetActiveSecondaryWeaponGroup
         234   E9 00201010 GetAdaptiveSamplingOption
         235   EA 001EC460 GetAgentDiplomacyShip
         236   EB 001EC550 GetAgentMaxSlotCount
         237   EC 001EC5A0 GetAgentOriginalOwner
         238   ED 001EC690 GetAgentSlotResearchWare
-        239   EE 00ABF6B0 GetAimAssistState
+        239   EE 00ABF710 GetAimAssistState
         240   EF 00148670 GetAllBlacklists
         241   F0 00148730 GetAllBoardingBehaviours
         242   F1 00148EC0 GetAllBoardingPhases
         243   F2 00201070 GetAllColorMapColors
-        244   F3 00ABF7F0 GetAllColorMapEntries
+        244   F3 00ABF850 GetAllColorMapEntries
         245   F4 002011A0 GetAllColorMapMappings
         246   F5 001BAEF0 GetAllCommanders
         247   F6 001499C0 GetAllControlPosts
@@ -300,7 +300,7 @@ File Type: EXECUTABLE IMAGE
         281  118 0014EA70 GetAskToSignalForFaction
         282  119 001A6DD0 GetAssignedConstructionVessels
         283  11A 001E15A0 GetAttackersOfBoardingOperation
-        284  11B 00ABF900 GetAutoRollState
+        284  11B 00ABF960 GetAutoRollState
         285  11C 00201BB0 GetAutoZoomResetOption
         286  11D 00201970 GetAutosaveIntervalOption
         287  11E 0014EBA0 GetAvailableClothingMods
@@ -321,7 +321,7 @@ File Type: EXECUTABLE IMAGE
         302  12D 001E21E0 GetBoardingRiskThresholds
         303  12E 001E2360 GetBoardingStrengthFromOperation
         304  12F 001BE6E0 GetBoardingStrengthOfControllableTierAmounts
-        305  130 00ABF940 GetBoostEnergyPercentage
+        305  130 00ABF9A0 GetBoostEnergyPercentage
         306  131 00228C00 GetBoxTextBoxColor
         307  132 00228CC0 GetBoxTextInfo
         308  133 0018FA90 GetBuildDuration
@@ -342,7 +342,7 @@ File Type: EXECUTABLE IMAGE
         323  142 00191370 GetBuildTaskDuration
         324  143 00191520 GetBuildTaskInfo
         325  144 00191750 GetBuildTasks
-        326  145 00AB94B0 GetBuildVersionSuffix
+        326  145 00AB9510 GetBuildVersionSuffix
         327  146 00191AB0 GetBuildWarePrice
         328  147 00150690 GetBuilderHiringFee
         329  148 00228F30 GetButtonBorderColor
@@ -353,7 +353,7 @@ File Type: EXECUTABLE IMAGE
         334  14D 00229180 GetButtonIconGlowFactor
         335  14E 00229240 GetButtonText2Details
         336  14F 002294B0 GetButtonTextGlowFactor
-        337  150 00AB9370 GetCameraRotation
+        337  150 00AB93D0 GetCameraRotation
         338  151 001A74A0 GetCargo
         339  152 001A7BE0 GetCargoSpaceUsedAfterTradeOrders
         340  153 00150760 GetCargoStatistics
@@ -372,10 +372,10 @@ File Type: EXECUTABLE IMAGE
         353  160 00229790 GetCloseOnUnhandledClickFrames
         354  161 00150D40 GetClusterBackground
         355  162 00201BE0 GetCockpitCameraScaleOption
-        356  163 00ABF9C0 GetCollisionAvoidanceState
+        356  163 00ABFA20 GetCollisionAvoidanceState
         357  164 00201BF0 GetColorBlindOption
         358  165 00201E70 GetColorBlindOptionStrength
-        359  166 00ABFA50 GetColorMapEntry
+        359  166 00ABFAB0 GetColorMapEntry
         360  167 00201F70 GetColorProfiles
         361  168 001BB340 GetCommander
         362  169 00150DF0 GetCommonContext
@@ -387,14 +387,14 @@ File Type: EXECUTABLE IMAGE
         368  16F 00151740 GetComponentClass
         369  170 001517D0 GetComponentClassMatrix
         370  171 001518B0 GetComponentCollidableSize
-        371  172 00AB94D0 GetComponentDetails
-        372  173 00ABFCC0 GetComponentHUDIcon
-        373  174 00ABFDB0 GetComponentIcon
+        371  172 00AB9530 GetComponentDetails
+        372  173 00ABFD20 GetComponentHUDIcon
+        373  174 00ABFE10 GetComponentIcon
         374  175 00151950 GetComponentKnownName
         375  176 00151B00 GetComponentName
-        376  177 00ABFE50 GetComponentOffset
-        377  178 00ABFF80 GetComponentScreenPosition
-        378  179 00AB98B0 GetConfigSetting
+        376  177 00ABFEB0 GetComponentOffset
+        377  178 00ABFFE0 GetComponentScreenPosition
+        378  179 00AB9910 GetConfigSetting
         379  17A 00202020 GetConfiguredModifierKeys
         380  17B 00192E80 GetConstructionMapItemLoadout
         381  17C 00193020 GetConstructionMapItemLoadout2
@@ -440,17 +440,17 @@ File Type: EXECUTABLE IMAGE
         421  1A4 001BB790 GetControllableSubordinateFleetUnits
         422  1A5 00153370 GetCreditsDueFromPlayerBuilds
         423  1A6 001535D0 GetCreditsDueFromPlayerTrades
-        424  1A7 00AB99D0 GetCrosshairArrowDetails
-        425  1A8 00AC0090 GetCrosshairPlatformGuidanceDetails
+        424  1A7 00AB9A30 GetCrosshairArrowDetails
+        425  1A8 00AC00F0 GetCrosshairPlatformGuidanceDetails
         426  1A9 001539E0 GetCurrentAmmoOfWeapon
         427  1AA 001E24D0 GetCurrentBoardingPhase
         428  1AB 001AB690 GetCurrentBuildProgress
-        429  1AC 00AB9F10 GetCurrentCrosshairMessage
-        430  1AD 00AB9FF0 GetCurrentCursorInfo
+        429  1AC 00AB9F70 GetCurrentCrosshairMessage
+        430  1AD 00ABA050 GetCurrentCursorInfo
         431  1AE 001E2650 GetCurrentDroneMode
         432  1AF 001BB8A0 GetCurrentFleetLogo
         433  1B0 00153A70 GetCurrentGPUNiceName
-        434  1B1 00ABA030 GetCurrentGameTime
+        434  1B1 00ABA090 GetCurrentGameTime
         435  1B2 00153AA0 GetCurrentLanguage
         436  1B3 00193810 GetCurrentLoadout
         437  1B4 00193970 GetCurrentLoadoutCounts
@@ -462,7 +462,7 @@ File Type: EXECUTABLE IMAGE
         443  1BA 00153AB0 GetCurrentMissionOffers
         444  1BB 00153B40 GetCurrentPlayerLogo
         445  1BC 00153C40 GetCurrentSoundDevice
-        446  1BD 00AC04B0 GetCurrentTargetMouseButtonMapping
+        446  1BD 00AC0510 GetCurrentTargetMouseButtonMapping
         447  1BE 00153C60 GetCurrentUTCDataTime
         448  1BF 00153C70 GetCurrentVentureInfo
         449  1C0 000B3880 GetCurrentVentureShips
@@ -578,7 +578,7 @@ File Type: EXECUTABLE IMAGE
         559  22E 001545D0 GetDisplayedModifierKey
         560  22F 001547D0 GetDistanceBetween
         561  230 001548B0 GetDockedShips
-        562  231 00AC0610 GetDroneDetails
+        562  231 00AC0670 GetDroneDetails
         563  232 001E3050 GetDroneModes
         564  233 002297D0 GetDropDownBackground2Details
         565  234 002298C0 GetDropDownBorderColor
@@ -612,14 +612,14 @@ File Type: EXECUTABLE IMAGE
         593  250 002028C0 GetEmergencyEjectOption
         594  251 002028E0 GetEnemyWarningAttackSound
         595  252 00202A40 GetEnemyWarningNearbySound
-        596  253 00ABA070 GetEntityActiveIcon
+        596  253 00ABA0D0 GetEntityActiveIcon
         597  254 00154C50 GetEntityCombinedSkill
-        598  255 00ABA1F0 GetEntityInactiveIcon
-        599  256 00ABA2E0 GetEntitySelectedIcon
+        598  255 00ABA250 GetEntityInactiveIcon
+        599  256 00ABA340 GetEntitySelectedIcon
         600  257 00154E60 GetEntitySkillsForAssignment
         601  258 00202C50 GetEnvMapProbeInsideGlassFadeOption
         602  259 00202BA0 GetEnvMapProbeOption
-        603  25A 00ABA460 GetEnvironmentObject
+        603  25A 00ABA4C0 GetEnvironmentObject
         604  25B 00155250 GetEquipmentModInfo
         605  25C 00155740 GetEquipmentModPropertyName
         606  25D 00194710 GetEstimatedBuildPrice
@@ -628,17 +628,17 @@ File Type: EXECUTABLE IMAGE
         609  260 00156060 GetExtensionName
         610  261 00156150 GetExtensionNameByID
         611  262 00156250 GetExtensionVersion
-        612  263 00ABA4F0 GetExternalTargetViewComponent
+        612  263 00ABA550 GetExternalTargetViewComponent
         613  264 00156360 GetExternalViewRefObject
         614  265 00157B40 GetFPS
         615  266 00202C80 GetFSRFrameGenOption
         616  267 001F1100 GetFactionAgent
         617  268 00194BC0 GetFactionBuildMethod
         618  269 00156390 GetFactionDefaultWeaponMode
-        619  26A 00ABA520 GetFactionDetails
-        620  26B 00AC0970 GetFactionNameForTargetMonitorHack
-        621  26C 00ABA720 GetFactionRelationStatus
-        622  26D 00AC0A00 GetFactionRelationStatus2
+        619  26A 00ABA580 GetFactionDetails
+        620  26B 00AC09D0 GetFactionNameForTargetMonitorHack
+        621  26C 00ABA780 GetFactionRelationStatus
+        622  26D 00AC0A60 GetFactionRelationStatus2
         623  26E 00156480 GetFactionRepresentative
         624  26F 001565D0 GetFightRuleInfo
         625  270 001568A0 GetFightRuleInfoCounts
@@ -696,7 +696,7 @@ File Type: EXECUTABLE IMAGE
         677  2A4 00157DF0 GetHQs
         678  2A5 00203030 GetHUDScaleOption
         679  2A6 00203310 GetHUDSeparateRadar
-        680  2A7 00ABA8B0 GetHUDUIScale
+        680  2A7 00ABA910 GetHUDUIScale
         681  2A8 0022CCD0 GetHelpOverlayInfo
         682  2A9 0022CDA0 GetHelpOverlayInfo2
         683  2AA 0022CE70 GetHelpOverlayInfo3
@@ -730,7 +730,7 @@ File Type: EXECUTABLE IMAGE
         711  2C6 00203360 GetLastSaveInfo
         712  2C7 00159B90 GetLibraryEntryAliases
         713  2C8 00159CC0 GetLicenceInfo
-        714  2C9 00ABA8F0 GetLoadingHint
+        714  2C9 00ABA950 GetLoadingHint
         715  2CA 00194D90 GetLoadout
         716  2CB 001950D0 GetLoadout2
         717  2CC 00195410 GetLoadoutCounts
@@ -743,17 +743,17 @@ File Type: EXECUTABLE IMAGE
         724  2D3 00197180 GetLoadoutStatistics5
         725  2D4 00195E60 GetLoadoutsInfo
         726  2D5 00159E40 GetLocalizedInputName
-        727  2D6 00ABABF0 GetLocalizedInteractiveNotificationKey
+        727  2D6 00ABAC50 GetLocalizedInteractiveNotificationKey
         728  2D7 0015A000 GetLocalizedRawMouseAxisName
         729  2D8 0015A170 GetLocalizedRawMouseButtonName
-        730  2D9 00ABACF0 GetLocalizedText
+        730  2D9 00ABAD50 GetLocalizedText
         731  2DA 00203790 GetLongRangeScanIndicatorOption
         732  2DB 0015A300 GetMacroClass
         733  2DC 0015A4C0 GetMacroDeployableCapacity
         734  2DD 001F4030 GetMacroMapPositionOnEcliptic
         735  2DE 0015A650 GetMacroMissileCapacity
         736  2DF 0015A7E0 GetMacrosStartingWith
-        737  2E0 00ABB090 GetMainMissiontargetPOSID
+        737  2E0 00ABB0F0 GetMainMissiontargetPOSID
         738  2E1 001F4120 GetMapComponentMissions
         739  2E2 0015A8B0 GetMapEditorMacros
         740  2E3 0015A8F0 GetMapEditorObjectList
@@ -774,9 +774,9 @@ File Type: EXECUTABLE IMAGE
         755  2F2 00198070 GetMaxLoadoutStatistics5
         756  2F3 001ABF40 GetMaxProductionStorage
         757  2F4 002037A0 GetMenuWidthScale
-        758  2F5 00ABB0A0 GetMessageDetails
-        759  2F6 00AC0C20 GetMessageDetails2
-        760  2F7 00AC0D90 GetMessageDetails3
+        758  2F5 00ABB100 GetMessageDetails
+        759  2F6 00AC0C80 GetMessageDetails2
+        760  2F7 00AC0DF0 GetMessageDetails3
         761  2F8 0015AE70 GetMessageInteractPosition
         762  2F9 0015AEF0 GetMessages
         763  2FA 0015B660 GetMineablesAtSectorPos
@@ -802,15 +802,15 @@ File Type: EXECUTABLE IMAGE
         783  30E 0015C600 GetMissionIDObjective
         784  30F 0015C840 GetMissionIDObjective2
         785  310 0015CAB0 GetMissionIDObjectiveTarget
-        786  311 00AC0F20 GetMissionInfo
-        787  312 00AC13C0 GetMissionInfo2
-        788  313 00AC1920 GetMissionInfo3
+        786  311 00AC0F80 GetMissionInfo
+        787  312 00AC1420 GetMissionInfo2
+        788  313 00AC1980 GetMissionInfo3
         789  314 00199C80 GetMissionLoadout
         790  315 00199E20 GetMissionLoadoutCounts
         791  316 0015CBE0 GetMissionObjectiveStep
         792  317 0015CE90 GetMissionObjectiveStep2
         793  318 0015D150 GetMissionObjectiveStep3
-        794  319 00AC1EB0 GetMissionOfferIcons
+        794  319 00AC1F10 GetMissionOfferIcons
         795  31A 0015D450 GetMissionOnlineInfo
         796  31B 0015D550 GetMissionThreadSubMissions
         797  31C 0015D5F0 GetModeLightIntensity
@@ -818,7 +818,7 @@ File Type: EXECUTABLE IMAGE
         799  31E 0019A140 GetModuleNeededResources
         800  31F 0019A2C0 GetModuleRecycledResources
         801  320 0015D600 GetMoneyLog
-        802  321 00AC21A0 GetMonitorExtents
+        802  321 00AC2200 GetMonitorExtents
         803  322 0015D740 GetMoonInfo
         804  323 0015E390 GetMoonInfo2
         805  324 00203DD0 GetMouseHUDModeOption
@@ -829,17 +829,17 @@ File Type: EXECUTABLE IMAGE
         810  329 00203EF0 GetMouseVRSensitivityPitch
         811  32A 00203EF0 GetMouseVRSensitivityYaw
         812  32B 0015F010 GetNPCAccountStatistics
-        813  32C 00AC2390 GetNextNewsItem
-        814  32D 00AC25F0 GetNextNewsItem2
-        815  32E 00ABB1F0 GetNotificationID
+        813  32C 00AC23F0 GetNextNewsItem
+        814  32D 00AC2650 GetNextNewsItem2
+        815  32E 00ABB250 GetNotificationID
         816  32F 0015EC10 GetNotificationTypes
         817  330 0015EE10 GetNotificationTypes2
-        818  331 00AC28D0 GetNumAcceptedMissions
+        818  331 00AC2930 GetNumAcceptedMissions
         819  332 0015F220 GetNumAllBlacklists
         820  333 0015F2B0 GetNumAllBoardingBehaviours
         821  334 0015F2C0 GetNumAllBoardingPhases
         822  335 00203F00 GetNumAllColorMapColors
-        823  336 00AC2940 GetNumAllColorMapEntries
+        823  336 00AC29A0 GetNumAllColorMapEntries
         824  337 00203F30 GetNumAllColorMapMappings
         825  338 001BD010 GetNumAllCommanders
         826  339 0015F2D0 GetNumAllControlPosts
@@ -915,7 +915,7 @@ File Type: EXECUTABLE IMAGE
         896  37F 001AD980 GetNumContainerWareReservations2
         897  380 001ADB10 GetNumContainerWorkforceInfluence
         898  381 001BD670 GetNumControllableSubordinateFleetUnits
-        899  382 00AC2950 GetNumCountermeasures
+        899  382 00AC29B0 GetNumCountermeasures
         900  383 001624D0 GetNumCurrentMissionOffers
         901  384 001D61F0 GetNumCustomGameStartBudgetGroups
         902  385 001D6230 GetNumCustomGameStartPaintThemes
@@ -973,7 +973,7 @@ File Type: EXECUTABLE IMAGE
         954  3B9 0019D380 GetNumModuleNeededResources
         955  3BA 0019D470 GetNumModuleRecycledResources
         956  3BB 001658B0 GetNumNotificationTypes
-        957  3BC 00ABB220 GetNumNotifications
+        957  3BC 00ABB280 GetNumNotifications
         958  3BD 001658C0 GetNumObjectsWithSyncPoint
         959  3BE 001BDB70 GetNumObjectsWithSyncPointFromOrder
         960  3BF 00165950 GetNumOrderDefinitions
@@ -992,9 +992,9 @@ File Type: EXECUTABLE IMAGE
         973  3CC 00165E70 GetNumPlayerLogos
         974  3CD 00166050 GetNumPlayerPeopleDefinitions
         975  3CE 0019E2F0 GetNumPlayerShipBuildTasks
-        976  3CF 00AC29C0 GetNumPrimaryWeapons
+        976  3CF 00AC2A20 GetNumPrimaryWeapons
         977  3D0 00166100 GetNumProductionMethodResources
-        978  3D1 00AC2A40 GetNumRadarModes
+        978  3D1 00AC2AA0 GetNumRadarModes
         979  3D2 00166230 GetNumRegionDefinitions
         980  3D3 00166240 GetNumRegionResourceWares
         981  3D4 0019D710 GetNumRemovedConstructionPlanModules
@@ -1008,7 +1008,7 @@ File Type: EXECUTABLE IMAGE
         989  3DC 001AE570 GetNumRequestedMissionWares
         990  3DD 001AE7E0 GetNumResearchModules
         991  3DE 00166330 GetNumScenarioStats
-        992  3DF 00AC2A80 GetNumSecondaryWeapons
+        992  3DF 00AC2AE0 GetNumSecondaryWeapons
         993  3E0 00166360 GetNumSectors
         994  3E1 001663E0 GetNumSectorsByOwner
         995  3E2 001E5BF0 GetNumShieldGroups
@@ -1042,13 +1042,13 @@ File Type: EXECUTABLE IMAGE
        1023  3FE 00166900 GetNumTradeOfferStatistics
        1024  3FF 00166AC0 GetNumTradeWares
        1025  400 00166AD0 GetNumTransactionLog
-       1026  401 00AC2B80 GetNumTurretSlots
-       1027  402 00AC2B00 GetNumTurrets
+       1026  401 00AC2BE0 GetNumTurretSlots
+       1027  402 00AC2B60 GetNumTurrets
        1028  403 00166C10 GetNumUISystemInfo
        1029  404 001E61A0 GetNumUnavailableUnits
        1030  405 001AFFA0 GetNumUnitCargo
        1031  406 00166D10 GetNumUnreadLibraryEntries
-       1032  407 00AC2C00 GetNumUnreadMails
+       1032  407 00AC2C60 GetNumUnreadMails
        1033  408 00166E00 GetNumUpgradeGroupCompatibilities
        1034  409 00167410 GetNumUpgradeGroups
        1035  40A 001676E0 GetNumUpgradeSlots
@@ -1067,10 +1067,10 @@ File Type: EXECUTABLE IMAGE
        1048  417 001683E0 GetNumWares
        1049  418 00168E80 GetNumWares2
        1050  419 001E6370 GetNumWeaponGroupsByWeapon
-       1051  41A 00AC2C70 GetNumWeaponSlots
+       1051  41A 00AC2CD0 GetNumWeaponSlots
        1052  41B 00169BF0 GetObjectBrakeDistance
        1053  41C 00169DA0 GetObjectCoverAbilityFaction
-       1054  41D 00AC2E90 GetObjectEngineStatus
+       1054  41D 00AC2EF0 GetObjectEngineStatus
        1055  41E 00169E60 GetObjectIDCode
        1056  41F 0016A030 GetObjectPositionInSector
        1057  420 002041F0 GetOpenTrackConnectionStatus
@@ -1091,9 +1091,9 @@ File Type: EXECUTABLE IMAGE
        1072  42F 0022DCD0 GetOverlayCols2
        1073  430 0022DF60 GetOverlayCols3
        1074  431 0022DA20 GetOverlayDefinition
-       1075  432 00ABB240 GetOwnerDetails
-       1076  433 00AC2D30 GetOwnerDetails2
-       1077  434 00ABB350 GetPOIDetails
+       1075  432 00ABB2A0 GetOwnerDetails
+       1076  433 00AC2D90 GetOwnerDetails2
+       1077  434 00ABB3B0 GetPOIDetails
        1078  435 002044E0 GetPOMOption
        1079  436 0019E4D0 GetPaidBuildPlotCenterOffset
        1080  437 0019E570 GetPaidBuildPlotSize
@@ -1139,7 +1139,7 @@ File Type: EXECUTABLE IMAGE
        1120  45F 0016BC80 GetPlayerComputerID
        1121  460 0016BCD0 GetPlayerContainerID
        1122  461 001B0BB0 GetPlayerControlledShipID
-       1123  462 00AC2FE0 GetPlayerCoverFaction
+       1123  462 00AC3040 GetPlayerCoverFaction
        1124  463 0016BD40 GetPlayerCurrentControlGroup
        1125  464 0016BDC0 GetPlayerFactionName
        1126  465 0016BE50 GetPlayerGalaxyID
@@ -1152,7 +1152,7 @@ File Type: EXECUTABLE IMAGE
        1133  46C 0016BEE0 GetPlayerLogos
        1134  46D 0016C230 GetPlayerName
        1135  46E 0016C270 GetPlayerObjectID
-       1136  46F 00AC3050 GetPlayerOccupiedShipID
+       1136  46F 00AC30B0 GetPlayerOccupiedShipID
        1137  470 001B0BE0 GetPlayerOccupiedShipNumFreeActorSlots
        1138  471 0016C2E0 GetPlayerPaintTheme
        1139  472 0016C330 GetPlayerPaintThemeMod
@@ -1160,24 +1160,24 @@ File Type: EXECUTABLE IMAGE
        1141  474 001F1B10 GetPlayerRepresentative
        1142  475 0019EAB0 GetPlayerShipBuildTasks
        1143  476 001B0C00 GetPlayerShipID
-       1144  477 00AC30A0 GetPlayerShipSize
+       1144  477 00AC3100 GetPlayerShipSize
        1145  478 0016C720 GetPlayerTargetOffset
        1146  479 0016C9B0 GetPlayerZoneID
-       1147  47A 01A56C20 GetPluginCount
-       1148  47B 01A56C10 GetPluginType
+       1147  47A 01A56C80 GetPluginCount
+       1148  47B 01A56C70 GetPluginType
        1149  47C 0016CA20 GetPositionalOffset
        1150  47D 00204590 GetPresentModeOption
        1151  47E 002045A0 GetPresentModeOption2
-       1152  47F 00AC3110 GetPrimaryWeapon
-       1153  480 00ABB090 GetPriorityMissiontargetPOSID
+       1152  47F 00AC3170 GetPrimaryWeapon
+       1153  480 00ABB0F0 GetPriorityMissiontargetPOSID
        1154  481 0016CC10 GetProductionMethodInfo
        1155  482 0016CDB0 GetProductionMethodInfo2
        1156  483 0016CF80 GetProductionMethodResources
        1157  484 001B0C70 GetPurchasableCargo
        1158  485 0016D130 GetPurposeName
-       1159  486 00AC34A0 GetRadarModeOption
+       1159  486 00AC3500 GetRadarModeOption
        1160  487 0016D220 GetRealComponentClass
-       1161  488 00ABB560 GetRectangleTargetElementExtents
+       1161  488 00ABB5C0 GetRectangleTargetElementExtents
        1162  489 002047D0 GetReducedSpeedModeOption
        1163  48A 0016D2B0 GetRegionBoundaries
        1164  48B 0016D540 GetRegionDefinition
@@ -1188,13 +1188,13 @@ File Type: EXECUTABLE IMAGE
        1169  490 0016DBA0 GetRelationRangeInfo
        1170  491 0016DFC0 GetRelationRangeUIMaxValue
        1171  492 0016E0A0 GetRelationRangeUIMinValue
-       1172  493 00ABB600 GetRelationStatus
-       1173  494 00AC3C30 GetRelationStatus2
-       1174  495 00AC34D0 GetRelationStatus3
-       1175  496 00AC3860 GetRelationStatus4
-       1176  497 00ABB780 GetRelativeAimOffset
-       1177  498 00ABBA60 GetRelativeAimScreenPosition
-       1178  499 00AC3C60 GetRemainingOxygen
+       1172  493 00ABB660 GetRelationStatus
+       1173  494 00AC3C90 GetRelationStatus2
+       1174  495 00AC3530 GetRelationStatus3
+       1175  496 00AC38C0 GetRelationStatus4
+       1176  497 00ABB7E0 GetRelativeAimOffset
+       1177  498 00ABBAC0 GetRelativeAimScreenPosition
+       1178  499 00AC3CC0 GetRemainingOxygen
        1179  49A 0019EE80 GetRemovedConstructionPlanModules
        1180  49B 0019EDD0 GetRemovedConstructionPlanModules2
        1181  49C 0019EF50 GetRemovedStationModules
@@ -1224,14 +1224,14 @@ File Type: EXECUTABLE IMAGE
        1205  4B4 00204B10 GetSaveInquiryVentureText
        1206  4B5 00204C80 GetSaveLocationName
        1207  4B6 00204FB0 GetSavesCompressedOption
-       1208  4B7 00ABBD20 GetScanProgress
+       1208  4B7 00ABBD80 GetScanProgress
        1209  4B8 0016E6B0 GetScenarioLoadingInfoTexts
        1210  4B9 0016E670 GetScenarioLoadingTexts
        1211  4BA 0016E6F0 GetScenarioScoreForNextStar
        1212  4BB 0016E980 GetScenarioScoreForRating
        1213  4BC 0016EA80 GetScenarioStats
        1214  4BD 0009C4B0 GetScreenDisplayOption
-       1215  4BE 00AC3D30 GetSecondaryWeapon
+       1215  4BE 00AC3D90 GetSecondaryWeapon
        1216  4BF 0016EB30 GetSectorControlStation
        1217  4C0 0016ED10 GetSectorPopulation
        1218  4C1 0016ED90 GetSectorsByOwner
@@ -1244,9 +1244,9 @@ File Type: EXECUTABLE IMAGE
        1225  4C8 001B19B0 GetShipActiveStance
        1226  4C9 001B1A50 GetShipCombinedSkill
        1227  4CA 001B1AD0 GetShipDefaultStance
-       1228  4CB 00AC40C0 GetShipOrLaserTowerSize
-       1229  4CC 00AC4330 GetShipPurpose
-       1230  4CD 00ABBD70 GetShipSize
+       1228  4CB 00AC4120 GetShipOrLaserTowerSize
+       1229  4CC 00AC4390 GetShipPurpose
+       1230  4CD 00ABBDD0 GetShipSize
        1231  4CE 001B1B70 GetShipStances
        1232  4CF 001B1C90 GetShipTradeLoopCargoReservationSetting
        1233  4D0 0019F070 GetShipValue
@@ -1269,14 +1269,14 @@ File Type: EXECUTABLE IMAGE
        1250  4E1 0022E530 GetSlidercellBorderColor
        1251  4E2 001E6C60 GetSlotCompatibilities
        1252  4E3 001E6FF0 GetSlotSize
-       1253  4E4 00ABBE60 GetSofttarget
-       1254  4E5 00AC4480 GetSofttarget2
+       1253  4E4 00ABBEC0 GetSofttarget
+       1254  4E5 00AC44E0 GetSofttarget2
        1255  4E6 001C1E20 GetSoftwareMaxCompatibleVersion
        1256  4E7 0016F1A0 GetSoftwarePredecessors
        1257  4E8 001C26A0 GetSoftwareSlots
        1258  4E9 0016F350 GetSoundDevices
        1259  4EA 00204FD0 GetSpeakTargetNameOption
-       1260  4EB 00AC4530 GetSpecialNPCs
+       1260  4EB 00AC4590 GetSpecialNPCs
        1261  4EC 0022ECA0 GetStandardButtonHelpOverlayInfo
        1262  4ED 0022F030 GetStandardButtonHelpOverlayInfo2
        1263  4EE 0022F3C0 GetStandardButtonHelpOverlayInfo3
@@ -1333,8 +1333,8 @@ File Type: EXECUTABLE IMAGE
        1314  521 002305B0 GetTableRowGroups
        1315  522 002306D0 GetTableRowInfo
        1316  523 002308C0 GetTableRowPadding
-       1317  524 00ABBF00 GetTargetAngle
-       1318  525 00ABC170 GetTargetElementOffset
+       1317  524 00ABBF60 GetTargetAngle
+       1318  525 00ABC1D0 GetTargetElementOffset
        1319  526 00221E10 GetTerraformingActiveProject
        1320  527 00221F30 GetTerraformingCurrentStats
        1321  528 00222280 GetTerraformingDynamicStats
@@ -1358,8 +1358,8 @@ File Type: EXECUTABLE IMAGE
        1339  53A 00225680 GetTerraformingStat
        1340  53B 00225920 GetTerraformingStatRange
        1341  53C 00225B70 GetTerraformingWorldName
-       1342  53D 00ABC340 GetTextHeight
-       1343  53E 00ABC530 GetTextWidth
+       1342  53D 00ABC3A0 GetTextHeight
+       1343  53E 00ABC590 GetTextWidth
        1344  53F 00205310 GetTextureQualityOption
        1345  540 002053C0 GetThirdPersonFlightOption
        1346  541 0016F690 GetTickerCache
@@ -1386,18 +1386,18 @@ File Type: EXECUTABLE IMAGE
        1367  556 0016FFC0 GetTransactionLog
        1368  557 001705F0 GetTransporterLocationComponent
        1369  558 00170990 GetTransporterLocationName
-       1370  559 00AC4640 GetTurret
+       1370  559 00AC46A0 GetTurret
        1371  55A 001E74B0 GetTurretGroupMode
        1372  55B 001E72E0 GetTurretGroupMode2
-       1373  55C 00AC48D0 GetUIAnchorScreenPosition
+       1373  55C 00AC4930 GetUIAnchorScreenPosition
        1374  55D 00171220 GetUIDefaultBaseRelation
        1375  55E 00205CB0 GetUIGlowIntensity
        1376  55F 00205E40 GetUIGlowOption
        1377  560 00171410 GetUIRelation
        1378  561 001715F0 GetUIRelationName
-       1379  562 00ABC750 GetUIScale
-       1380  563 00ABC800 GetUIScaleFactor
-       1381  564 00AC4FA0 GetUIScaleFactorRange
+       1379  562 00ABC7B0 GetUIScale
+       1380  563 00ABC860 GetUIScaleFactor
+       1381  564 00AC5000 GetUIScaleFactorRange
        1382  565 00171B30 GetUISystemInfo
        1383  566 00172730 GetUISystemInfo2
        1384  567 001B3060 GetUnitCargo
@@ -1424,7 +1424,7 @@ File Type: EXECUTABLE IMAGE
        1405  57C 00177DE0 GetValidTransporterTargets
        1406  57D 00177F50 GetValidTransporterTargets2
        1407  57E 00206150 GetVelocityIndicatorOption
-       1408  57F 00AC4BC0 GetVelocityScreenPosition
+       1408  57F 00AC4C20 GetVelocityScreenPosition
        1409  580 001782F0 GetVentureDLCStatus
        1410  581 00178300 GetVenturePlatformDocks
        1411  582 001E7A50 GetVenturePlatforms
@@ -1439,9 +1439,9 @@ File Type: EXECUTABLE IMAGE
        1420  58B 00177080 GetWareTransportTypes
        1421  58C 001756A0 GetWares
        1422  58D 001761F0 GetWares2
-       1423  58E 00AC5010 GetWeaponDetails
-       1424  58F 00AC54B0 GetWeaponDetails2
-       1425  590 00AC5970 GetWeaponDetails3
+       1423  58E 00AC5070 GetWeaponDetails
+       1424  58F 00AC5510 GetWeaponDetails2
+       1425  590 00AC59D0 GetWeaponDetails3
        1426  591 001E7740 GetWeaponGroupsByWeapon
        1427  592 001773A0 GetWeaponLaunchedMacro
        1428  593 00177430 GetWeaponMode
@@ -1449,8 +1449,8 @@ File Type: EXECUTABLE IMAGE
        1430  595 001C3620 GetWingName
        1431  596 001B38C0 GetWorkForceInfo
        1432  597 001774C0 GetZoneAt
-       1433  598 00AC5E50 HandleTargetMouseClickOnRadar
-       1434  599 00AC5F20 HandleTargetMouseDownOnRadar
+       1433  598 00AC5EB0 HandleTargetMouseClickOnRadar
+       1434  599 00AC5F80 HandleTargetMouseDownOnRadar
        1435  59A 00177DB0 HasAcceptedOnlineMission
        1436  59B 001F72C0 HasBuildMapFloatingSelection
        1437  59C 00177660 HasConfigSetting
@@ -1475,7 +1475,7 @@ File Type: EXECUTABLE IMAGE
        1456  5AF 00177D80 HasFollowCameraBasePosChanged
        1457  5B0 002309B0 HasFrameBrackets
        1458  5B1 00206190 HasFrameRateLimit
-       1459  5B2 00AC5F60 HasLimitedOxygenSupply
+       1459  5B2 00AC5FC0 HasLimitedOxygenSupply
        1460  5B3 001C39C0 HasOrderQueuePriorityOrder
        1461  5B4 001C3A90 HasPersonArrived
        1462  5B5 001C3C80 HasPopulatedSubordinateGroup
@@ -1483,7 +1483,7 @@ File Type: EXECUTABLE IMAGE
        1464  5B7 00230A10 HasRenderTargetStartNoise
        1465  5B8 00178890 HasResearched
        1466  5B9 002061A0 HasSavegame
-       1467  5BA 00ABC890 HasSeta
+       1467  5BA 00ABC8F0 HasSeta
        1468  5BB 001B4180 HasShipFlightAssist
        1469  5BC 001B4230 HasShipTradeLoopCargoReservationOverride
        1470  5BD 00230A70 HasStartAnimation
@@ -1504,31 +1504,31 @@ File Type: EXECUTABLE IMAGE
        1485  5CC 001E8120 InstallShieldMod
        1486  5CD 001B4600 InstallShipMod
        1487  5CE 001792C0 InstallWeaponMod
-       1488  5CF 00AC61E0 InvalidateRadarCursorPosition
+       1488  5CF 00AC6240 InvalidateRadarCursorPosition
        1489  5D0 00206490 IsAAOptionSupported
        1490  5D1 00206510 IsActiveHeadTrackerAvailable
        1491  5D2 00206530 IsActiveHeadTrackerSettingSupported
-       1492  5D3 00AC5FF0 IsAdvancedSatellite
+       1492  5D3 00AC6050 IsAdvancedSatellite
        1493  5D4 00179670 IsAmmoMacroCompatible
        1494  5D5 000B33F0 IsAppStoreVersion
-       1495  5D6 00ABC900 IsAsteroid
-       1496  5D7 00AC6110 IsAutoMouseEmulationActive
-       1497  5D8 00AC6120 IsAutoPilotActive
-       1498  5D9 00ABC9A0 IsAutotargetingActive
-       1499  5DA 00ABC9B0 IsBomb
+       1495  5D6 00ABC960 IsAsteroid
+       1496  5D7 00AC6170 IsAutoMouseEmulationActive
+       1497  5D8 00AC6180 IsAutoPilotActive
+       1498  5D9 00ABCA00 IsAutotargetingActive
+       1499  5DA 00ABCA10 IsBomb
        1500  5DB 00230A90 IsBoxTextWordWrap
-       1501  5DC 00AC6130 IsBuildStorage
+       1501  5DC 00AC6190 IsBuildStorage
        1502  5DD 0019FD70 IsBuildWaitingForSecondaryComponentResources
        1503  5DE 001B4980 IsBuilderBusy
        1504  5DF 00230AF0 IsCheckBoxActive
        1505  5E0 00230B50 IsCheckBoxChecked
        1506  5E1 00179950 IsClientModified
-       1507  5E2 00AC6220 IsCollectable
-       1508  5E3 00AC6290 IsCommander
+       1507  5E2 00AC6280 IsCollectable
+       1508  5E3 00AC62F0 IsCommander
        1509  5E4 00179980 IsComponentBlacklisted
        1510  5E5 00179B70 IsComponentClass
        1511  5E6 00179C60 IsComponentOperational
-       1512  5E7 00ABCA50 IsComponentWrecked
+       1512  5E7 00ABCAB0 IsComponentWrecked
        1513  5E8 001D6C40 IsConstructionPlanAvailableInCustomGameStart
        1514  5E9 0019FE60 IsConstructionPlanValid
        1515  5EA 001B4A70 IsContainerAmmoMacroCompatible
@@ -1541,26 +1541,26 @@ File Type: EXECUTABLE IMAGE
        1522  5F1 00179D60 IsControlPressed
        1523  5F2 00179DC0 IsConversationActive
        1524  5F3 00179DE0 IsConversationCancelling
-       1525  5F4 00ABCAA0 IsCrate
-       1526  5F5 00AC6320 IsCrystal
+       1525  5F4 00ABCB00 IsCrate
+       1526  5F5 00AC6380 IsCrystal
        1527  5F6 001F7370 IsCurrentBuildMapPlotPositionDiscovered
        1528  5F7 001F74D0 IsCurrentBuildMapPlotValid
        1529  5F8 002066F0 IsCurrentGPUDiscrete
        1530  5F9 001C3EC0 IsCurrentOrderCritical
-       1531  5FA 00AC63C0 IsCurrentlyScanning
+       1531  5FA 00AC6420 IsCurrentlyScanning
        1532  5FB 001D6D00 IsCustomGameStartPropertyChanged
        1533  5FC 00206710 IsDLSSFrameGenOptionSupported
        1534  5FD 002067D0 IsDLSSFrameGenSupported
        1535  5FE 002067E0 IsDLSSSupported
-       1536  5FF 00AC6400 IsDataVault
+       1536  5FF 00AC6460 IsDataVault
        1537  600 001E85F0 IsDefensibleBeingBoardedBy
        1538  601 000B33F0 IsDemoVersion
        1539  602 001B5200 IsDeployableMacroCompatible
-       1540  603 00ABCB40 IsDestructible
-       1541  604 00AC64B0 IsDestructible2
-       1542  605 00AC6770 IsDetailUIElement
+       1540  603 00ABCBA0 IsDestructible
+       1541  604 00AC6510 IsDestructible2
+       1542  605 00AC67D0 IsDetailUIElement
        1543  606 001F1C60 IsDiplomacyExcluded
-       1544  607 00AC69F0 IsDockingBay
+       1544  607 00AC6A50 IsDockingBay
        1545  608 001E8760 IsDroneTypeArmed
        1546  609 001E8840 IsDroneTypeBlocked
        1547  60A 00230BB0 IsDropDownActive
@@ -1569,14 +1569,14 @@ File Type: EXECUTABLE IMAGE
        1550  60D 00230CD0 IsEditBoxInputEncrypted
        1551  60E 00230D90 IsEditBoxTextHidden
        1552  60F 00230D30 IsEditBoxTextSelectedOnActivation
-       1553  610 00AC6A90 IsEncryptedDirectInputModeActive
-       1554  611 00ABCBE0 IsEntity
-       1555  612 00ABCC80 IsErrorLogActive
+       1553  610 00AC6AF0 IsEncryptedDirectInputModeActive
+       1554  611 00ABCC40 IsEntity
+       1555  612 00ABCCE0 IsErrorLogActive
        1556  613 00179DF0 IsExtensionEnabled
-       1557  614 00ABCC90 IsExternalTargetMode
-       1558  615 009B9FE0 IsExternalViewActive
+       1557  614 00ABCCF0 IsExternalTargetMode
+       1558  615 009BA040 IsExternalViewActive
        1559  616 00179F00 IsExternalViewDisabled
-       1560  617 00ABCCA0 IsFPSEnabled
+       1560  617 00ABCD00 IsFPSEnabled
        1561  618 002067F0 IsFSRFrameGenSupported
        1562  619 0017A650 IsFSROnWithoutAA
        1563  61A 00179F30 IsFactionAllyToFaction
@@ -1586,8 +1586,8 @@ File Type: EXECUTABLE IMAGE
        1567  61E 0017A450 IsFactionInRelationRangeToFaction
        1568  61F 001C3F90 IsFleetCommander
        1569  620 0017A640 IsFleetManagerPlayerEnabled
-       1570  621 00AC6AA0 IsFlightAssistActive
-       1571  622 009B9FA0 IsFloatingViewActive
+       1570  621 00AC6B00 IsFlightAssistActive
+       1571  622 009BA000 IsFloatingViewActive
        1572  623 0017A670 IsFullscreenCutsceneActive
        1573  624 00230DF0 IsFullscreenMenuDisplayed
        1574  625 000B33F0 IsGOGVersion
@@ -1597,50 +1597,50 @@ File Type: EXECUTABLE IMAGE
        1578  629 0017A6A0 IsGameOver
        1579  62A 0017A6B0 IsGamePaused
        1580  62B 0017A6C0 IsGameStartModified
-       1581  62C 00ABCCD0 IsGate
+       1581  62C 00ABCD30 IsGate
        1582  62D 000B33F0 IsGestureSteeringActive
        1583  62E 001B5680 IsHQ
-       1584  62F 00ABCDB0 IsHUDActive
+       1584  62F 00ABCE10 IsHUDActive
        1585  630 00206800 IsHUDRadarActive
-       1586  631 00ABCD70 IsHeadTrackingActive
+       1586  631 00ABCDD0 IsHeadTrackingActive
        1587  632 0017A7B0 IsIconValid
-       1588  633 00AC6B00 IsInPanelMode
+       1588  633 00AC6B60 IsInPanelMode
        1589  634 0017A870 IsInfoUnlockedForPlayer
        1590  635 0017A960 IsInputModifierPressed
        1591  636 0017AA00 IsJoystickSteeringAdapative
        1592  637 0017AA10 IsKnownItemRead
        1593  638 0017AB80 IsKnownRead
        1594  639 0017ABD0 IsKnownToPlayer
-       1595  63A 00AC6B20 IsLandmark
+       1595  63A 00AC6B80 IsLandmark
        1596  63B 000B33F0 IsLanguageSettingEnabled
        1597  63C 0017AC30 IsLanguageValid
-       1598  63D 00AC6BD0 IsLaserTower
-       1599  63E 00AC6CD0 IsLeftMouseButtonDown
+       1598  63D 00AC6C30 IsLaserTower
+       1599  63E 00AC6D30 IsLeftMouseButtonDown
        1600  63F 0019FFD0 IsLoadoutCompatible
        1601  640 001A0240 IsLoadoutValid
-       1602  641 00ABCDE0 IsLockbox
-       1603  642 00AC6CF0 IsLowOnOxygen
+       1602  641 00ABCE40 IsLockbox
+       1603  642 00AC6D50 IsLowOnOxygen
        1604  643 0009C4B0 IsMasterVersion
-       1605  644 00AC6DB0 IsMiddleMouseButtonDown
-       1606  645 00AC6DD0 IsMine
+       1605  644 00AC6E10 IsMiddleMouseButtonDown
+       1606  645 00AC6E30 IsMine
        1607  646 00230FB0 IsMiniWidgetSystemUsed
-       1608  647 00AC6E80 IsMissileIncoming
-       1609  648 00AC6EC0 IsMissileLockingOn
+       1608  647 00AC6EE0 IsMissileIncoming
+       1609  648 00AC6F20 IsMissileLockingOn
        1610  649 000B33F0 IsMissionBoard
        1611  64A 0017AC40 IsMissionLimitReached
-       1612  64B 00AC6F00 IsMouseDoubleClickMode
+       1612  64B 00AC6F60 IsMouseDoubleClickMode
        1613  64C 000E0850 IsMouseEmulationActive
-       1614  64D 00AC6F50 IsMouseSteeringActive
+       1614  64D 00AC6FB0 IsMouseSteeringActive
        1615  64E 00206830 IsMouseSteeringAdapative
        1616  64F 00206840 IsMouseSteeringLineEnabled
        1617  650 00206860 IsMouseSteeringPersistent
        1618  651 000B33F0 IsMouseVRPointerAllowed
-       1619  652 00AC6F60 IsNPCLineSkippable
-       1620  653 00ABCE80 IsNavBeacon
+       1619  652 00AC6FC0 IsNPCLineSkippable
+       1620  653 00ABCEE0 IsNavBeacon
        1621  654 000B33F0 IsNetworkEngineEnabled
        1622  655 0017AD60 IsNewGame
        1623  656 00230FD0 IsNextStartAnimationSkipped
-       1624  657 00AC6F80 IsObjectKnown
+       1624  657 00AC6FE0 IsObjectKnown
        1625  658 0017AD70 IsObjectShootingDisabledByStanceOnly
        1626  659 0009C4B0 IsOnlineEnabled
        1627  65A 00206880 IsOpenTrackEnabled
@@ -1655,44 +1655,44 @@ File Type: EXECUTABLE IMAGE
        1636  663 0017B1A0 IsPlayerControllingShip
        1637  664 0017AEA0 IsPlayerCoverable
        1638  665 0017B1D0 IsPlayerFightRuleDefault
-       1639  666 00AC6FF0 IsPlayerOccupiedShipDocked
+       1639  666 00AC7050 IsPlayerOccupiedShipDocked
        1640  667 0017B2B0 IsPlayerTradeRuleDefault
        1641  668 0017B390 IsPlayerValid
-       1642  669 00ABCF20 IsPointingWithinAimingRange
+       1642  669 00ABCF80 IsPointingWithinAimingRange
        1643  66A 002068B0 IsPresentModeAvailable
        1644  66B 002068E0 IsPresentModeOptionSupported
        1645  66C 0017B3C0 IsRealComponentClass
-       1646  66D 00AC7020 IsRecyclable
-       1647  66E 00AC70C0 IsReducedSpeedModeActive
+       1646  66D 00AC7080 IsRecyclable
+       1647  66E 00AC7120 IsReducedSpeedModeActive
        1648  66F 0017B4B0 IsRequestedGPUCurrent
-       1649  670 00AC7100 IsResourceProbe
-       1650  671 00AC71A0 IsRightMouseButtonDown
+       1649  670 00AC7160 IsResourceProbe
+       1650  671 00AC7200 IsRightMouseButtonDown
        1651  672 0017B500 IsRunningOnSteamDeck
-       1652  673 00AC71C0 IsSatellite
+       1652  673 00AC7220 IsSatellite
        1653  674 00206960 IsSaveListLoadingComplete
        1654  675 00206980 IsSaveValid
        1655  676 0017B510 IsScenarioLoading
-       1656  677 00ABCF30 IsSetaActive
+       1656  677 00ABCF90 IsSetaActive
        1657  678 0017B560 IsShiftPressed
-       1658  679 00ABCF60 IsShip
+       1658  679 00ABCFC0 IsShip
        1659  67A 001B5700 IsShipAtExternalDock
        1660  67B 001B57E0 IsShipBeingRetrieved
        1661  67C 001E8950 IsSlotMandatory
-       1662  67D 00ABD010 IsSofttargetManagerActive
+       1662  67D 00ABD070 IsSofttargetManagerActive
        1663  67E 001C4390 IsSoftwareDefault
        1664  67F 0017B5C0 IsStartmenu
-       1665  680 00ABD020 IsStation
-       1666  681 00AC7270 IsStationary
+       1665  680 00ABD080 IsStation
+       1666  681 00AC72D0 IsStationary
        1667  682 0017B5F0 IsStoryFeatureUnlocked
-       1668  683 00ABD0C0 IsSuperHighway
+       1668  683 00ABD120 IsSuperHighway
        1669  684 001B5A30 IsSupplyManual
-       1670  685 00ABD170 IsSurfaceElement
+       1670  685 00ABD1D0 IsSurfaceElement
        1671  686 00230FF0 IsTableMultiSelect
        1672  687 00231060 IsTableRowBorderBelowEnabled
        1673  688 00231110 IsTableRowInteractive
-       1674  689 00ABD220 IsTargetInPlayerWeaponRange
-       1675  68A 00AC7320 IsTargetMonitorNotification
-       1676  68B 00ABD200 IsTargetable
+       1674  689 00ABD280 IsTargetInPlayerWeaponRange
+       1675  68A 00AC7380 IsTargetMonitorNotification
+       1676  68B 00ABD260 IsTargetable
        1677  68C 002260E0 IsTerraformingProjectOngoing
        1678  68D 00206A40 IsThrottleBidirectional
        1679  68E 0017B680 IsTimelinesScenario
@@ -1713,20 +1713,20 @@ File Type: EXECUTABLE IMAGE
        1694  69D 000B33F0 IsVRPointerActive
        1695  69E 000B33F0 IsVRVersion
        1696  69F 000B33F0 IsVRViveControllerActive
-       1697  6A0 00ABD550 IsValidComponent
+       1697  6A0 00ABD5B0 IsValidComponent
        1698  6A1 0017BBD0 IsValidTrade
        1699  6A2 0009C4B0 IsVentureExtensionSupported
        1700  6A3 000B33F0 IsVentureSeasonSupported
-       1701  6A4 00AC7340 IsVentureShip
+       1701  6A4 00AC73A0 IsVentureShip
        1702  6A5 001E9230 IsVirtualUpgradeMacroCompatible
        1703  6A6 0017BC00 IsWeaponArmed
        1704  6A7 0017BC80 IsWeaponModeCompatible
-       1705  6A8 00AC73B0 IsWidgetsystemRequestingCrosshairVisible
+       1705  6A8 00AC7410 IsWidgetsystemRequestingCrosshairVisible
        1706  6A9 0017BF00 IsWillingToBuyFromPlayer
        1707  6AA 0017C030 IsWillingToSellToPlayer
        1708  6AB 001C4710 IsWingCommander
-       1709  6AC 00AC73E0 IsZone
-       1710  6AD 00ABD590 IsZoneHighway
+       1709  6AC 00AC7440 IsZone
+       1710  6AD 00ABD5F0 IsZoneHighway
        1711  6AE 001E9600 LaunchLaserTower
        1712  6AF 001E9880 LaunchMine
        1713  6B0 001E9AF0 LaunchNavBeacon
@@ -1737,20 +1737,20 @@ File Type: EXECUTABLE IMAGE
        1718  6B5 00095ED0 MakePlayerOwnerOf
        1719  6B6 00206B10 MapModifierButton
        1720  6B7 00207080 MapModifierKey
-       1721  6B8 00ABD640 MarkIndicatorShown
+       1721  6B8 00ABD6A0 MarkIndicatorShown
        1722  6B9 0017C290 MissionBriefingInteractButtonClicked
        1723  6BA 00095ED0 MovePlayerToSectorPos
        1724  6BB 0017C3C0 MutePlayerAlert
        1725  6BC 0017C430 NewGame
        1726  6BD 0017C7B0 NewMultiplayerGame
        1727  6BE 0017C870 NotifyChatMessageRead
-       1728  6BF 00ABD6B0 NotifyDisplayNotification
-       1729  6C0 00ABD6C0 NotifyErrorLogDispatching
-       1730  6C1 00ABD6D0 NotifyErrorLogDispatchingDone
-       1731  6C2 00AC7480 NotifyInteractMenuHidden
-       1732  6C3 00AC7640 NotifyInteractMenuShown
-       1733  6C4 00AC77F0 NotifyMissionPosIDConnected
-       1734  6C5 00AC7820 NotifyMissionPosIDDisconnected
+       1728  6BF 00ABD710 NotifyDisplayNotification
+       1729  6C0 00ABD720 NotifyErrorLogDispatching
+       1730  6C1 00ABD730 NotifyErrorLogDispatchingDone
+       1731  6C2 00AC74E0 NotifyInteractMenuHidden
+       1732  6C3 00AC76A0 NotifyInteractMenuShown
+       1733  6C4 00AC7850 NotifyMissionPosIDConnected
+       1734  6C5 00AC7880 NotifyMissionPosIDDisconnected
        1735  6C6 02EE06A8 NvOptimusEnablement
        1736  6C7 0017C8A0 OpenMovieMenu
        1737  6C8 0017C940 OpenWebBrowser
@@ -1764,7 +1764,7 @@ File Type: EXECUTABLE IMAGE
        1745  6D0 001A0870 PrepareBuildSequenceResources
        1746  6D1 001A0680 PrepareBuildSequenceResources2
        1747  6D2 001B6250 PutShipIntoStorage
-       1748  6D3 00AC7850 QueryGameServers
+       1748  6D3 00AC78B0 QueryGameServers
        1749  6D4 0017D210 QuickDock
        1750  6D5 0017D250 QuickMenuAccess
        1751  6D6 0017D2E0 ReadAllInventoryWares
@@ -1776,10 +1776,10 @@ File Type: EXECUTABLE IMAGE
        1757  6DC 001C4B30 ReassignFleetUnitToFleetUnit
        1758  6DD 001C4C50 ReassignPeople
        1759  6DE 001F7590 RedoConstructionMapChange
-       1760  6DF 00ABD6E0 ReenableErrorLog
+       1760  6DF 00ABD740 ReenableErrorLog
        1761  6E0 001F7630 ReleaseConstructionMapState
        1762  6E1 001C4F20 ReleaseDetachedSubordinateGroup
-       1763  6E2 00ABD6F0 ReleaseInteractionDescriptor
+       1763  6E2 00ABD750 ReleaseInteractionDescriptor
        1764  6E3 0017DB60 ReleaseOrderSyncPoint
        1765  6E4 001C5120 ReleaseOrderSyncPointFromOrder
        1766  6E5 001C4FD0 ReleasePersonFromCrewTransfer
@@ -1802,7 +1802,7 @@ File Type: EXECUTABLE IMAGE
        1783  6F6 001C5440 RemoveDefaultOrderFailure
        1784  6F7 0017DEC0 RemoveDockingBayReservation
        1785  6F8 0017DF40 RemoveFightRule
-       1786  6F9 00ABD720 RemoveFill
+       1786  6F9 00ABD780 RemoveFill
        1787  6FA 001C54C0 RemoveFleetUnit
        1788  6FB 001F7640 RemoveFloatingSequenceFromConstructionPlan
        1789  6FC 0017DFA0 RemoveGateConnection
@@ -1815,7 +1815,7 @@ File Type: EXECUTABLE IMAGE
        1796  703 001C5640 RemoveOrder2
        1797  704 001C5740 RemoveOrderFailure
        1798  705 001C58D0 RemoveOrderSyncPointID
-       1799  706 00ABD9B0 RemoveOutline
+       1799  706 00ABDA10 RemoveOutline
        1800  707 0017E0F0 RemovePaintMod
        1801  708 001C59F0 RemovePerson
        1802  709 001C5B40 RemovePlannedDefaultOrder
@@ -1840,7 +1840,7 @@ File Type: EXECUTABLE IMAGE
        1821  71C 001D7490 ResetCustomGameStart
        1822  71D 001D74D0 ResetCustomGameStartProperty
        1823  71E 0017E5A0 ResetDefaultResponseToSignalForFaction
-       1824  71F 00AC7880 ResetEncryptedDirectInputData
+       1824  71F 00AC78E0 ResetEncryptedDirectInputData
        1825  720 0017E7A0 ResetFollowCameraBasePos
        1826  721 0017E7C0 ResetFollowCameraBasePosOverride
        1827  722 001F84E0 ResetMapPlayerRotation
@@ -1936,7 +1936,7 @@ File Type: EXECUTABLE IMAGE
        1917  77C 001C6070 SetCommander
        1918  77D 0017EE50 SetComponentDescription
        1919  77E 0017EFF0 SetComponentOwner
-       1920  77F 00ABDC40 SetConfigSetting
+       1920  77F 00ABDCA0 SetConfigSetting
        1921  780 001F87B0 SetConstructionMapBuildAngleStep
        1922  781 001F8870 SetConstructionMapCollisionDetection
        1923  782 001F7A40 SetConstructionMapItemBookmarked
@@ -1956,7 +1956,7 @@ File Type: EXECUTABLE IMAGE
        1937  790 001B7D20 SetContainerWorkforceFillCapacity
        1938  791 001C6200 SetControllableBlacklist
        1939  792 001C6360 SetControllableFightRule
-       1940  793 00ABDF20 SetCrosshairMessage
+       1940  793 00ABDF80 SetCrosshairMessage
        1941  794 001C64C0 SetCurrentLoopOrder
        1942  795 001D7580 SetCustomGameStartAccessProperty
        1943  796 001D78F0 SetCustomGameStartBlueprintProperty
@@ -2024,7 +2024,7 @@ File Type: EXECUTABLE IMAGE
        2005  7D4 001A3D20 SetFactionBuildMethod
        2006  7D5 0017F6A0 SetFactionDefaultWeaponMode
        2007  7D6 0017F7D0 SetFactionRelationToPlayerFaction
-       2008  7D7 00ABDF40 SetFill
+       2008  7D7 00ABDFA0 SetFill
        2009  7D8 001C67F0 SetFleetLogo
        2010  7D9 001C6900 SetFleetManagement
        2011  7DA 001C6AC0 SetFleetName
@@ -2137,11 +2137,11 @@ File Type: EXECUTABLE IMAGE
        2118  845 00180090 SetMessageRead
        2119  846 00215FA0 SetModifierButtonPosition
        2120  847 00216510 SetModifierKeyPosition
-       2121  848 00AC7890 SetMonitorExtents
-       2122  849 00AC7A20 SetMonitorRenderState
-       2123  84A 00AC7A30 SetMouseCursorPosition
+       2121  848 00AC78F0 SetMonitorExtents
+       2122  849 00AC7A80 SetMonitorRenderState
+       2123  84A 00AC7A90 SetMouseCursorPosition
        2124  84B 00216A80 SetMouseHUDModeOption
-       2125  84C 00AC7A50 SetMouseInputBlockedByAnarkElement
+       2125  84C 00AC7AB0 SetMouseInputBlockedByAnarkElement
        2126  84D 00235290 SetMouseOverText
        2127  84E 00235400 SetMouseOverTextAdditional
        2128  84F 002171D0 SetMouseOverTextOption
@@ -2155,7 +2155,7 @@ File Type: EXECUTABLE IMAGE
        2136  857 00219530 SetMultipleGfxModes
        2137  858 002196C0 SetMultipleGfxModes2
        2138  859 00219900 SetMultipleGfxModes3
-       2139  85A 00AC7B90 SetNewsItemHidden
+       2139  85A 00AC7BF0 SetNewsItemHidden
        2140  85B 00180100 SetNotificationTypeEnabled
        2141  85C 001801C0 SetObjectCoverFaction
        2142  85D 00180420 SetObjectForcedRadarVisible
@@ -2164,7 +2164,7 @@ File Type: EXECUTABLE IMAGE
        2145  860 001C7080 SetOrderLoop
        2146  861 00219F70 SetOrderQueueOption
        2147  862 001C7120 SetOrderSyncPointID
-       2148  863 00ABE360 SetOutline
+       2148  863 00ABE3C0 SetOutline
        2149  864 0021A300 SetPOMOption
        2150  865 00180830 SetPaintModLocked
        2151  866 001808C0 SetPlayerBlacklistDefault
@@ -2190,11 +2190,11 @@ File Type: EXECUTABLE IMAGE
        2171  87A 001813D0 SetPositionalOffset
        2172  87B 0021A720 SetPresentModeOption
        2173  87C 0021B350 SetPresentModeOption2
-       2174  87D 00AC7CD0 SetRadarMousePosition
-       2175  87E 00ABE660 SetRadarRenderTarget
-       2176  87F 00AC7DD0 SetRadarRenderTarget2
-       2177  880 00ABE860 SetRadarRenderTargetOnTarget
-       2178  881 00AC7FD0 SetRadarRenderTargetOnTarget2
+       2174  87D 00AC7D30 SetRadarMousePosition
+       2175  87E 00ABE6C0 SetRadarRenderTarget
+       2176  87F 00AC7E30 SetRadarRenderTarget2
+       2177  880 00ABE8C0 SetRadarRenderTargetOnTarget
+       2178  881 00AC8030 SetRadarRenderTargetOnTarget2
        2179  882 0021BFA0 SetReducedSpeedModeOption
        2180  883 00181500 SetRegionDefinition
        2181  884 00181740 SetRelationBoostToFaction
@@ -2219,8 +2219,8 @@ File Type: EXECUTABLE IMAGE
        2200  897 002358D0 SetSliderCellMinSelectValue
        2201  898 00235980 SetSliderCellMinValue
        2202  899 00235A30 SetSliderCellValue
-       2203  89A 00ABEA00 SetSofttarget
-       2204  89B 00ABEC60 SetSofttargetByMissionOffer
+       2203  89A 00ABEA60 SetSofttarget
+       2204  89B 00ABECC0 SetSofttargetByMissionOffer
        2205  89C 0021C5C0 SetSpeakTargetNameOption
        2206  89D 0021D420 SetStardustIntensityOption
        2207  89E 0021D6A0 SetStartmenuBackgroundOption
@@ -2264,7 +2264,7 @@ File Type: EXECUTABLE IMAGE
        2245  8C4 00181970 SetUICoverOverride
        2246  8C5 0021F870 SetUIGlowIntensity
        2247  8C6 0021FB00 SetUIGlowOption
-       2248  8C7 00ABEC90 SetUIScaleFactor
+       2248  8C7 00ABECF0 SetUIScaleFactor
        2249  8C8 0021FD60 SetUpscalingOption
        2250  8C9 00181980 SetUserData
        2251  8CA 00095ED0 SetVRControllerAutoHide
@@ -2287,8 +2287,8 @@ File Type: EXECUTABLE IMAGE
        2268  8DB 001B84E0 ShouldPlayerShipsWaitForPlayer
        2269  8DC 00182160 ShouldPlayerTaxiWaitForPlayer
        2270  8DD 00236290 ShouldRenderTargetBeCleared
-       2271  8DE 00AC8170 ShouldShowMouseSteeringHelperLine
-       2272  8DF 00AC81E0 ShouldShowShieldBar
+       2271  8DE 00AC81D0 ShouldShowMouseSteeringHelperLine
+       2272  8DF 00AC8240 ShouldShowShieldBar
        2273  8E0 001C7A50 ShouldSubordinateGroupAttackOnSight
        2274  8E1 001C7B40 ShouldSubordinateGroupDockAtCommander
        2275  8E2 001C7C30 ShouldSubordinateGroupReinforceFleet
@@ -2299,7 +2299,7 @@ File Type: EXECUTABLE IMAGE
        2280  8E7 001FDF20 ShowEditorMap
        2281  8E8 002362F0 ShowGamepadTextInput
        2282  8E9 00182190 ShowInfoLine
-       2283  8EA 00AC82C0 ShowInteractMenu
+       2283  8EA 00AC8320 ShowInteractMenu
        2284  8EB 001FDFD0 ShowMultiverseMap
        2285  8EC 001FE3F0 ShowObjectConfigurationMap
        2286  8ED 001FE120 ShowObjectConfigurationMap2
@@ -2333,7 +2333,7 @@ File Type: EXECUTABLE IMAGE
        2314  909 00184110 StartVoiceSequence2
        2315  90A 001842B0 StopBriefing
        2316  90B 00184390 StopDetailmonitorCutscene
-       2317  90C 00AC8510 StopEncryptedDirectInputHandling
+       2317  90C 00AC8570 StopEncryptedDirectInputHandling
        2318  90D 001FEF60 StopMapBoxSelect
        2319  90E 001FF010 StopPanMap
        2320  90F 001843C0 StopPlayerActivity
@@ -2342,12 +2342,12 @@ File Type: EXECUTABLE IMAGE
        2323  912 00184480 StopVoiceSequence
        2324  913 001FF230 StoreConstructionMapState
        2325  914 001B8DA0 TakeShipFromInternalStorage
-       2326  915 00AC8520 TargetRadarComponent
+       2326  915 00AC8580 TargetRadarComponent
        2327  916 001C8400 TeleportPlayerTo
        2328  917 00184490 ToggleAutoPilot
-       2329  918 00AC85B0 ToggleDrones
+       2329  918 00AC8610 ToggleDrones
        2330  919 001844C0 ToggleFlightAssist
-       2331  91A 00ABECD0 ToggleLootMagnet
+       2331  91A 00ABED30 ToggleLootMagnet
        2332  91B 001FF970 ToggleMapPanToRotate
        2333  91C 001844F0 ToggleMouseSteeringMode
        2334  91D 00184510 ToggleRadarMode
@@ -2363,7 +2363,7 @@ File Type: EXECUTABLE IMAGE
        2344  927 002207A0 UnmapModifierButton
        2345  928 00220D10 UnmapModifierKey
        2346  929 00184C10 UnmutePlayerAlert
-       2347  92A 00ABED10 UnsetRadarRenderTarget
+       2347  92A 00ABED70 UnsetRadarRenderTarget
        2348  92B 001EB640 UpdateAttackerOfBoardingOperation
        2349  92C 00184C80 UpdateBlacklist
        2350  92D 001851E0 UpdateBlacklist2
