@@ -4,15 +4,15 @@
 // Part of the X4Native SDK. Included by x4native.h.
 //
 // Provides:
-//   x4n::entity::find_component()      — resolve UniverseID to Object*
-//   x4n::entity::get_class()        — runtime class ID via vtable (all types)
-//   x4n::entity::is_derived_from()     — IS-A class check via vtable (all types)
-//   x4n::entity::get_component_macro() — read macro name from any component
-//   x4n::entity::get_component_id()    — read UniverseID from component pointer
+//   x4n::entity::find_component()      — resolve UniverseID to X4Component*
+//   x4n::entity::resolve_entity()      — SEH-guarded raw pointer validation
+//   x4n::entity::get_component_macro() — macro name (heavy components only)
 //   x4n::entity::get_spawntime()       — Container-class spawntime
 //
-// Class IDs are auto-generated per game build via the pipeline (x4_game_class_ids.inc).
-// Use x4n::GameClass enum with get_class() / is_derived_from().
+// For game_class() and is_a(), use the methods on X4Component directly:
+//   comp->game_class()               — returns GameClass enum
+//   comp->is_a(GameClass::Station)   — IS-A check via vtable
+// For sector-specific properties (sunlight, resources), use x4n::sector::Sector.
 //
 // All functions require on_game_loaded to have fired.
 // ---------------------------------------------------------------------------
@@ -39,41 +39,6 @@ inline X4Component* find_component(uint64_t id) {
         g->ComponentRegistry_Find(reg, id, 4));
 }
 
-/// Get the runtime class ID of a component via its vtable (GetGameClass, slot 566).
-/// Works for ALL component types (player, NPC, object, space, etc.).
-/// Returns static_cast<GameClass>(GAMECLASS_SENTINEL) if the component is null or invalid.
-/// @note Do NOT use comp->class_id (+0x68) -- that field is NOT the class ID.
-///       GetGameClass is a virtual function returning a hardcoded constant per class.
-/// @stability STABLE -- vtable-based, no raw offsets.
-/// @verified v9.00 build 603098 (GetComponentClass decompilation)
-inline GameClass get_class(const X4Component* comp) {
-    if (!comp || !comp->vtable) return static_cast<GameClass>(GAMECLASS_SENTINEL);
-    using Fn = uint32_t(__fastcall*)(const void*);
-    auto fn = reinterpret_cast<Fn*>(comp->vtable)[X4_VTABLE_GET_CLASS_ID / 8];
-    return fn ? static_cast<GameClass>(fn(comp)) : static_cast<GameClass>(GAMECLASS_SENTINEL);
-}
-
-/// Convenience overload: get class ID by UniverseID.
-inline GameClass get_class(uint64_t id) {
-    return get_class(find_component(id));
-}
-
-/// Check if a component IS-A given class via vtable (IsOrDerivedFromGameClass, slot 568).
-/// Works for ALL component types. Use GameClass enum values.
-/// @stability STABLE -- vtable-based, no raw offsets.
-/// @verified v9.00 build 603098 (SetObjectRadarVisible, AddCluster decompilation)
-inline bool is_derived_from(const X4Component* comp, GameClass cls) {
-    if (!comp || !comp->vtable) return false;
-    using Fn = bool(__fastcall*)(const void*, uint32_t);
-    auto fn = reinterpret_cast<Fn*>(comp->vtable)[X4_VTABLE_IS_DERIVED_CLASS / 8];
-    return fn ? fn(comp, static_cast<uint32_t>(cls)) : false;
-}
-
-/// Convenience overload: IS-A check by UniverseID.
-inline bool is_derived_from(uint64_t id, GameClass cls) {
-    return is_derived_from(find_component(id), cls);
-}
-
 /// Get the class name string for an entity (e.g. "station", "sector", "player").
 /// Wraps the game's GetComponentClass export. Returns "" if unavailable.
 inline const char* get_class_name(uint64_t id) {
@@ -82,34 +47,27 @@ inline const char* get_class_name(uint64_t id) {
     return g->GetComponentClass(id);
 }
 
-/// Read a component's UniverseID from its object pointer.
-/// @stability MODERATE — depends on X4_COMPONENT_OFFSET_ID (+0x08).
-/// @verified v9.00 build 602526 (GetClusters_Lua, GetSectors_Lua)
-inline uint64_t get_component_id(const X4Component* component) {
-    if (!component) return 0;
-    return component->id;
-}
-
-/// Resolve a raw uint64_t (from MD event fields) to a typed X4Component*.
+/// Resolve a raw uint64_t (from MD event fields) to a typed X4EntityBase*.
 /// MD event params often contain raw component pointers stored as uint64_t.
 /// SEH-guarded: validates the pointer is readable by probing ->id.
-/// Returns nullptr if the value is null or not a valid component pointer.
-inline X4Component* resolve_component(uint64_t raw_ptr) {
+/// Returns nullptr if the value is null or not a valid entity pointer.
+inline X4EntityBase* resolve_entity(uint64_t raw_ptr) {
     if (raw_ptr == 0) return nullptr;
     __try {
-        auto* comp = reinterpret_cast<X4Component*>(raw_ptr);
-        (void)comp->id;  // probe — triggers SEH if invalid
-        return comp;
+        auto* ent = reinterpret_cast<X4EntityBase*>(raw_ptr);
+        (void)ent->id;  // probe — triggers SEH if invalid
+        return ent;
     } __except(1) {
         return nullptr;
     }
 }
 
-/// Read the macro name string from any component (sector, cluster, station, ship).
+/// Read the macro name string from a heavy component (sector, cluster, station, ship).
 /// Uses the embedded interface at component+0x30, vtable slot 4 (GetMacroName).
 /// Returns nullptr if the component is invalid or has no macro name.
 /// The returned pointer is owned by the component's internal std::string — valid
 /// as long as the component exists. Do NOT store across frames.
+/// @note Only valid for heavy components (X4Component). NOT for X4ResourceArea.
 /// @note Assumes MSVC x64 std::string layout (SSO threshold = 16 bytes).
 /// @stability MODERATE — depends on X4_COMPONENT_OFFSET_DEFINITION (+0x30) + vtable[4].
 /// @verified v9.00 build 602526 (GetComponentData "macro" handler at 0x1402461CC)

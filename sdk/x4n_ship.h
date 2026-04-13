@@ -142,7 +142,7 @@ class Ship {
 public:
     explicit Ship(UniverseID id)
         : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_derived_from(comp_, GameClass::Ship))
+        if (comp_ && !comp_->is_a(GameClass::Ship))
             comp_ = nullptr;
     }
 

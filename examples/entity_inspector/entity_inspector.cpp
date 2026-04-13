@@ -40,17 +40,17 @@ static void inspect_entity(uint64_t id, const char* label) {
     }
 
     // --- Class ID via vtable (universal — works for ALL component types) ---
-    auto cls = x4n::entity::get_class(comp);
+    auto cls = comp->game_class();
 
     // --- Macro name via definition interface vtable (universal) ---
     const char* macro = x4n::entity::get_component_macro(comp);
 
     x4n::log::info("inspector: [%s] id=%llu class=%u(%s) macro=%s",
-                   label, id, (uint32_t)cls, x4n::entity::get_class_name(id),
+                   label, id, cls, x4n::entity::get_class_name(id),
                    macro ? macro : "(null)");
 
     // --- Object-hierarchy fields (only valid if IS-A "object") ---
-    bool is_object = x4n::entity::is_derived_from(comp, x4n::GameClass::Object);
+    bool is_object = comp->is_a(x4n::GameClass::Object);
     if (is_object) {
         bool    alive  = comp->exists != 0;
         void*   parent = comp->parent;
@@ -83,7 +83,7 @@ static void inspect_entity(uint64_t id, const char* label) {
     }
 
     // --- Space-class visibility (clusters, sectors, zones — NOT Object-derived) ---
-    bool is_space = x4n::entity::is_derived_from(comp, x4n::GameClass::Space);
+    bool is_space = comp->is_a(x4n::GameClass::Space);
     if (is_space) {
         bool known_all   = x4n::visibility::get_space_known_to_all(id);
         size_t fac_count = x4n::visibility::get_space_known_factions_count(id);
@@ -93,7 +93,7 @@ static void inspect_entity(uint64_t id, const char* label) {
     }
 
     // --- Spawntime (Container-class: stations, ships) ---
-    if (x4n::entity::is_derived_from(comp, x4n::GameClass::Container)) {
+    if (comp->is_a(x4n::GameClass::Container)) {
         double spawn = x4n::entity::get_spawntime(id);
         if (spawn >= 0.0)
             x4n::log::info("inspector: [%s]   spawntime=%.1f", label, spawn);

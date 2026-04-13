@@ -33,7 +33,7 @@ class Module {
 public:
     explicit Module(UniverseID id)
         : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_derived_from(comp_, GameClass::Module))
+        if (comp_ && !comp_->is_a(GameClass::Module))
             comp_ = nullptr;
     }
 
@@ -41,10 +41,10 @@ public:
     UniverseID id() const { return id_; }
 
     bool is_production() const {
-        return valid() && entity::is_derived_from(comp_, GameClass::Production);
+        return valid() && comp_->is_a(GameClass::Production);
     }
     bool is_processing() const {
-        return valid() && entity::is_derived_from(comp_, GameClass::Processingmodule);
+        return valid() && comp_->is_a(GameClass::Processingmodule);
     }
     bool is_operational() const {
         auto* g = game();

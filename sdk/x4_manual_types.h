@@ -99,37 +99,6 @@ typedef struct X4DefinitionInterface {
 #endif
 } X4DefinitionInterface;
 
-typedef struct X4Component {
-    void*     vtable;            // +0x00: main vtable (~800+ slots, see X4_VTABLE_* constants)
-    uint64_t  id;                // +0x08: UniverseID (also raw generation seed — dual purpose)
-    uint8_t   _pad_10[0x20];    // +0x10..+0x2F: internal engine bookkeeping (unresolved)
-    X4DefinitionInterface definition; // +0x30: embedded sub-object (8 bytes — just the vtable ptr)
-    void*     ctrl_vtable;       // +0x38: shared_ptr control block vtable
-    int32_t   ref_count;         // +0x40: atomic reference count
-    int32_t   weak_count;        // +0x44: atomic weak ref / lifecycle state (1->2->3)
-    uint8_t   _pad_48[0x20];    // +0x48..+0x67: unresolved
-    int32_t   class_id;          // +0x68: DEPRECATED — NOT the runtime class ID. Use vtable GetClassID (slot 566) instead.
-    uint8_t   _pad_6C[0x04];    // +0x6C..+0x6F: padding
-    void*     parent;            // +0x70: parent X4Component* (null for galaxy root)
-    uint8_t   _pad_78[0x30];    // +0x78..+0xA7: unresolved (48 bytes)
-    void*     children;          // +0xA8: child container ptr (group-indexed partition array, 32-byte buckets)
-    uint8_t   _pad_B0[0x21];    // +0xB0..+0xD0: unresolved
-    uint8_t   exists;            // +0xD1: existence flag (0=destroyed, nonzero=alive)
-} X4Component;
-
-#ifdef __cplusplus
-static_assert(offsetof(X4Component, id)         == 0x08, "X4Component::id offset mismatch");
-static_assert(offsetof(X4Component, definition) == 0x30, "X4Component::definition offset mismatch");
-static_assert(offsetof(X4Component, ref_count)  == 0x40, "X4Component::ref_count offset mismatch");
-static_assert(offsetof(X4Component, class_id)   == 0x68, "X4Component::class_id offset mismatch");
-static_assert(offsetof(X4Component, parent)     == 0x70, "X4Component::parent offset mismatch");
-static_assert(offsetof(X4Component, children)   == 0xA8, "X4Component::children offset mismatch");
-static_assert(offsetof(X4Component, exists)     == 0xD1, "X4Component::exists offset mismatch");
-#endif
-
-// Component registry — opaque, accessed only via ComponentRegistry_Find.
-typedef struct X4ComponentRegistry_ X4ComponentRegistry;
-
 // ---- Engine class IDs (runtime numeric IDs) ----
 // Auto-generated from class_ids.csv by generate_class_ids.ps1.
 // Full table in x4_game_class_ids.inc. Use x4n::GameClass enum (e.g. x4n::GameClass::Station).
@@ -142,6 +111,71 @@ typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 //   object(72) > container(110) > controllable(111) — ordered entities
 //   space(117) > cluster(15), sector(87), zone(108) — spatial hierarchy
 #include "x4_game_class_ids.inc"
+
+// --- X4EntityBase ---
+// Minimal base shared by ALL game entities (ships, stations, sectors,
+// resource areas, etc.). Verified in-game across Sector, Ship, ResourceArea.
+// Heavier types (X4Component, X4ResourceArea) inherit from this.
+//
+// @verified v9.00 build 604402 (in-game probe: Sector/Ship/ResourceArea)
+struct X4EntityBase {
+    void*      vtable;          // +0x00: main vtable (~800+ slots, see X4_VTABLE_* constants)
+    UniverseID id;              // +0x08: UniverseID (also raw generation seed — dual purpose)
+    void*      _unk_10;         // +0x10: null for Sector/ResourceArea, heap ptr for Ship. Purpose unknown.
+    void*      _type_meta;      // +0x18: per-type constant (.text ptr). Same for all instances of same class. Factory/dispatch related.
+    void*      _unk_20;         // +0x20: instance-specific ptr (null for ResourceArea). Purpose unknown.
+    void*      _unk_28;         // +0x28: instance-specific ptr (null for ResourceArea). Purpose unknown.
+};
+static_assert(offsetof(X4EntityBase, vtable) == 0x00, "X4EntityBase vtable offset");
+static_assert(offsetof(X4EntityBase, id)     == 0x08, "X4EntityBase id offset");
+
+// --- X4Component ---
+// Full ("heavy") component layout verified on ships, stations, sectors.
+// Fields at +0x30 onward are only valid for these heavy entity types.
+// Lighter entities (ResourceArea, etc.) share the X4EntityBase prefix
+// but diverge after +0x10 — do NOT cast them to X4Component for field access.
+struct X4Component : X4EntityBase {
+    X4DefinitionInterface definition; // +0x30: embedded sub-object (8 bytes — just the vtable ptr)
+    void*     ctrl_vtable;       // +0x38: shared_ptr control block vtable
+    int32_t   ref_count;         // +0x40: atomic reference count
+    int32_t   weak_count;        // +0x44: atomic weak ref / lifecycle state (1->2->3)
+    uint8_t   _pad_48[0x20];    // +0x48..+0x67: unresolved
+    int32_t   class_id;          // +0x68: DEPRECATED — NOT the runtime class ID. Use game_class() instead.
+    uint8_t   _pad_6C[0x04];    // +0x6C..+0x6F: padding
+    void*     parent;            // +0x70: parent X4Component* (null for galaxy root)
+    uint8_t   _pad_78[0x30];    // +0x78..+0xA7: unresolved (48 bytes)
+    void*     children;          // +0xA8: child container ptr (group-indexed partition array, 32-byte buckets)
+    uint8_t   _pad_B0[0x21];    // +0xB0..+0xD0: unresolved
+    uint8_t   exists;            // +0xD1: existence flag (0=destroyed, nonzero=alive)
+
+    /// Runtime class ID via vtable slot 566 (GetGameClass).
+    /// Safe on all GameClass-registered types (ships, stations, sectors, etc.).
+    /// NOT safe on lightweight types like ResourceArea — crashes (no GameClass entry).
+    x4n::GameClass game_class() const {
+        if (!vtable) return static_cast<x4n::GameClass>(x4n::GAMECLASS_SENTINEL);
+        using Fn = uint32_t(__fastcall*)(const void*);
+        auto fn = reinterpret_cast<Fn*>(vtable)[566]; // X4_VTABLE_GET_CLASS_ID / 8
+        return static_cast<x4n::GameClass>(fn ? fn(this) : x4n::GAMECLASS_SENTINEL);
+    }
+
+    /// IS-A check via vtable slot 568 (IsOrDerivedFromGameClass).
+    bool is_a(x4n::GameClass cls) const {
+        if (!vtable) return false;
+        using Fn = bool(__fastcall*)(const void*, uint32_t);
+        auto fn = reinterpret_cast<Fn*>(vtable)[568]; // X4_VTABLE_IS_DERIVED_CLASS / 8
+        return fn ? fn(this, static_cast<uint32_t>(cls)) : false;
+    }
+};
+static_assert(offsetof(X4Component, id)         == 0x08, "X4Component::id offset mismatch");
+static_assert(offsetof(X4Component, definition) == 0x30, "X4Component::definition offset mismatch");
+static_assert(offsetof(X4Component, ref_count)  == 0x40, "X4Component::ref_count offset mismatch");
+static_assert(offsetof(X4Component, class_id)   == 0x68, "X4Component::class_id offset mismatch");
+static_assert(offsetof(X4Component, parent)     == 0x70, "X4Component::parent offset mismatch");
+static_assert(offsetof(X4Component, children)   == 0xA8, "X4Component::children offset mismatch");
+static_assert(offsetof(X4Component, exists)     == 0xD1, "X4Component::exists offset mismatch");
+
+// Component registry — opaque, accessed only via ComponentRegistry_Find.
+typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 
 // ---- Global data RVA: Component registry ----
 // Add to imagebase to get absolute address. Dereference to get the actual value.
@@ -191,6 +225,16 @@ typedef struct X4ComponentRegistry_ X4ComponentRegistry;
                                                    /*          sentinel -1.0 = not set.                      */
                                                    /*          MD: $container.spawntime (class index 0x44C)   */
                                                    /*          MD: $container.age = gametime - spawntime      */
+
+// ---- Space-class offsets (clusters, sectors, zones — IS-A Space(117)) ----
+// Sunlight is stored on the CLUSTER (parent of sector), not on the sector.
+// The game's Lua property handler walks sector→parent(+0x70) up to the first
+// Space entity (= Cluster), then reads these offsets.
+// FIND: sub_1407B51D0 (sunlight getter): while(!(entity+0x360)) walk parent.
+//   Reads double at entity+0x368 when flag is set.
+// @verified v9.00 build 604402 (IDA: sub_1407B51D0, sub_1402F04C0, sub_140252FF0)
+#define X4_SPACE_OFFSET_HAS_SUNLIGHT       0x360  /* uint8 — flag: sunlight value is set (not inherited) */
+#define X4_SPACE_OFFSET_SUNLIGHT           0x368  /* double — sunlight intensity (0.0=dark, ~1.0=standard, up to ~3.7) */
 
 // ---- Component main vtable slot offsets (byte offsets into vtable) ----
 // The main vtable at +0x00 has ~800+ slots. Key slots:
@@ -429,6 +473,134 @@ typedef struct alignas(16) X4PlanEntry {
 #define X4_OBJECT_OFFSET_MASSTRAFFIC_QUEUE      0x3E0  /* ptr   — mass traffic queue object (null if not in mass traffic) */
 #define X4_OBJECT_OFFSET_RADAR_VISIBLE          0x400  /* uint8 — radar visibility, set by engine property system + MD action */
 #define X4_OBJECT_OFFSET_FORCED_RADAR_VISIBLE   0x401  /* uint8 — forced radar visibility (satellites, nav beacons) */
+
+// ======== SECTOR RESOURCE AREAS ===========================================
+// ResourceArea children of a Sector, used for unfiltered resource yield access.
+// GetDiscoveredSectorResources (FFI) has a player discovery filter at RA+0x1D0.
+// Direct memory access bypasses it by iterating the sector's child vector.
+// @verified v9.00 build 604402
+
+// FIND: Decompile GetNumDiscoveredSectorResources (PE export). After sector class
+//   validation (vtable IS-A check for class 87=Sector), find `mov rsi,[rcx+XXX]`
+//   / `mov rbp,[rcx+YYY]` — these are the std::vector begin/end of ResourceArea
+//   child nodes. Stride 8 (pointer per child). Each child: *(node)+0x08 = UniverseID.
+//   ---
+//   1. Find GetNumDiscoveredSectorResources (FFI export, PE export table)
+//   2. In its body: `mov rsi, [rcx+XXX]` / `mov rbp, [rcx+YYY]` where rcx=Sector*
+//      → XXX = RESAREA_VEC_BEGIN, YYY = RESAREA_VEC_END
+//   3. Same function: `comisd xmm0, [rdi+ZZZ]` where rdi=ResourceArea*
+//      → ZZZ = DISCOVERY_TIME
+//   4. Same function: reads int value from `[ResourceArea + WWW]` for yield accumulation
+//      → WWW = CURRENT_YIELD
+//   5. Follows ptr at `[ResourceArea + 0x30]` → RegionYieldDef, then `[def + 0x20]` → WareClass
+//   6. WareClass ware name: MSVC SSO string at +0x10 (buf/ptr) / +0x28 (capacity)
+//      Cross-verify with GetRegionResourceWares which reads from same WareClass vector.
+//   ---
+#define X4_SECTOR_RESAREA_VEC_BEGIN     0x3F8  /* uintptr_t — vector begin (ptr to first element) */
+#define X4_SECTOR_RESAREA_VEC_END       0x400  /* uintptr_t — vector end (ptr past last element) */
+
+// --- WareClass (partial) ---
+// FIND: From RegionYieldDef+0x20 → WareClass*. Ware name is an MSVC SSO
+//   std::string at +0x10 (buf/ptr) / +0x28 (capacity). Cross-verify with
+//   GetRegionResourceWares (PE export) which reads from same WareClass vector.
+struct X4WareClass {
+    char     _pad0[0x10];       // +0x00 — vtable + base fields
+    char     name_buf[16];      // +0x10 — inline SSO buffer, OR char* if heap-allocated
+    uint64_t name_len;          // +0x20 — string length
+    uint64_t name_cap;          // +0x28 — SSO capacity; >= 16 means name_buf is a char*
+
+    const char* name() const {
+        if (name_cap >= 16)
+            return *reinterpret_cast<const char* const*>(&name_buf[0]);
+        return &name_buf[0];
+    }
+};
+static_assert(offsetof(X4WareClass, name_buf) == 0x10, "WareClass name_buf offset");
+static_assert(offsetof(X4WareClass, name_len) == 0x20, "WareClass name_len offset");
+static_assert(offsetof(X4WareClass, name_cap) == 0x28, "WareClass name_cap offset");
+
+// --- RegionYieldDef ---
+// Static definition attached to each ResourceArea. Loaded from regionyields.xml.
+// Contains ware type, yield amount, and mining/respawn tuning params.
+//
+// FIND: sub_140EA30F0 (XML init) populates all fields from XML attributes.
+//   GetNumDiscoveredSectorResources: reads +0x20 (WareClass), +0x48 (respawn).
+//   sub_140743160 (depletion): reads +0x48.
+//
+// XML schema: libraries/regionyields.xsd <definition> element.
+// In-game verified: cur <= max_yield always; typical max values 250k–1M.
+// Field-to-XML mapping verified via probe (hydrogen objectyieldfactor=1.0 /
+//   gatherspeedfactor=0.7; ice objectyieldfactor=1.2 / gatherspeedfactor=1.0).
+// @verified v9.00 build 604402
+struct X4RegionYieldDef {
+    // +0x00: definition ID std::string (MSVC layout: buf[16] + len + cap = 0x20 bytes)
+    char          id_buf[16];            // +0x00 — SSO buffer or char* (MSVC SSO)
+    uint64_t      id_len;               // +0x10
+    uint64_t      id_cap;               // +0x18
+    X4WareClass*  ware_class;           // +0x20 — XML "ware": ware type (ore, hydrogen, etc.)
+    void*         boundary_data;        // +0x28 — parsed from <boundary> child element
+    bool          random_rotation[3];   // +0x30 — XML randompitch/randomyaw/randomroll (order TBD)
+    char          _pad0[0x05];          // +0x33 — alignment padding
+    int64_t       max_yield;            // +0x38 — XML "yield": total yield amount. cur always <= max.
+    float         object_yield_factor;  // +0x40 — XML "objectyieldfactor": per-object yield scale (mineral/scrap). Default 1.0.
+    float         gather_speed_factor;  // +0x44 — XML "gatherspeedfactor": mining speed scale (gas). Default 1.0.
+    float         respawn_delay;        // +0x48 — XML "respawndelay" × 60: seconds before respawn. -60 = no respawn.
+    int32_t       rating;               // +0x4C — XML "rating": star rating × 3 (0–15). 15 = 5 stars.
+    uint32_t      yield_tag_idx;        // +0x50 — XML "tag": compatibility tag index (global table lookup)
+    char          _pad1[0x04];          // +0x54 — alignment padding
+    void*         scan_effect;          // +0x58 — XML "scaneffect": effect definition ptr (scaneffectcolor baked in)
+    int32_t       scan_effect_amount;   // +0x60 — XML "scaneffectamount": scan result effect count. Default 1.
+    float         scan_effect_intensity;// +0x64 — XML "scaneffectintensity": scan result opacity/volume. Default 1.0.
+
+    /// Read definition ID from the inline std::string.
+    const char* id() const {
+        if (id_cap >= 16)
+            return *reinterpret_cast<const char* const*>(&id_buf[0]);
+        return &id_buf[0];
+    }
+};
+static_assert(offsetof(X4RegionYieldDef, ware_class)           == 0x20, "RegionYieldDef ware_class offset");
+static_assert(offsetof(X4RegionYieldDef, boundary_data)        == 0x28, "RegionYieldDef boundary_data offset");
+static_assert(offsetof(X4RegionYieldDef, random_rotation)      == 0x30, "RegionYieldDef random_rotation offset");
+static_assert(offsetof(X4RegionYieldDef, max_yield)            == 0x38, "RegionYieldDef max_yield offset");
+static_assert(offsetof(X4RegionYieldDef, object_yield_factor)  == 0x40, "RegionYieldDef object_yield_factor offset");
+static_assert(offsetof(X4RegionYieldDef, gather_speed_factor)  == 0x44, "RegionYieldDef gather_speed_factor offset");
+static_assert(offsetof(X4RegionYieldDef, respawn_delay)        == 0x48, "RegionYieldDef respawn_delay offset");
+static_assert(offsetof(X4RegionYieldDef, rating)               == 0x4C, "RegionYieldDef rating offset");
+static_assert(offsetof(X4RegionYieldDef, yield_tag_idx)        == 0x50, "RegionYieldDef yield_tag_idx offset");
+static_assert(offsetof(X4RegionYieldDef, scan_effect)          == 0x58, "RegionYieldDef scan_effect offset");
+static_assert(offsetof(X4RegionYieldDef, scan_effect_amount)   == 0x60, "RegionYieldDef scan_effect_amount offset");
+static_assert(offsetof(X4RegionYieldDef, scan_effect_intensity)== 0x64, "RegionYieldDef scan_effect_intensity offset");
+
+// --- ResourceArea ---
+// Live resource node within a Sector. Child of the sector's RA vector.
+// Inherits X4EntityBase (vtable + id) but diverges from X4Component after +0x10.
+//
+// No GameClass enum entry — identified via RTTI dynamic_cast to U::ResourceArea.
+// Entity functions (get_class, is_a) work via the shared X4EntityBase.
+//
+// FIND: GetNumDiscoveredSectorResources: RA+0x30 = def ptr, RA+0x80 = yield,
+//   RA+0x1D0 = discovery time. sub_140743160 (depletion): writes RA+0x80.
+//   sub_1407425D0 (respawn): reads RA+0x38 (parent), writes RA+0x1D8 (job),
+//   RA+0x1E0 (pending flag).
+// @verified v9.00 build 604402
+struct X4ResourceArea : X4EntityBase {
+    X4RegionYieldDef*  definition;      // +0x30 — static definition (ware, max yield, params)
+    void*              parent;          // +0x38 — parent/container ptr (used in respawn)
+    char               _pad1[0x40];     // +0x40
+    int64_t            current_yield;   // +0x80 — live yield (depletes with mining, regenerates)
+    char               _pad2[0x148];    // +0x88
+    double             discovery_time;  // +0x1D0 — player discovery timestamp (game time)
+    void*              respawn_job;     // +0x1D8 — active respawn job ptr (null if not respawning)
+    uint8_t            respawn_pending; // +0x1E0 — set to 1 when respawn queued
+};
+static_assert(offsetof(X4ResourceArea, id)              == 0x08,  "ResourceArea id offset");
+static_assert(offsetof(X4ResourceArea, definition)      == 0x30,  "ResourceArea definition offset");
+static_assert(offsetof(X4ResourceArea, parent)          == 0x38,  "ResourceArea parent offset");
+static_assert(offsetof(X4ResourceArea, current_yield)   == 0x80,  "ResourceArea current_yield offset");
+static_assert(offsetof(X4ResourceArea, discovery_time)  == 0x1D0, "ResourceArea discovery_time offset");
+static_assert(offsetof(X4ResourceArea, respawn_job)     == 0x1D8, "ResourceArea respawn_job offset");
+static_assert(offsetof(X4ResourceArea, respawn_pending) == 0x1E0, "ResourceArea respawn_pending offset");
 
 // ======== MD EVENT SYSTEM =================================================
 // Hooked by X4Native core via EventQueue_InsertOrDispatch (version_db).
