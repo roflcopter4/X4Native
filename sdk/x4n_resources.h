@@ -78,8 +78,8 @@ inline uint32_t collect_raw(
         if (!entity::is_a(sector, x4n::GameClass::Sector)) return 0;
 
         auto base = reinterpret_cast<uintptr_t>(sector);
-        auto** begin = *reinterpret_cast<X4EntityBase***>(base + detail::offsets()->sector_resarea_vec_begin);
-        auto** end   = *reinterpret_cast<X4EntityBase***>(base + detail::offsets()->sector_resarea_vec_end);
+        auto** begin = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_begin);
+        auto** end   = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_end);
         if (!begin || begin >= end) return 0;
 
         uint32_t wcount = 0;
