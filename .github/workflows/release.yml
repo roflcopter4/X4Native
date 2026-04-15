@@ -13,12 +13,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Extract version from tag
+      - name: Extract version from tag + source
         id: version
         shell: pwsh
         run: |
-          $ver = "${{ github.ref_name }}" -replace '^v', ''
-          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          # Game version from source (single source of truth)
+          $label = (Select-String -Path sdk/x4_game_types.h -Pattern '#define X4_GAME_VERSION_LABEL\s+"([^"]+)"').Matches[0].Groups[1].Value
+          $gameBuild = (Select-String -Path sdk/x4_game_types.h -Pattern '#define X4_GAME_TYPES_BUILD\s+(\d+)').Matches[0].Groups[1].Value
+
+          # Version = tag without the 'v' prefix
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+
+          echo "full_version=$tag" >> $env:GITHUB_OUTPUT
+          echo "game_build=$gameBuild" >> $env:GITHUB_OUTPUT
+          echo "label=$label" >> $env:GITHUB_OUTPUT
+          Write-Host "Release: v$tag (game=$label)"
 
       - name: Configure
         run: cmake --preset default
@@ -30,6 +39,7 @@ jobs:
       - name: Package end-user zip
         shell: pwsh
         run: |
+          $ver = "${{ steps.version.outputs.full_version }}"
           $staging = "pkg/x4native"
           New-Item -ItemType Directory -Path $staging/native -Force | Out-Null
           New-Item -ItemType Directory -Path $staging/ui -Force | Out-Null
@@ -44,12 +54,13 @@ jobs:
           Copy-Item native/x4native_64.dll $staging/native/
           Copy-Item native/x4native_core.dll $staging/native/
 
-          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-v${{ steps.version.outputs.version }}.zip"
+          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-v$ver.zip"
 
       # --- SDK Package ---
       - name: Package SDK zip
         shell: pwsh
         run: |
+          $ver = "${{ steps.version.outputs.full_version }}"
           $staging = "pkg/x4native-sdk"
           New-Item -ItemType Directory -Path $staging/examples/hello -Force | Out-Null
 
@@ -59,26 +70,28 @@ jobs:
           Copy-Item examples/hello/CMakeLists.txt $staging/examples/hello/
           Copy-Item examples/hello/x4native.json $staging/examples/hello/
 
-          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-sdk-v${{ steps.version.outputs.version }}.zip"
+          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-sdk-v$ver.zip"
 
       # --- Debug Symbols ---
       - name: Package symbols zip
         shell: pwsh
         run: |
+          $ver = "${{ steps.version.outputs.full_version }}"
           $staging = "pkg/x4native-symbols"
           New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
           Copy-Item native/x4native_64.pdb $staging/
           Copy-Item native/x4native_core.pdb $staging/
 
-          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-symbols-v${{ steps.version.outputs.version }}.zip"
+          Compress-Archive -Path $staging -DestinationPath "pkg/x4native-symbols-v$ver.zip"
 
       # --- GitHub Release ---
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "X4Native v${{ steps.version.outputs.full_version }}"
           generate_release_notes: true
           files: |
-            pkg/x4native-v${{ steps.version.outputs.version }}.zip
-            pkg/x4native-sdk-v${{ steps.version.outputs.version }}.zip
-            pkg/x4native-symbols-v${{ steps.version.outputs.version }}.zip
+            pkg/x4native-v${{ steps.version.outputs.full_version }}.zip
+            pkg/x4native-sdk-v${{ steps.version.outputs.full_version }}.zip
+            pkg/x4native-symbols-v${{ steps.version.outputs.full_version }}.zip

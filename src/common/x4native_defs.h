@@ -1,12 +1,6 @@
 #pragma once
 #include <cstdint>
 
-#define X4NATIVE_API_VERSION 2
-#define X4NATIVE_VERSION_MAJOR 0
-#define X4NATIVE_VERSION_MINOR 9
-#define X4NATIVE_VERSION_PATCH 0
-#define X4NATIVE_VERSION_STR "0.9.0"
-
 // ---------------------------------------------------------------------------
 // Interface between proxy and core DLL.
 // The proxy owns the CoreDispatch struct; the core fills it with function

@@ -564,7 +564,7 @@ static void api_log(int level, const char* message) {
 }
 
 static const char* s_game_ver_cache;
-static const char* s_x4n_ver_cache = X4NATIVE_VERSION_STR;
+static const char* s_x4n_ver_cache = X4_GAME_VERSION_LABEL;
 
 static const char* api_get_game_version() {
     return s_game_ver_cache;

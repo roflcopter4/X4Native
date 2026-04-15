@@ -449,7 +449,7 @@ int core_init(CoreInitContext* ctx) {
 
     // 1. Logger
     x4n::Logger::init(g_ext_root);
-    x4n::Logger::info("X4Native core v" X4NATIVE_VERSION_STR " initializing...");
+    x4n::Logger::info("X4Native core v" X4_GAME_VERSION_LABEL " initializing...");
     x4n::Logger::info("Extension root: {}", g_ext_root);
 
     // 2. Event system
@@ -457,7 +457,7 @@ int core_init(CoreInitContext* ctx) {
 
     // 3. Game version
     g_game_version  = x4n::Version::detect();
-    g_version_string = std::string(X4NATIVE_VERSION_STR) +
+    g_version_string = std::string(X4_GAME_VERSION_LABEL) +
                        " (game: " + g_game_version + ")";
 
     // 4. Game API — resolve X4.exe function pointers

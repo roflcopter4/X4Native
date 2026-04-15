@@ -36,6 +36,21 @@ endif()
 set(DEPLOY_DIR "${X4_GAME_DIR}/extensions/x4native")
 
 # ---------------------------------------------------------------------------
+# Game version — parsed from sdk/x4_game_types.h (single source of truth)
+# ---------------------------------------------------------------------------
+file(STRINGS "${CMAKE_SOURCE_DIR}/sdk/x4_game_types.h" _build_line
+     REGEX "^#define X4_GAME_TYPES_BUILD [0-9]+$")
+string(REGEX REPLACE "^#define X4_GAME_TYPES_BUILD ([0-9]+)$" "\\1" X4_GAME_TYPES_BUILD "${_build_line}")
+message(STATUS "X4_GAME_TYPES_BUILD: ${X4_GAME_TYPES_BUILD}")
+
+# Generate content.xml from template with correct game version
+configure_file(
+    "${CMAKE_SOURCE_DIR}/extension/content.xml.in"
+    "${CMAKE_SOURCE_DIR}/extension/content.xml"
+    @ONLY
+)
+
+# ---------------------------------------------------------------------------
 # DLL build (Phase 1+, when src/ exists)
 # ---------------------------------------------------------------------------
 if(EXISTS "${CMAKE_SOURCE_DIR}/src/CMakeLists.txt")
@@ -50,7 +65,8 @@ endif()
 # ---------------------------------------------------------------------------
 # Extension folder — deploy everything except settings (user-editable)
 install(DIRECTORY extension/ DESTINATION .
-    PATTERN "x4native_settings.json" EXCLUDE)
+    PATTERN "x4native_settings.json" EXCLUDE
+    PATTERN "content.xml.in" EXCLUDE)
 
 # Framework settings — only deploy if not already present (preserves user edits)
 install(CODE "
