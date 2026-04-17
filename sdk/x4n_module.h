@@ -77,6 +77,49 @@ public:
         if (is_production())       g->PauseProductionModule(id_, p);
         else if (is_processing())  g->PauseProcessingModule(id_, p);
     }
+
+    /// True iff this module has been manually paused.
+    ///
+    /// Handles both Production (class 78, paused_since sentinel at +0x398) and
+    /// Processingmodule (class 77, pause byte at +0x3B8). For Production, reads the
+    /// `paused_since` timestamp which is the game engine's authoritative pause check
+    /// (not the redundant +0x3F4 flag byte). For Processingmodule, reads its pause byte
+    /// directly — no timestamp exists on that class.
+    ///
+    /// See docs/rev/PRODUCTION_MODULES.md §5.3.
+    /// Works for NPC-owned modules (read path is not gated; only the FFI write is).
+    bool is_paused() const {
+        if (!valid()) return false;
+        if (entity::is_a(comp_, GameClass::Production)) {
+            double t = *reinterpret_cast<const double*>(
+                reinterpret_cast<const uint8_t*>(comp_) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
+            return t > -0.9999;
+        }
+        if (entity::is_a(comp_, GameClass::Processingmodule)) {
+            return *(reinterpret_cast<const uint8_t*>(comp_)
+                      + X4_PROCESSINGMODULE_PAUSED_FLAG_OFFSET) != 0;
+        }
+        return false;
+    }
+
+    /// `player.age` seconds at which this Production module was paused; returns -1.0
+    /// if not currently paused or if this isn't a Production module.
+    ///
+    /// **Production-only.** Processingmodule (class 77) has no timestamp field — its
+    /// pause/resume handlers never stamp a "since" value (confirmed by decompiling
+    /// sub_14053C4A0 / sub_14053C560). If you need to track pause duration for a
+    /// Processingmodule, you must maintain state outside the game (e.g., observe
+    /// is_paused() transitions across polls).
+    ///
+    /// Subtract from current `player.age` to get seconds-paused for Production modules.
+    /// Save-persistent — the timestamp survives save/load cycles.
+    ///
+    /// See docs/rev/PRODUCTION_MODULES.md §5.3.
+    double paused_since() const {
+        if (!is_production()) return -1.0;
+        return *reinterpret_cast<const double*>(
+            reinterpret_cast<const uint8_t*>(comp_) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
+    }
 };
 
 }} // namespace x4n::module

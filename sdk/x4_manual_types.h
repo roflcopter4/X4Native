@@ -160,6 +160,51 @@ static_assert(offsetof(X4Component, parent)     == 0x70, "X4Component::parent of
 static_assert(offsetof(X4Component, children)   == 0xA8, "X4Component::children offset mismatch");
 static_assert(offsetof(X4Component, exists)     == 0xD1, "X4Component::exists offset mismatch");
 
+// ---- Production (class 78) field offsets ----
+// Production-specific offsets. NOT present on X4Component base (shared prefix),
+// NOT present on Processingmodule (class 77 uses +0x3B8 for its pause byte with no timestamp).
+// WARNING: struct offsets — update when game build changes.
+// Verified: build 605025. See docs/rev/PRODUCTION_MODULES.md §5.3.
+// Use x4n::module::Module::is_paused() / paused_since() — do NOT read these offsets
+// directly in consumer code (per project "no raw offsets in consumers" rule).
+//
+// FIND (paused_since @ +0x398):
+//   PauseProductionModule @ 0x14017CAA0 dispatches to its pause handler (sub_1407258B0).
+//   Inside the handler, look for `movsd [rcx+0x398], xmm1` — the instruction that stamps
+//   player.age into the timestamp slot. Resume handler (sub_140725BA0) inverts: reads
+//   *[rbx+0x398], adds elapsed to cumulative at +0x3A0, then writes the -1.0 sentinel
+//   (0xBFF0000000000000) back to +0x398.
+#define X4_PRODUCTION_PAUSED_SINCE_OFFSET            0x398  /* double, player.age at pause; -1.0 = not paused (sentinel) */
+
+// FIND (cumulative_paused_time @ +0x3A0):
+//   Resume handler sub_140725BA0. After reading +0x398, it computes elapsed = player.age
+//   - *[rbx+0x398] and adds to *(double*)(this+0x3A0) before zeroing the sentinel.
+//   The `addsd [rbx+0x3A0], xmm0` pattern is the cumulative counter update.
+#define X4_PRODUCTION_CUMULATIVE_PAUSED_TIME_OFFSET  0x3A0  /* double, accumulated paused seconds across all cycles */
+
+// FIND (recipe_index @ +0x3A8, state @ +0x3F0):
+//   GetContainerWareProduction @ 0x1401AA460 module-iteration loop. Look for
+//   `state = *(int32*)(module + 1008)` (= +0x3F0) and `*(int32*)(module + 936) != -1`
+//   (= +0x3A8). Both appear in the "skip uninitialized / require recipe" guard before
+//   accumulating the per-ware rate. See PRODUCTION_MODULES.md §6.1.
+#define X4_PRODUCTION_RECIPE_INDEX_OFFSET            0x3A8  /* int32, -1 = no recipe */
+#define X4_PRODUCTION_STATE_OFFSET                   0x3F0  /* int32, 1=starving/uninitialized, 8=active */
+
+// FIND (paused_flag @ +0x3F4):
+//   PauseProductionModule direct body (before dispatch to sub_1407258B0). The byte write
+//   `mov byte ptr [v5+0x3F4], 1` at 0x14017CBC3 flips the flag. Also written (to 0) by
+//   the resume path near the sentinel reset in sub_140725BA0.
+#define X4_PRODUCTION_PAUSED_FLAG_OFFSET             0x3F4  /* uint8, redundant with sentinel above */
+
+// FIND (processingmodule paused_flag @ +0x3B8):
+//   Start from the `PauseProcessingModule` FFI entry (x4_game_func_list.inc:1526) — its
+//   implementation tailcalls into the pause helper sub_14053C4A0 (resume helper is
+//   sub_14053C560 at the sibling call site). Pause handler writes
+//   `byte ptr [this+0x3B8], 1`; resume handler clears it. No timestamp field — the
+//   resume helper does NOT read/write any adjacent double, so the "paused since"
+//   concept doesn't apply to Processingmodule.
+#define X4_PROCESSINGMODULE_PAUSED_FLAG_OFFSET       0x3B8  /* uint8, class 77 only — no timestamp field */
+
 // Component registry — opaque, accessed only via ComponentRegistry_Find.
 typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 

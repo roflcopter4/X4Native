@@ -84,15 +84,39 @@ Decompiled behavior:
 
 ### 5.3 Internal State (offsets from module base)
 
+**Production class (class 78):**
+
 | Offset | Type | Field | Notes |
 |--------|------|-------|-------|
+| +0x398 (920) | double | **paused_since** | `player.age` seconds at pause; **`-1.0` = not paused** (sentinel) |
+| +0x3A0 (928) | double | cumulative_paused_time | accumulated paused seconds across all pause cycles (debug/UI) |
 | +0x3A8 (936) | int32 | recipe_index | -1 = no recipe assigned |
 | +0x3B0 (944) | double | rate_multiplier | production speed factor |
 | +0x3B8 (952) | double | consumption_multiplier | resource consumption factor |
 | +0x3D8 (984) | ptr | recipe_begin | start of recipe array (96 bytes per entry) |
 | +0x3E0 (992) | ptr | recipe_end | end of recipe array |
 | +0x3F0 (1008) | int32 | production_state | 1=uninitialized, 8=active |
-| +0x3F4 (1012) | uint8 | **paused** | 0=running, 1=manually paused |
+| +0x3F4 (1012) | uint8 | paused_flag | 0=running, 1=manually paused (redundant with +0x398 sentinel) |
+
+**Pause write path** (confirmed via `PauseProductionModule` @ 0x14017CAA0):
+1. Pause handler `sub_1407258B0` — `movsd [rcx+0x398], xmm1` stamps current `player.age`.
+2. `*(uint8*)(module+0x3F4) = 1` at 0x14017CBC3.
+
+**Resume write path** (`sub_140725BA0`):
+1. Computes `elapsed = player.age - *(double*)(module+0x398)`.
+2. Adds `elapsed` to `+0x3A0` (cumulative counter).
+3. Resets `+0x398` back to `-1.0` (`0xBFF0000000000000`) at 0x140725C7C.
+4. Clears `+0x3F4`.
+
+**Why `+0x398` is authoritative**: the game engine's "is this module paused" check (`sub_140725F70`) branches on `*(double*)(module+0x398) > -0.9999` internally — i.e., it uses the sentinel, not the flag byte. Reads of `+0x398` are the correct path for both pause detection and pause-duration computation. Save-persistent.
+
+**Processingmodule class (class 77) — distinct layout:**
+
+| Offset | Type | Field | Notes |
+|--------|------|-------|-------|
+| +0x3B8 (952) | uint8 | paused | no timestamp field — "duration paused" concept does not apply |
+
+Processingmodule write paths: `sub_14053C4A0` (pause) / `sub_14053C560` (resume). The resume helper does **not** compute elapsed time; no cumulative or since-counter is stored.
 
 ### 5.4 Player-Only Limitation
 
