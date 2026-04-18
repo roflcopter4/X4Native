@@ -145,5 +145,136 @@ enum class GameClass : uint32_t {
 /// Extension code should check for nullptr/null component instead of comparing to this.
 inline constexpr uint32_t GAMECLASS_SENTINEL = 120;
 
+/// Engine-facing class name (raw form from class_ids.csv).
+/// Used by x4n::entity::find_ancestor() to pass GameClass into GetContextByClass,
+/// and by typed wrappers around IsComponentClass / IsRealComponentClass.
+/// Returns nullptr for out-of-range values (graceful fallback: caller gets null result).
+inline const char* class_name(GameClass c) {
+    static constexpr const char* NAMES[] = {
+        "accessory"                 , // 0 Accessory
+        "adsign"                    , // 1 Adsign
+        "adsignobject"              , // 2 Adsignobject
+        "anomaly"                   , // 3 Anomaly
+        "asteroid"                  , // 4 Asteroid
+        "attachment"                , // 5 Attachment
+        "bomb"                      , // 6 Bomb
+        "bomblauncher"              , // 7 Bomblauncher
+        "buildstorage"              , // 8 Buildstorage
+        "buildmodule"               , // 9 Buildmodule
+        "buildprocessor"            , // 10 Buildprocessor
+        "bullet"                    , // 11 Bullet
+        "cargobay"                  , // 12 Cargobay
+        "celestialbody"             , // 13 Celestialbody
+        "checkpoint"                , // 14 Checkpoint
+        "cluster"                   , // 15 Cluster
+        "cockpit"                   , // 16 Cockpit
+        "collectableshieldrestore"  , // 17 Collectableshieldrestore
+        "collectableammo"           , // 18 Collectableammo
+        "collectableblueprints"     , // 19 Collectableblueprints
+        "collectablewares"          , // 20 Collectablewares
+        "component"                 , // 21 Component
+        "computer"                  , // 22 Computer
+        "connectionmodule"          , // 23 Connectionmodule
+        "controlroom"               , // 24 Controlroom
+        "countermeasure"            , // 25 Countermeasure
+        "crate"                     , // 26 Crate
+        "crate_l"                   , // 27 CrateL
+        "crate_m"                   , // 28 CrateM
+        "crate_s"                   , // 29 CrateS
+        "crystal"                   , // 30 Crystal
+        "cutsceneanchor"            , // 31 Cutsceneanchor
+        "datavault"                 , // 32 Datavault
+        "defencemodule"             , // 33 Defencemodule
+        "defensible"                , // 34 Defensible
+        "destructible"              , // 35 Destructible
+        "detector"                  , // 36 Detector
+        "dismantleprocessor"        , // 37 Dismantleprocessor
+        "dockarea"                  , // 38 Dockarea
+        "dockingbay"                , // 39 Dockingbay
+        "drop"                      , // 40 Drop
+        "effectobject"              , // 41 Effectobject
+        "engine"                    , // 42 Engine
+        "entity"                    , // 43 Entity
+        "forceemitter"              , // 44 Forceemitter
+        "fogvolume"                 , // 45 Fogvolume
+        "galaxy"                    , // 46 Galaxy
+        "gate"                      , // 47 Gate
+        "habitation"                , // 48 Habitation
+        "hackerprobe"               , // 49 Hackerprobe
+        "highway"                   , // 50 Highway
+        "highwayblocker"            , // 51 Highwayblocker
+        "highwaybooster"            , // 52 Highwaybooster
+        "highwayentrygate"          , // 53 Highwayentrygate
+        "highwayexitgate"           , // 54 Highwayexitgate
+        "highwayscene"              , // 55 Highwayscene
+        "highwaytrigger"            , // 56 Highwaytrigger
+        "holomap"                   , // 57 Holomap
+        "influenceobject"           , // 58 Influenceobject
+        "landmarkobject"            , // 59 Landmarkobject
+        "lensflare"                 , // 60 Lensflare
+        "lock"                      , // 61 Lock
+        "lockbox"                   , // 62 Lockbox
+        "mine"                      , // 63 Mine
+        "miningnode"                , // 64 Miningnode
+        "missile"                   , // 65 Missile
+        "missilelauncher"           , // 66 Missilelauncher
+        "missileturret"             , // 67 Missileturret
+        "moon"                      , // 68 Moon
+        "navbeacon"                 , // 69 Navbeacon
+        "navcontext"                , // 70 Navcontext
+        "npc"                       , // 71 Npc
+        "object"                    , // 72 Object
+        "pier"                      , // 73 Pier
+        "planet"                    , // 74 Planet
+        "player"                    , // 75 Player
+        "positional"                , // 76 Positional
+        "processingmodule"          , // 77 Processingmodule
+        "production"                , // 78 Production
+        "radar"                     , // 79 Radar
+        "recyclable"                , // 80 Recyclable
+        "region"                    , // 81 Region
+        "resourceprobe"             , // 82 Resourceprobe
+        "room"                      , // 83 Room
+        "satellite"                 , // 84 Satellite
+        "scanner"                   , // 85 Scanner
+        "scene"                     , // 86 Scene
+        "sector"                    , // 87 Sector
+        "shieldgenerator"           , // 88 Shieldgenerator
+        "ship_xs"                   , // 89 ShipXs
+        "ship_s"                    , // 90 ShipS
+        "ship_m"                    , // 91 ShipM
+        "ship_l"                    , // 92 ShipL
+        "ship_xl"                   , // 93 ShipXl
+        "signalleak"                , // 94 Signalleak
+        "spacesuit"                 , // 95 Spacesuit
+        "stardust"                  , // 96 Stardust
+        "station"                   , // 97 Station
+        "storage"                   , // 98 Storage
+        "sun"                       , // 99 Sun
+        "switchable"                , // 100 Switchable
+        "targetpoint"               , // 101 Targetpoint
+        "textdisplay"               , // 102 Textdisplay
+        "turret"                    , // 103 Turret
+        "uielement"                 , // 104 Uielement
+        "ventureplatform"           , // 105 Ventureplatform
+        "weapon"                    , // 106 Weapon
+        "welfaremodule"             , // 107 Welfaremodule
+        "zone"                      , // 108 Zone
+        "collectable"               , // 109 Collectable
+        "container"                 , // 110 Container
+        "controllable"              , // 111 Controllable
+        "explosive"                 , // 112 Explosive
+        "launcher"                  , // 113 Launcher
+        "module"                    , // 114 Module
+        "nonplayer"                 , // 115 Nonplayer
+        "ship"                      , // 116 Ship
+        "space"                     , // 117 Space
+        "triggerobject"             , // 118 Triggerobject
+        "walkablemodule"             // 119 Walkablemodule
+    };
+    auto idx = static_cast<size_t>(c);
+    return idx < (sizeof(NAMES) / sizeof(NAMES[0])) ? NAMES[idx] : nullptr;
+}
+
 } // namespace x4n
 #endif

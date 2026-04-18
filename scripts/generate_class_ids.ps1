@@ -104,6 +104,25 @@ $lines.Add("/// Internal sentinel value -- not a real class. Returned by get_cla
 $lines.Add("/// Extension code should check for nullptr/null component instead of comparing to this.")
 $lines.Add("inline constexpr uint32_t GAMECLASS_SENTINEL = $sentinel;")
 $lines.Add("")
+$lines.Add("/// Engine-facing class name (raw form from class_ids.csv).")
+$lines.Add("/// Used by x4n::entity::find_ancestor() to pass GameClass into GetContextByClass,")
+$lines.Add("/// and by typed wrappers around IsComponentClass / IsRealComponentClass.")
+$lines.Add("/// Returns nullptr for out-of-range values (graceful fallback: caller gets null result).")
+$lines.Add("inline const char* class_name(GameClass c) {")
+$lines.Add("    static constexpr const char* NAMES[] = {")
+$maxRawLen = ($entries | ForEach-Object { $_.RawName.Length } | Measure-Object -Maximum).Maximum
+for ($i = 0; $i -le $lastIdx; $i++) {
+    $e = $entries[$i]
+    $quoted = '"' + $e.RawName + '"'
+    $padded = $quoted.PadRight($maxRawLen + 4)
+    $comma = if ($i -lt $lastIdx) { "," } else { "" }
+    $lines.Add("        ${padded}${comma} // $($e.Id) $($e.PascalName)")
+}
+$lines.Add("    };")
+$lines.Add("    auto idx = static_cast<size_t>(c);")
+$lines.Add("    return idx < (sizeof(NAMES) / sizeof(NAMES[0])) ? NAMES[idx] : nullptr;")
+$lines.Add("}")
+$lines.Add("")
 $lines.Add("} // namespace x4n")
 $lines.Add("#endif")
 $lines.Add("")

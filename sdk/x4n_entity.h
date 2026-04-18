@@ -131,4 +131,20 @@ inline double get_spawntime(const X4Component* comp) {
         reinterpret_cast<uintptr_t>(comp) + detail::offsets()->container_spawntime);
 }
 
+/// Walk the component's context chain upward and return the first ancestor
+/// matching the given class. Returns 0 if none found or if the FFI is unavailable.
+/// Typed wrapper around the engine's GetContextByClass using the generated
+/// x4n::class_name() mapping — preferred over raw GetContextByClass with
+/// stringly-typed class names.
+///
+/// Example:
+///   UniverseID sector = x4n::entity::find_ancestor(ship_id, GameClass::Sector);
+///   UniverseID bs     = x4n::entity::find_ancestor(station_id, GameClass::Buildstorage);
+inline UniverseID find_ancestor(UniverseID id, GameClass cls) {
+    auto* g = game();
+    if (!g || !g->GetContextByClass) return 0;
+    const char* name = class_name(cls);
+    return name ? g->GetContextByClass(id, name, false) : 0;
+}
+
 }} // namespace x4n::entity

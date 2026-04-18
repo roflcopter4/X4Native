@@ -46,6 +46,21 @@ public:
     bool is_processing() const {
         return valid() && entity::is_a(comp_, GameClass::Processingmodule);
     }
+    bool is_habitation() const {
+        return valid() && entity::is_a(comp_, GameClass::Habitation);
+    }
+    bool is_buildmodule() const {
+        return valid() && entity::is_a(comp_, GameClass::Buildmodule);
+    }
+    bool is_storage() const {
+        return valid() && entity::is_a(comp_, GameClass::Storage);
+    }
+    bool is_defence() const {
+        return valid() && entity::is_a(comp_, GameClass::Defencemodule);
+    }
+    bool is_connection() const {
+        return valid() && entity::is_a(comp_, GameClass::Connectionmodule);
+    }
     bool is_operational() const {
         auto* g = game();
         return valid() && g && g->IsComponentOperational(id_);
