@@ -256,6 +256,20 @@ typedef struct X4ComponentRegistry_ X4ComponentRegistry;
                                                    /*          MD: $container.spawntime (class index 0x44C)   */
                                                    /*          MD: $container.age = gametime - spawntime      */
 
+// FIND (price_factor @ +0x7A0):
+//   SetContainerGlobalPriceFactor @ 0x1401B73D0 decompile. After the IsClassID(110)
+//   guard and the player-faction comparison (*vtable+5632), the clamp+write chain
+//   ends in `v4[488] = result` where v4 is `_DWORD*` → 488*4 = 1952 = 0x7A0.
+//   Clamp logic in the FFI: if arg < 0 → writes -1.0f sentinel (restore default);
+//   else writes max(min(arg, 1.0), 0.0). Direct writes should use the SAME range.
+//   Engine reads this field when computing trade offers (trade.find.free.xml →
+//   find_sell_offer / find_buy_offer → container price table). The gate is
+//   player-owned-only — direct-field writes bypass it (same pattern as
+//   X4_PRODUCTION_PAUSED_SINCE_OFFSET for reads on NPC modules).
+// Verified: build 605025
+#define X4_CONTAINER_PRICE_FACTOR_OFFSET   0x7A0  /* float — global price multiplier, clamp [0.0, 1.0].    */
+                                                   /*          Engine sentinel -1.0 = no override (default). */
+
 // ---- Space-class offsets (clusters, sectors, zones — IS-A Space(117)) ----
 // Sunlight is stored on the CLUSTER (parent of sector), not on the sector.
 // The game's Lua property handler walks sector→parent(+0x70) up to the first

@@ -70,4 +70,5 @@
 #include "x4n_module.h"
 #include "x4n_station.h"
 #include "x4n_ship.h"
+#include "x4n_container.h"
 
