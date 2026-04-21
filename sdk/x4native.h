@@ -58,6 +58,7 @@
 #include "x4n_log.h"
 #include "x4n_stash.h"
 #include "x4n_hooks.h"
+#include "x4n_settings.h"
 
 // Game domain helpers
 #include "x4n_entity.h"

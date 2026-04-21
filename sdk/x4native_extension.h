@@ -41,6 +41,22 @@ extern "C" {
 #define X4NATIVE_LOG_WARN   2
 #define X4NATIVE_LOG_ERROR  3
 
+// ---- Settings types (declared in x4native.json "settings" array) ---------
+#define X4N_SETTING_TOGGLE   0
+#define X4N_SETTING_DROPDOWN 1
+#define X4N_SETTING_SLIDER   2
+
+// Payload fired on the "on_setting_changed" event. Only the field matching
+// `type` is meaningful. Strings live only for the duration of the callback.
+typedef struct X4NativeSettingChanged {
+    const char* extension_id;
+    const char* key;
+    int         type;     // X4N_SETTING_*
+    int         b;
+    double      d;
+    const char* s;
+} X4NativeSettingChanged;
+
 // ---- Export macro ---------------------------------------------------------
 #ifdef _MSC_VER
   #define X4NATIVE_EXPORT extern "C" __declspec(dllexport)
@@ -205,7 +221,26 @@ typedef struct X4NativeAPI {
     // Extensions read from this via x4n::offsets() — never need recompilation.
     const void* offsets;            // X4GameOffsets* — internal, used by SDK inline functions
 
-    void* _reserved[11];
+    // --- Per-extension settings (declared in x4native.json "settings" array) ---
+    // Typed getters/setters scoped to the calling extension. Unknown keys or
+    // type mismatches return the `fallback` and are logged. set_* writes the
+    // value to <profile>\x4native\<ext_id>.user.json and fires
+    // `on_setting_changed` (payload: X4NativeSettingChanged).
+    int         (*get_setting_bool)  (const char* key, int fallback,
+                                      void* _api_ptr);
+    double      (*get_setting_number)(const char* key, double fallback,
+                                      void* _api_ptr);
+    const char* (*get_setting_string)(const char* key, const char* fallback,
+                                      void* _api_ptr);
+
+    void        (*set_setting_bool)  (const char* key, int value,
+                                      void* _api_ptr);
+    void        (*set_setting_number)(const char* key, double value,
+                                      void* _api_ptr);
+    void        (*set_setting_string)(const char* key, const char* value,
+                                      void* _api_ptr);
+
+    void* _reserved[5];
 } X4NativeAPI;
 
 // ---- Required exports from extension DLLs --------------------------------

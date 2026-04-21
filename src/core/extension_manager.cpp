@@ -3,6 +3,7 @@
 #include "event_system.h"
 #include "game_api.h"
 #include "hook_manager.h"
+#include "settings_manager.h"
 #include "x4native_defs.h"
 
 #include <x4_game_types.h>
@@ -126,6 +127,14 @@ void ExtensionManager::discover() {
 
             Logger::info("Discovered extension: {} (id={}, priority={}, api={})",
                          info.name, info.extension_id, info.priority, info.api_version);
+
+            // Register settings now that we know the extension_id.
+            if (!info.settings_schema.empty()) {
+                SettingsManager::register_extension(info.extension_id,
+                                                    std::move(info.settings_schema));
+                info.settings_schema.clear();  // moved out; keep the vector empty
+            }
+
             s_extensions.push_back(std::move(info));
         }
     }
@@ -185,6 +194,12 @@ bool ExtensionManager::parse_config(const std::string& json_path, ExtensionInfo&
 
     if (cfg.contains("autoreload") && cfg["autoreload"].is_boolean())
         info.autoreload = cfg["autoreload"].get<bool>();
+
+    // Settings schema — optional. Actual registration happens in discover()
+    // once we know the extension_id (pulled from content.xml).
+    if (cfg.contains("settings"))
+        SettingsManager::parse_schema_array(cfg["settings"], info.settings_schema,
+                                            info.name);
 
     return true;
 }
@@ -480,6 +495,9 @@ void ExtensionManager::unload_extension(ExtensionInfo& ext) {
         ext.log_handle = INVALID_HANDLE_VALUE;
     }
     ext.log_path.clear();  // reset so load_extension recomputes from log_name on hot-reload
+
+    // Settings stay registered across hot-reload so values survive; they are
+    // only dropped on full shutdown (SettingsManager::shutdown()).
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +642,50 @@ static int api_register_lua_bridge(const char* lua_event, const char* cpp_event)
     return -1;
 }
 
+// Settings wrappers — resolve the calling extension via _ext_info.
+static const char* ext_id_from_api(void* api_ptr) {
+    if (!api_ptr) return nullptr;
+    auto* api = static_cast<X4NativeAPI*>(api_ptr);
+    auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
+    return ext ? ext->extension_id.c_str() : nullptr;
+}
+
+static int api_get_setting_bool(const char* key, int fallback, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return fallback;
+    return SettingsManager::get_bool(id, key, fallback != 0) ? 1 : 0;
+}
+
+static double api_get_setting_number(const char* key, double fallback, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return fallback;
+    return SettingsManager::get_number(id, key, fallback);
+}
+
+static const char* api_get_setting_string(const char* key, const char* fallback, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return fallback;
+    return SettingsManager::get_string(id, key, fallback);
+}
+
+static void api_set_setting_bool(const char* key, int value, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return;
+    SettingsManager::set_bool(id, key, value != 0);
+}
+
+static void api_set_setting_number(const char* key, double value, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return;
+    SettingsManager::set_number(id, key, value);
+}
+
+static void api_set_setting_string(const char* key, const char* value, void* api_ptr) {
+    const char* id = ext_id_from_api(api_ptr);
+    if (!id || !key) return;
+    SettingsManager::set_string(id, key, value ? value : "");
+}
+
 void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
     s_game_ver_cache = s_game_version.c_str();
 
@@ -664,6 +726,12 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
     api._ext_log_named_fn     = reinterpret_cast<void*>(api_log_named);
     api._ext_info             = &ext;
     api.offsets               = &s_offsets;
+    api.get_setting_bool      = api_get_setting_bool;
+    api.get_setting_number    = api_get_setting_number;
+    api.get_setting_string    = api_get_setting_string;
+    api.set_setting_bool      = api_set_setting_bool;
+    api.set_setting_number    = api_set_setting_number;
+    api.set_setting_string    = api_set_setting_string;
 }
 
 // ---------------------------------------------------------------------------

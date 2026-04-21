@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <x4native_extension.h>
+#include "settings_manager.h"
 #include "x4native_defs.h"
 
 namespace x4n {
@@ -46,6 +47,11 @@ struct ExtensionInfo {
     bool        initialized = false;
     bool        reload_pending = false;  // set by tick(), consumed by flush_pending_reloads()
     FILETIME    dll_mtime = {};          // mtime of dll_path at last load (for change detection)
+
+    // Declared settings schema — parsed from x4native.json at discovery time.
+    // The authoritative data lives in SettingsManager, keyed by extension_id.
+    // This vector is only used to hand the schema off during registration.
+    std::vector<SettingSchema> settings_schema;
 
     // API struct for this extension — persists for the extension's lifetime.
     // Extensions store a pointer to this during x4native_init().

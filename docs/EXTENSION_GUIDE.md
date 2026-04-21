@@ -59,6 +59,7 @@ Tells the framework where to find your DLL and how to load it:
 | `min_api_version` | No | Minimum framework API version required |
 | `autoreload` | No | `true` → watch DLL for changes and hot-reload in-place (default `false`) |
 | `logfile` | No | Log filename inside your extension folder (default `<name>.log`). Must be a relative path. |
+| `settings` | No | Array of user-configurable settings surfaced in **Settings → Extensions → `…`** and persisted per-user. See [Settings](#settings). |
 
 ## Minimal Extension
 
@@ -91,6 +92,7 @@ X4N_SHUTDOWN {
 #include <x4n_log.h>         // x4n::log::info/warn/error/debug
 #include <x4n_stash.h>       // x4n::stash::set/get (survives /reloadui)
 #include <x4n_hooks.h>       // x4n::hook::before/after/remove
+#include <x4n_settings.h>    // x4n::settings::get_*/set_*, on_setting_changed
 
 // Game domain helpers:
 #include <x4n_entity.h>      // x4n::entity::find_component
@@ -538,6 +540,81 @@ x4n::stash::clear();  // only clears YOUR extension's keys
 | Namespace | Auto-scoped to extension name |
 | Thread safety | Mutex-protected in proxy |
 | Max size | Process memory (no artificial limit) |
+## Settings
+
+Extensions can declare **user-configurable settings** that appear in the vanilla X4 menu at **Settings → Extensions → select your extension → `…`**, directly under the built-in **Enabled** toggle. Values are persisted per-user in
+`<X4 profile>/x4native/<extension_id>.user.json`
+(e.g. `Documents\Egosoft\X4\<account>\x4native\x4native_mymod.user.json`),
+not in your extension folder — they survive extension updates, Steam Workshop re-syncs, and Windows user switching.
+
+### Declaring settings
+
+Add a `"settings"` array to `x4native.json`. Three widget types are supported:
+
+```json
+{
+    "name": "mymod",
+    "library": "native\\x4native_mymod.dll",
+    "settings": [
+        { "id": "verbose",  "name": "Verbose logging",
+          "type": "toggle", "default": false },
+
+        { "id": "poll_s",   "name": "Poll interval (s)",
+          "type": "slider", "min": 1, "max": 30, "step": 1, "default": 5 },
+
+        { "id": "provider", "name": "LLM Provider",
+          "type": "dropdown", "default": "anthropic",
+          "options": [
+            { "id": "anthropic", "text": "Anthropic" },
+            { "id": "openai",    "text": "OpenAI"    }
+          ]
+        }
+    ]
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `id` | Yes | Stable key, used both for persistence and in the C++ API. `[a-z0-9_]` recommended. |
+| `name` | No | Label shown in the UI. Defaults to `id`. |
+| `type` | Yes | One of `"toggle"`, `"slider"`, `"dropdown"`. |
+| `default` | No | Default value (matched to the type). Used until the player changes it. |
+| `min` / `max` / `step` | For `slider` | Inclusive bounds and step size. Slider values are clamped to `[min, max]` on write. |
+| `options` | For `dropdown` | Array of `{ "id", "text" }`. Writes with a value not in this list are rejected. |
+
+### Reading & writing from C++
+
+```cpp
+#include <x4n_settings.h>
+
+X4N_EXTENSION {
+    bool        verbose  = x4n::settings::get_bool  ("verbose", false);
+    double      poll_s   = x4n::settings::get_number("poll_s",  5.0);
+    const char* provider = x4n::settings::get_string("provider", "anthropic");
+
+    // Programmatic write — also updates the UI and persists to disk.
+    x4n::settings::set_bool("verbose", true);
+
+    // Subscribe to changes from UI or code.
+    x4n::on_setting_changed([](const X4NativeSettingChanged& info) {
+        if (std::string_view(info.extension_id) != "x4native_mymod") return;
+        switch (info.type) {
+            case X4N_SETTING_TOGGLE:   /* info.b */ break;
+            case X4N_SETTING_SLIDER:   /* info.d */ break;
+            case X4N_SETTING_DROPDOWN: /* info.s */ break;
+        }
+    });
+}
+```
+
+Values are read lazily — the first `get_*` call for an extension loads the user JSON (if any). Each `set_*` writes atomically (`.tmp` + rename) and fires `on_setting_changed` for every subscriber.
+
+### Constraints
+
+- **Protected UI Mode must be disabled** (same prerequisite as X4Native itself). Without it, the `debug` library is unavailable and the Lua injector can't wire up the rows. The DLL-side read/write still works regardless.
+- A setting whose `id` changes between releases is a new setting — old values in the user's JSON for the old id are ignored (not migrated).
+- `toggle` / `slider` / `dropdown` are the only types currently. Text input can be added; open an issue if you need it.
+
 ## Hot-Reload Workflow
 
 Extension DLLs use the same copy-on-load pattern as the framework core: the original DLL is never locked by the game process. This means you can **rebuild your extension while the game is running** and have it reload automatically.

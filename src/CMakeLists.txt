@@ -55,6 +55,7 @@ add_library(x4native_64 SHARED
 
 target_include_directories(x4native_64 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/sdk
 )
 
 # Debug-only: proxy needs nlohmann_json for settings file parsing (autoreload)
@@ -78,6 +79,7 @@ add_library(x4native_core SHARED
     core/extension_manager.cpp
     core/game_api.cpp
     core/hook_manager.cpp
+    core/settings_manager.cpp
     core/version.cpp
 )
 

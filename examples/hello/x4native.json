@@ -3,5 +3,33 @@
     "library": "native\\x4native_hello.dll",
     "priority": 100,
     "min_api_version": 1,
-    "autoreload": true
+    "autoreload": true,
+    "settings": [
+        {
+            "id": "verbose",
+            "name": "Verbose logging",
+            "type": "toggle",
+            "default": false
+        },
+        {
+            "id": "poll_interval_s",
+            "name": "Poll interval (s)",
+            "type": "slider",
+            "min": 1,
+            "max": 30,
+            "step": 1,
+            "default": 5
+        },
+        {
+            "id": "greeting",
+            "name": "Greeting",
+            "type": "dropdown",
+            "default": "hello",
+            "options": [
+                { "id": "hello",     "text": "Hello" },
+                { "id": "howdy",     "text": "Howdy" },
+                { "id": "greetings", "text": "Greetings" }
+            ]
+        }
+    ]
 }

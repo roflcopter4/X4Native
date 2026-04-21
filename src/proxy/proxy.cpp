@@ -385,6 +385,108 @@ static int l_prepare_reload(lua_State* L) {
 // Returns true if the core DLL was modified on disk and should be reloaded.
 // Compiled out entirely in Release builds.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Per-extension settings — Lua marshalling
+// ---------------------------------------------------------------------------
+//
+// l_get_extension_settings(ext_id) returns an ordered array of row tables:
+//   { {id, name, type, current, default, options?, min?, max?, step?}, ... }
+// l_set_extension_setting(ext_id, key, value) writes the value (type inferred
+// from the Lua value).
+
+static void push_setting_row(lua_State* L, const SettingInfo& info) {
+    x4n::lua::createtable(L, 0, 8);
+
+    x4n::lua::pushstring(L, info.id ? info.id : "");
+    x4n::lua::setfield(L, -2, "id");
+    x4n::lua::pushstring(L, info.name ? info.name : "");
+    x4n::lua::setfield(L, -2, "name");
+
+    const char* type_str = "toggle";
+    if      (info.type == X4N_SETTING_DROPDOWN) type_str = "dropdown";
+    else if (info.type == X4N_SETTING_SLIDER)   type_str = "slider";
+    x4n::lua::pushstring(L, type_str);
+    x4n::lua::setfield(L, -2, "type");
+
+    switch (info.type) {
+        case X4N_SETTING_TOGGLE:
+            x4n::lua::pushboolean(L, info.current_bool);
+            x4n::lua::setfield(L, -2, "current");
+            x4n::lua::pushboolean(L, info.default_bool);
+            x4n::lua::setfield(L, -2, "default");
+            break;
+
+        case X4N_SETTING_SLIDER:
+            x4n::lua::pushnumber(L, info.current_number);
+            x4n::lua::setfield(L, -2, "current");
+            x4n::lua::pushnumber(L, info.default_number);
+            x4n::lua::setfield(L, -2, "default");
+            x4n::lua::pushnumber(L, info.min);
+            x4n::lua::setfield(L, -2, "min");
+            x4n::lua::pushnumber(L, info.max);
+            x4n::lua::setfield(L, -2, "max");
+            x4n::lua::pushnumber(L, info.step);
+            x4n::lua::setfield(L, -2, "step");
+            break;
+
+        case X4N_SETTING_DROPDOWN:
+            x4n::lua::pushstring(L, info.current_string ? info.current_string : "");
+            x4n::lua::setfield(L, -2, "current");
+            x4n::lua::pushstring(L, info.default_string ? info.default_string : "");
+            x4n::lua::setfield(L, -2, "default");
+            x4n::lua::createtable(L, info.option_count, 0);
+            for (int i = 0; i < info.option_count; ++i) {
+                x4n::lua::createtable(L, 0, 2);
+                x4n::lua::pushstring(L, info.options[i].id ? info.options[i].id : "");
+                x4n::lua::setfield(L, -2, "id");
+                x4n::lua::pushstring(L, info.options[i].text ? info.options[i].text : "");
+                x4n::lua::setfield(L, -2, "text");
+                x4n::lua::rawseti(L, -2, i + 1);
+            }
+            x4n::lua::setfield(L, -2, "options");
+            break;
+    }
+}
+
+static int l_get_extension_settings(lua_State* L) {
+    const char* ext_id = x4n::lua::L_checkstring(L, 1);
+    const SettingInfo* entries = nullptr;
+    int n = 0;
+    if (g_dispatch.enumerate_settings)
+        n = g_dispatch.enumerate_settings(ext_id, &entries);
+    x4n::lua::createtable(L, n, 0);
+    for (int i = 0; i < n; ++i) {
+        push_setting_row(L, entries[i]);
+        x4n::lua::rawseti(L, -2, i + 1);
+    }
+    return 1;
+}
+
+static int l_set_extension_setting(lua_State* L) {
+    const char* ext_id = x4n::lua::L_checkstring(L, 1);
+    const char* key    = x4n::lua::L_checkstring(L, 2);
+
+    SettingValueC v = {};
+    int t = x4n::lua::type(L, 3);
+    if (t == LUA_TBOOLEAN) {
+        v.type = X4N_SETTING_TOGGLE;
+        v.b    = x4n::lua::toboolean(L, 3);
+    } else if (t == LUA_TNUMBER) {
+        v.type = X4N_SETTING_SLIDER;
+        v.d    = static_cast<double>(x4n::lua::tonumber(L, 3));
+    } else if (t == LUA_TSTRING) {
+        v.type = X4N_SETTING_DROPDOWN;
+        v.s    = x4n::lua::tostring(L, 3);
+    } else {
+        return x4n::lua::L_error(L,
+            "set_extension_setting: value must be boolean, number, or string");
+    }
+
+    if (g_dispatch.set_extension_setting)
+        g_dispatch.set_extension_setting(ext_id, key, &v);
+    return 0;
+}
+
 #ifndef NDEBUG
 static int l_should_autoreload(lua_State* L) {
     if (!g_autoreload_checked) {
@@ -441,16 +543,18 @@ int luaopen_x4native(lua_State* L) {
     x4n::lua::newtable(L);
 
     struct { const char* name; lua_CFunction fn; } funcs[] = {
-        { "discover_extensions",   l_discover_extensions   },
-        { "raise_event",           l_raise_event           },
-        { "raise_lua_event",       l_raise_lua_event       },
-        { "log",                   l_log                   },
-        { "get_version",           l_get_version           },
-        { "get_loaded_extensions", l_get_loaded_extensions },
-        { "reload",                l_reload                },
-        { "prepare_reload",        l_prepare_reload        },
+        { "discover_extensions",     l_discover_extensions     },
+        { "raise_event",             l_raise_event             },
+        { "raise_lua_event",         l_raise_lua_event         },
+        { "log",                     l_log                     },
+        { "get_version",             l_get_version             },
+        { "get_loaded_extensions",   l_get_loaded_extensions   },
+        { "reload",                  l_reload                  },
+        { "prepare_reload",          l_prepare_reload          },
+        { "get_extension_settings",  l_get_extension_settings  },
+        { "set_extension_setting",   l_set_extension_setting   },
 #ifndef NDEBUG
-        { "should_autoreload",     l_should_autoreload     },
+        { "should_autoreload",       l_should_autoreload       },
 #endif
     };
 

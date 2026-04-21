@@ -14,6 +14,7 @@
 #include "extension_manager.h"
 #include "game_api.h"
 #include "hook_manager.h"
+#include "settings_manager.h"
 #include "version.h"
 #include "x4native_defs.h"
 
@@ -429,6 +430,7 @@ static void impl_prepare_reload() {
 static void impl_shutdown() {
     x4n::Logger::info("Core shutting down...");
     x4n::ExtensionManager::shutdown();
+    x4n::SettingsManager::shutdown();
     remove_md_event_hook();
     remove_radar_visibility_hook();
     remove_frame_tick_hook();
@@ -436,6 +438,17 @@ static void impl_shutdown() {
     x4n::GameAPI::shutdown();
     x4n::EventSystem::shutdown();
     x4n::Logger::shutdown();
+}
+
+static int impl_enumerate_settings(const char* ext_id, const SettingInfo** out) {
+    if (!ext_id) { if (out) *out = nullptr; return 0; }
+    return x4n::SettingsManager::enumerate(ext_id, out);
+}
+
+static void impl_set_extension_setting(const char* ext_id, const char* key,
+                                       const SettingValueC* value) {
+    if (!ext_id || !key || !value) return;
+    x4n::SettingsManager::set_from_abi(ext_id, key, *value);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,14 +506,16 @@ int core_init(CoreInitContext* ctx) {
                                 g_stash_remove, g_stash_clear);
 
     // 6. Fill the proxy's dispatch table
-    ctx->dispatch->discover_extensions   = impl_discover_extensions;
-    ctx->dispatch->raise_event           = impl_raise_event;
-    ctx->dispatch->get_version           = impl_get_version;
-    ctx->dispatch->get_loaded_extensions = impl_get_loaded_extensions;
-    ctx->dispatch->set_lua_state         = impl_set_lua_state;
-    ctx->dispatch->prepare_reload        = impl_prepare_reload;
-    ctx->dispatch->shutdown              = impl_shutdown;
-    ctx->dispatch->log                   = impl_log;
+    ctx->dispatch->discover_extensions    = impl_discover_extensions;
+    ctx->dispatch->raise_event            = impl_raise_event;
+    ctx->dispatch->get_version            = impl_get_version;
+    ctx->dispatch->get_loaded_extensions  = impl_get_loaded_extensions;
+    ctx->dispatch->set_lua_state          = impl_set_lua_state;
+    ctx->dispatch->prepare_reload         = impl_prepare_reload;
+    ctx->dispatch->shutdown               = impl_shutdown;
+    ctx->dispatch->log                    = impl_log;
+    ctx->dispatch->enumerate_settings     = impl_enumerate_settings;
+    ctx->dispatch->set_extension_setting  = impl_set_extension_setting;
 
     x4n::Logger::info("Core initialized successfully");
     return 0;

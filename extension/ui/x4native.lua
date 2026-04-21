@@ -91,6 +91,10 @@ local function load_dll()
 
     x4native_api = result
 
+    -- Expose to other X4Native UI files (e.g. x4n_settings_menu.lua).
+    -- Single well-known global; consumers should treat it as read-only.
+    _G.__X4NATIVE_API = x4native_api
+
     -- Discover and load extension DLLs (calls x4native_init on each)
     x4native_api.discover_extensions()
     return true

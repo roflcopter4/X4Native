@@ -10,10 +10,35 @@
 #include <x4n_core.h>
 #include <x4n_events.h>
 #include <x4n_log.h>
+#include <x4n_settings.h>
+
+#include <string_view>
 
 static X4GameFunctions* game = nullptr;
-static int g_sub_loaded = 0;
-static int g_sub_saved  = 0;
+static int g_sub_loaded  = 0;
+static int g_sub_saved   = 0;
+static int g_sub_setting = 0;
+
+static void on_hello_setting_changed(const x4n::SettingChanged& info) {
+    // Ignore changes from other extensions.
+    if (!info.extension_id) return;
+    if (std::string_view(info.extension_id) != "x4native_hello") return;
+
+    switch (info.type) {
+        case X4N_SETTING_TOGGLE:
+            x4n::log::info("hello: setting changed: %s = %s",
+                           info.key, info.b ? "true" : "false");
+            break;
+        case X4N_SETTING_SLIDER:
+            x4n::log::info("hello: setting changed: %s = %.2f",
+                           info.key, info.d);
+            break;
+        case X4N_SETTING_DROPDOWN:
+            x4n::log::info("hello: setting changed: %s = %s",
+                           info.key, info.s ? info.s : "(null)");
+            break;
+    }
+}
 
 static void on_game_loaded() {
     // Default: goes to hello.log
@@ -57,8 +82,17 @@ X4N_EXTENSION {
     // x4n::log::set_log_file("hello_v2.log");
     // x4n::log::info("hello: this goes to hello_v2.log");
 
-    g_sub_loaded = x4n::on("on_game_loaded", on_game_loaded);
-    g_sub_saved  = x4n::on("on_game_save",   on_game_save);
+    // Read current settings (declared in x4native.json "settings" array).
+    // First run seeds defaults; subsequent runs read persisted user values.
+    bool        verbose  = x4n::settings::get_bool  ("verbose", false);
+    double      poll_s   = x4n::settings::get_number("poll_interval_s", 5.0);
+    const char* greeting = x4n::settings::get_string("greeting", "hello");
+    x4n::log::info("hello: settings: verbose=%s poll_interval_s=%.1f greeting=%s",
+                   verbose ? "true" : "false", poll_s, greeting);
+
+    g_sub_loaded  = x4n::on("on_game_loaded", on_game_loaded);
+    g_sub_saved   = x4n::on("on_game_save",   on_game_save);
+    g_sub_setting = x4n::on_setting_changed(on_hello_setting_changed);
 }
 
 X4N_SHUTDOWN {
@@ -66,4 +100,5 @@ X4N_SHUTDOWN {
     x4n::log::info("hello extension unloaded", false);  // also note in x4native.log
     x4n::off(g_sub_loaded);
     x4n::off(g_sub_saved);
+    x4n::off(g_sub_setting);
 }
