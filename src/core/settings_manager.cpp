@@ -24,6 +24,11 @@ void SettingsManager::register_extension(const std::string& extension_id,
     ext.schema = std::move(schema);
     ext.values.clear();
     ext.values_loaded = false;
+    // Hot-reload may change schema shape (added/removed settings, renamed
+    // options). Clear the ABI cache vectors so rebuild_abi_cache sees a
+    // clean slate — not just the "dirty" flag.
+    ext.abi_cache.clear();
+    ext.options_cache.clear();
     ext.abi_cache_built = false;
     Logger::info("Settings: registered {} setting(s) for extension '{}'",
                  ext.schema.size(), extension_id);
@@ -85,10 +90,14 @@ std::string SettingsManager::user_file_path(const std::string& extension_id) {
 void SettingsManager::ensure_loaded(const std::string& extension_id,
                                     ExtensionSettings& ext) {
     if (ext.values_loaded) return;
-    ext.values_loaded = true;
 
-    // Seed every key with its default first.
+    // Seed any key that isn't already in the value map with its default. We
+    // only fill gaps (instead of rebuilding from scratch) because an earlier
+    // call may have returned without committing `values_loaded=true` (profile
+    // dir not yet resolvable) while extension code set values in the
+    // meantime — we don't want to clobber those on retry.
     for (const auto& s : ext.schema) {
+        if (ext.values.count(s.id)) continue;
         switch (s.type) {
             case SettingType::Toggle:   ext.values[s.id] = s.default_bool;   break;
             case SettingType::Slider:   ext.values[s.id] = s.default_number; break;
@@ -97,7 +106,17 @@ void SettingsManager::ensure_loaded(const std::string& extension_id,
     }
 
     auto path = user_file_path(extension_id);
-    if (path.empty()) return;
+    if (path.empty()) {
+        // Profile directory unresolvable (startup race before GameAPI is
+        // ready). Defaults are seeded above so callers see sane values;
+        // leave `values_loaded` false so the next call retries and picks
+        // up user.json once the profile is online.
+        return;
+    }
+
+    // Path resolves → this is a terminal attempt. Whether the file exists,
+    // is missing, or is malformed, defaults apply and we don't retry.
+    ext.values_loaded = true;
 
     std::ifstream f(path);
     if (!f.is_open()) return;
@@ -175,17 +194,16 @@ void SettingsManager::write_user_file(const std::string& extension_id,
         }
         f << doc.dump(2);
     }
+    // std::filesystem::rename atomically replaces the destination on both
+    // Windows (MoveFileEx with MOVEFILE_REPLACE_EXISTING) and POSIX. No
+    // remove+rename retry is needed.
     std::error_code ec;
     fs::rename(tmp, path, ec);
     if (ec) {
-        // rename fails if the destination exists on some platforms; remove+rename.
-        fs::remove(path, ec);
-        fs::rename(tmp, path, ec);
-        if (ec) {
-            Logger::warn("Settings: rename '{}' -> '{}' failed: {}",
-                         tmp, path, ec.message());
-            return;
-        }
+        Logger::warn("Settings: rename '{}' -> '{}' failed: {}",
+                     tmp, path, ec.message());
+        std::error_code cleanup_ec;
+        fs::remove(tmp, cleanup_ec);  // best-effort: don't leave a stale .tmp behind
     }
 }
 

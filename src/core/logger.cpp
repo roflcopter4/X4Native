@@ -30,21 +30,39 @@ static constexpr const char* level_tag(LogLevel lv) {
     return "?";
 }
 
+// Rotation failures that aren't "the file doesn't exist" are surfaced via
+// OutputDebugStringA. We can't use the Logger itself here: open_log runs
+// during Logger bring-up, so recursion would be unsafe.
+static void log_rotate_error(const char* op, const std::string& path) {
+    DWORD err = GetLastError();
+    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) return;
+    std::string msg = std::string("X4Native: log ") + op + " '" + path +
+                      "' failed (GLE=" + std::to_string(err) + ")\n";
+    OutputDebugStringA(msg.c_str());
+}
+
 HANDLE Logger::open_log(const std::string& log_path) {
     static constexpr int MAX_BACKUPS = 4;
     std::string base = log_path;
     if (base.size() >= 4 && base.compare(base.size() - 4, 4, ".log") == 0)
         base.resize(base.size() - 4);
 
-    DeleteFileA((base + ".4.log").c_str());
-    for (int i = MAX_BACKUPS - 1; i >= 1; --i) {
-        MoveFileA((base + "." + std::to_string(i) + ".log").c_str(),
-                  (base + "." + std::to_string(i + 1) + ".log").c_str());
-    }
-    MoveFileA(log_path.c_str(), (base + ".1.log").c_str());
+    std::string oldest = base + ".4.log";
+    if (!DeleteFileA(oldest.c_str())) log_rotate_error("delete", oldest);
 
-    return CreateFileA(log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
-                       nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    for (int i = MAX_BACKUPS - 1; i >= 1; --i) {
+        std::string src = base + "." + std::to_string(i) + ".log";
+        std::string dst = base + "." + std::to_string(i + 1) + ".log";
+        if (!MoveFileA(src.c_str(), dst.c_str())) log_rotate_error("rotate", src);
+    }
+    std::string first_backup = base + ".1.log";
+    if (!MoveFileA(log_path.c_str(), first_backup.c_str()))
+        log_rotate_error("rotate", log_path);
+
+    HANDLE h = CreateFileA(log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                           nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) log_rotate_error("open", log_path);
+    return h;
 }
 
 void Logger::init(const std::string& mod_root) {
@@ -157,46 +175,46 @@ void Logger::shutdown() {
     s_mod_root.clear();
 }
 
-static void write_handle(std::mutex& mtx, HANDLE h, LogLevel level, std::string_view msg) {
-    auto now = std::chrono::system_clock::now();
-    auto line = std::format("[{:%Y-%m-%d %H:%M:%S}] [{}] {}\n", now, level_tag(level), msg);
-
-    {
+// Write `line` to `h` under `mtx`, then (outside the lock) optionally flush.
+// Flushing outside the lock keeps high-volume log callers from serialising
+// on disk sync — FlushFileBuffers is thread-safe per MSDN.
+static void write_handle(std::mutex& mtx, HANDLE h, LogLevel level, std::string_view line) {
+    bool should_flush = false;
+    if (h != INVALID_HANDLE_VALUE) {
         std::lock_guard lock(mtx);
-        if (h != INVALID_HANDLE_VALUE) {
-            DWORD written;
-            WriteFile(h, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
-            if (level >= LogLevel::Info)
-                FlushFileBuffers(h);
-        }
+        DWORD written;
+        WriteFile(h, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+        should_flush = (level >= LogLevel::Info);
     }
-
-    OutputDebugStringA(line.c_str());
+    if (should_flush) FlushFileBuffers(h);
 }
 
 void Logger::write(LogLevel level, std::string_view msg) {
-    // While buffering, hold lines in memory so they can be replayed once a
-    // file handle exists. Still dump to OutputDebugString immediately so
-    // developers see them live in a debugger.
-    if (s_buffering) {
-        {
-            std::lock_guard lock(s_mutex);
-            if (s_buffering) {
-                s_buffer.emplace_back(level, std::string(msg));
-                auto now = std::chrono::system_clock::now();
-                auto line = std::format("[{:%Y-%m-%d %H:%M:%S}] [{}] {}\n",
-                                        now, level_tag(level), msg);
-                OutputDebugStringA(line.c_str());
-                return;
-            }
+    auto now = std::chrono::system_clock::now();
+    auto line = std::format("[{:%Y-%m-%d %H:%M:%S}] [{}] {}\n", now, level_tag(level), msg);
+
+    // Decide buffer vs file in a single critical section so we never race
+    // with open_files() swapping s_buffering/s_handle.
+    HANDLE h = INVALID_HANDLE_VALUE;
+    {
+        std::lock_guard lock(s_mutex);
+        if (s_buffering) {
+            s_buffer.emplace_back(level, std::string(msg));
+            OutputDebugStringA(line.c_str());
+            return;
         }
-        // Raced with open_files(); fall through to normal write path.
+        h = s_handle;
     }
-    write_handle(s_mutex, s_handle, level, msg);
+
+    write_handle(s_mutex, h, level, line);
+    OutputDebugStringA(line.c_str());
 }
 
 void Logger::write_to(HANDLE h, LogLevel level, std::string_view msg) {
-    write_handle(s_mutex, h, level, msg);
+    auto now = std::chrono::system_clock::now();
+    auto line = std::format("[{:%Y-%m-%d %H:%M:%S}] [{}] {}\n", now, level_tag(level), msg);
+    write_handle(s_mutex, h, level, line);
+    OutputDebugStringA(line.c_str());
 }
 
 } // namespace x4n

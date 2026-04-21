@@ -247,7 +247,12 @@ typedef struct X4NativeAPI {
     void        (*set_setting_string)(const char* key, const char* value,
                                       void* _api_ptr);
 
-    void* _reserved[3];
+    // Trailing ABI pad. New function pointers are added by decrementing this
+    // count — extensions compiled against an older header still see a valid
+    // struct layout for every field they know about. Grow this array (never
+    // shrink it) when the runway gets low; shrinking would silently break
+    // already-compiled extensions.
+    void* _reserved[16];
 } X4NativeAPI;
 
 // ---- Required exports from extension DLLs --------------------------------

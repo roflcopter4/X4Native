@@ -5,6 +5,15 @@
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ---------------------------------------------------------------------------
+# Feature flags
+# ---------------------------------------------------------------------------
+# Core hot-reload: the proxy watches x4native_core.dll's mtime and hot-reloads
+# it when a new build lands on disk. Dev-time convenience; safe to ship in
+# Release (the actual behavior is also gated at runtime by the `autoreload`
+# flag in x4native_settings.json, which defaults false).
+option(X4N_WITH_RELOAD "Compile in core hot-reload support (proxy)" OFF)
+
 # Output DLLs directly into native/ (all configs) so the symlink dev-mode
 # and the deploy target both find them in the same place.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/native")
@@ -58,10 +67,13 @@ target_include_directories(x4native_64 PRIVATE
     ${CMAKE_SOURCE_DIR}/sdk
 )
 
-# Debug-only: proxy needs nlohmann_json for settings file parsing (autoreload)
-target_link_libraries(x4native_64 PRIVATE
-    $<$<CONFIG:Debug>:nlohmann_json::nlohmann_json>
-)
+# Autoreload feature — proxy needs nlohmann_json for settings file parsing.
+# Both the compile define and the linked lib are gated by X4N_WITH_RELOAD so
+# builds with the feature disabled carry no json-header compile cost.
+if(X4N_WITH_RELOAD)
+    target_compile_definitions(x4native_64 PRIVATE X4N_WITH_RELOAD=1)
+    target_link_libraries(x4native_64 PRIVATE nlohmann_json::nlohmann_json)
+endif()
 
 # No lib prefix (produce x4native_64.dll, not libx4native_64.dll)
 set_target_properties(x4native_64 PROPERTIES

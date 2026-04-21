@@ -229,12 +229,22 @@ bool ExtensionManager::parse_config(const std::string& json_path, ExtensionInfo&
 // Per-extension log helpers
 // ---------------------------------------------------------------------------
 
+// Resolves the (api, ext) pair from a `void* api_ptr` argument passed by the
+// SDK-side log wrappers. Returns {nullptr, nullptr} if anything is missing.
+// `ext` being null is the caller's early-return condition.
+static std::pair<X4NativeAPI*, ExtensionInfo*> resolve_ext(void* api_ptr) {
+    if (!api_ptr) return {nullptr, nullptr};
+    auto* api = static_cast<X4NativeAPI*>(api_ptr);
+    auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
+    return {api, ext};
+}
+
 // api_log_ext — routes x4n::log::info/warn/etc. to the extension's own log file.
 // Falls back to the global framework log if the handle is not set.
 static void api_log_ext(int level, const char* message, void* api_ptr) {
     auto lv = static_cast<x4n::LogLevel>(level);
-    if (api_ptr) {
-        auto* api = static_cast<X4NativeAPI*>(api_ptr);
+    auto [api, _] = resolve_ext(api_ptr);
+    if (api) {
         HANDLE h = static_cast<HANDLE>(api->_ext_log_handle);
         if (h && h != INVALID_HANDLE_VALUE) {
             x4n::Logger::write_to(h, lv, message);
@@ -249,9 +259,7 @@ static void api_log_ext(int level, const char* message, void* api_ptr) {
 // subfolder (<profile>\x4native\<ext_id>\) — absolute paths and traversal
 // are rejected.
 static void api_init_log(const char* filename, void* api_ptr) {
-    if (!api_ptr) return;
-    auto* api  = static_cast<X4NativeAPI*>(api_ptr);
-    auto* ext  = static_cast<ExtensionInfo*>(api->_ext_info);
+    auto [api, ext] = resolve_ext(api_ptr);
     if (!ext) return;
 
     if (!filename || !filename[0]) return;
@@ -306,10 +314,7 @@ static void api_log_named(int level, const char* message,
         api_log_ext(level, message, api_ptr);
         return;
     }
-    if (!api_ptr) return;
-
-    auto* api = static_cast<X4NativeAPI*>(api_ptr);
-    auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
+    auto [api, ext] = resolve_ext(api_ptr);
     if (!ext) return;
 
     if (!Logger::is_safe_relative_name(
@@ -810,7 +815,7 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
 // JSON serialization of loaded extensions
 // ---------------------------------------------------------------------------
 
-std::string ExtensionManager::loaded_extensions_json() {
+const char* ExtensionManager::loaded_extensions_json() {
     json arr = json::array();
     for (const auto& ext : s_extensions) {
         if (ext.initialized) {
@@ -822,10 +827,10 @@ std::string ExtensionManager::loaded_extensions_json() {
             });
         }
     }
-    // Store in static string so c_str() survives the call
+    // Single static buffer — pointer is stable until the next call.
     static std::string cached;
     cached = arr.dump();
-    return cached;
+    return cached.c_str();
 }
 
 } // namespace x4n

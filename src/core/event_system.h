@@ -34,7 +34,7 @@ public:
     static void md_fire_before(uint32_t type_id, void* payload);  // called by hook detour
     static void md_fire_after(uint32_t type_id, void* payload);
 
-
+private:
     struct Subscription {
         int            id;
         EventCallback  callback;

@@ -39,9 +39,13 @@ static std::string      g_core_live_path;
 static bool             g_initialized    = false;
 
 // ---------------------------------------------------------------------------
-// Debug-only: autoreload state
+// Core hot-reload state (compiled in when X4N_WITH_RELOAD=1)
 // ---------------------------------------------------------------------------
-#ifndef NDEBUG
+// Guarded on a dedicated feature flag rather than NDEBUG because the project's
+// actually-run build config is Release/RelWithDebInfo (std::string layout
+// must match the game's Release STL). Runtime behavior is separately gated
+// by the `autoreload` key in x4native_settings.json.
+#ifdef X4N_WITH_RELOAD
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -52,7 +56,6 @@ static FILETIME g_last_core_mtime  = {};       // last known timestamp
 /// Read x4native_settings.json to check "autoreload" flag.
 /// Called on each core load so the result is logged after hot-reloads too.
 static void read_autoreload_setting() {
-
     std::string path = g_ext_root + "x4native_settings.json";
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -94,7 +97,7 @@ static bool core_modified_since_last_check() {
     }
     return false;
 }
-#endif // NDEBUG
+#endif // X4N_WITH_RELOAD
 
 // ---------------------------------------------------------------------------
 // Stash — in-memory key-value that survives /reloadui and core hot-reload
@@ -215,7 +218,7 @@ static bool load_core() {
         return false;
     }
 
-#ifndef NDEBUG
+#ifdef X4N_WITH_RELOAD
     read_autoreload_setting();
 #endif
 
@@ -381,11 +384,6 @@ static int l_prepare_reload(lua_State* L) {
 }
 
 // ---------------------------------------------------------------------------
-// Debug-only: autoreload check (called from Lua per-frame, throttled)
-// Returns true if the core DLL was modified on disk and should be reloaded.
-// Compiled out entirely in Release builds.
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 // Per-extension settings — Lua marshalling
 // ---------------------------------------------------------------------------
 //
@@ -487,7 +485,7 @@ static int l_set_extension_setting(lua_State* L) {
     return 0;
 }
 
-#ifndef NDEBUG
+#ifdef X4N_WITH_RELOAD
 static int l_should_autoreload(lua_State* L) {
     if (!g_autoreload_checked) {
         read_autoreload_setting();
@@ -500,7 +498,7 @@ static int l_should_autoreload(lua_State* L) {
     x4n::lua::pushboolean(L, core_modified_since_last_check() ? 1 : 0);
     return 1;
 }
-#endif // NDEBUG
+#endif // X4N_WITH_RELOAD
 
 // ---------------------------------------------------------------------------
 // Entry point — called by Lua: package.loadlib("...dll", "luaopen_x4native")
@@ -553,7 +551,7 @@ int luaopen_x4native(lua_State* L) {
         { "prepare_reload",          l_prepare_reload          },
         { "get_extension_settings",  l_get_extension_settings  },
         { "set_extension_setting",   l_set_extension_setting   },
-#ifndef NDEBUG
+#ifdef X4N_WITH_RELOAD
         { "should_autoreload",       l_should_autoreload       },
 #endif
     };

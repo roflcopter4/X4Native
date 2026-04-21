@@ -24,6 +24,7 @@
 
 #include "x4n_core.h"
 #include "x4n_entity.h"
+#include <cstddef>
 #include <cstdint>
 
 namespace x4n { namespace buildprocessor {
@@ -64,11 +65,7 @@ public:
     /// you need your own timer — this field only measures active CV-work time.
     ///
     /// See docs/rev/PRODUCTION_MODULES.md (to be extended) for IDA traces.
-    double started_at() const {
-        if (!valid()) return -1.0;
-        return *reinterpret_cast<const double*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_BUILDPROCESSOR_STARTED_AT_OFFSET);
-    }
+    double started_at() const { return read_double_or(X4_BUILDPROCESSOR_STARTED_AT_OFFSET, -1.0); }
 
     /// True iff this buildprocessor is currently processing a build.
     /// Equivalent to `started_at() > -0.9999` (sentinel check matching the
@@ -82,28 +79,30 @@ public:
     /// as `paused_since()` on Production modules. The engine's
     /// GetBuildProcessorEstimatedTimeLeft uses this to subtract pause time
     /// from elapsed-since-start.
-    double paused_at() const {
-        if (!valid()) return -1.0;
-        return *reinterpret_cast<const double*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_BUILDPROCESSOR_PAUSED_AT_OFFSET);
-    }
+    double paused_at() const { return read_double_or(X4_BUILDPROCESSOR_PAUSED_AT_OFFSET, -1.0); }
 
     /// 1-indexed current build stage (0 if not processing). Stage count
     /// comes from the macro's build plan — a single station module may be
     /// composed of multiple stages. Paired with `total_stages()` yields
     /// overall progress %.
-    int32_t current_stage() const {
-        if (!valid()) return 0;
-        return *reinterpret_cast<const int32_t*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_BUILDPROCESSOR_CURRENT_STAGE_OFFSET);
-    }
+    int32_t current_stage() const { return read_int32_or(X4_BUILDPROCESSOR_CURRENT_STAGE_OFFSET, 0); }
 
     /// Total build stages for the current task's macro (0 if not processing).
     /// @see current_stage
-    int32_t total_stages() const {
-        if (!valid()) return 0;
+    int32_t total_stages() const { return read_int32_or(X4_BUILDPROCESSOR_TOTAL_STAGES_OFFSET, 0); }
+
+private:
+    // Direct-field accessors. All fields are plain scalars at known offsets
+    // in the Buildprocessor component, so we share one read path per type.
+    double read_double_or(std::ptrdiff_t offset, double fallback) const {
+        if (!valid()) return fallback;
+        return *reinterpret_cast<const double*>(
+            reinterpret_cast<const uint8_t*>(comp_) + offset);
+    }
+    int32_t read_int32_or(std::ptrdiff_t offset, int32_t fallback) const {
+        if (!valid()) return fallback;
         return *reinterpret_cast<const int32_t*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_BUILDPROCESSOR_TOTAL_STAGES_OFFSET);
+            reinterpret_cast<const uint8_t*>(comp_) + offset);
     }
 };
 

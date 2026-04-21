@@ -9,6 +9,24 @@
 // X4NativeAPI::get_setting_*). Current values persist in
 //   <profile>\x4native\<extension_id>.user.json
 // where <profile> is `GetSaveFolderPath()`'s parent.
+//
+// Threading model
+// ---------------
+// SettingsManager is **not** internally synchronised. All public methods run
+// on the X4 UI thread exclusively:
+//   - Extension lifecycle (register/unregister/shutdown) — UI thread.
+//   - Read/write accessors (get_*, set_*) — UI thread (extensions invoke from
+//     their UI-thread callbacks; proxy dispatches UI → core on the UI thread).
+//   - Settings menu interactions route UI → proxy → core on the UI thread.
+//
+// ABI pointer lifetime
+// --------------------
+// `enumerate()` returns a pointer into `ExtensionSettings::abi_cache`. That
+// buffer is stable for the lifetime of the extension registration. It is
+// rebuilt on register_extension() (schema changes on hot-reload) and its
+// current-value fields are refreshed in-place on every enumerate() call.
+// Callers must consume the pointer before the next register/unregister for
+// the same extension.
 // ---------------------------------------------------------------------------
 
 #include <nlohmann/json.hpp>

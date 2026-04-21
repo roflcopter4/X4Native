@@ -402,9 +402,7 @@ static const char* impl_get_version() {
 }
 
 static const char* impl_get_loaded_extensions() {
-    static std::string cached;
-    cached = x4n::ExtensionManager::loaded_extensions_json();
-    return cached.c_str();
+    return x4n::ExtensionManager::loaded_extensions_json();
 }
 
 static void impl_set_lua_state(void* L) {

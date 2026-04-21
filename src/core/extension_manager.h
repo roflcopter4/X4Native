@@ -103,7 +103,10 @@ public:
     static void tick();                   // throttled mtime check — call every frame
     static void flush_pending_reloads();  // safe reload point — call before firing frame events
     static const std::vector<ExtensionInfo>& extensions() { return s_extensions; }
-    static std::string loaded_extensions_json();
+    // Serializes the loaded-extension set as JSON. Returns a pointer into
+    // a single internal static buffer — valid until the next call. Callers
+    // that need to keep the string across calls must copy it.
+    static const char* loaded_extensions_json();
 
 private:
     enum class LoadResult { ok, skipped, failed };

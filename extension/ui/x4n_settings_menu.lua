@@ -242,12 +242,6 @@ local function install()
         return orig_handler(optionParameter)
     end
 
-    -- Also re-apply when the engine reports our own extension settings changed
-    -- (fires after SetExtensionSettings; we piggy-back to refresh on engine nudges).
-    if menu.registerCallback then
-        -- Some helpers register menus via callback tables; not required here.
-    end
-
     installed = true
     if api.log then api.log(1, "Settings menu injector installed") end
     return true
