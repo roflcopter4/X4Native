@@ -1,5 +1,4 @@
 {
-    "name": "hello",
     "library": "native\\x4native_hello.dll",
     "priority": 100,
     "min_api_version": 1,

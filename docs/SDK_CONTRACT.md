@@ -2,7 +2,7 @@
 
 ## Internal C ABI
 
-Extensions interact through the `x4n::` namespace API, which wraps a flat C ABI that crosses DLL boundaries safely. The SDK is split into focused headers — core (`x4n_core.h`, `x4n_events.h`, `x4n_log.h`, `x4n_stash.h`, `x4n_hooks.h`) and domain helpers (`x4n_entity.h`, `x4n_math.h`, `x4n_memory.h`, `x4n_rooms.h`, `x4n_plans.h`, `x4n_visibility.h`) — each self-contained. `x4native.h` is a convenience umbrella that includes all of them. Extension developers never use the C ABI layer directly.
+Extensions interact through the `x4n::` namespace API, which wraps a flat C ABI that crosses DLL boundaries safely. The SDK is split into focused headers — core (`x4n_core.h`, `x4n_events.h`, `x4n_log.h`, `x4n_stash.h`, `x4n_hooks.h`, `x4n_settings.h`) and domain helpers (`x4n_entity.h`, `x4n_math.h`, `x4n_memory.h`, `x4n_rooms.h`, `x4n_plans.h`, `x4n_visibility.h`, `x4n_galaxy.h`, `x4n_sector.h`, `x4n_resources.h`, `x4n_module.h`, `x4n_station.h`, `x4n_ship.h`, `x4n_container.h`, `x4n_buildprocessor.h`) — each self-contained. `x4native.h` is a convenience umbrella that includes all of them. Extension developers never use the C ABI layer directly.
 
 ### Required Exports
 
@@ -14,89 +14,33 @@ extern "C" __declspec(dllexport) void x4native_shutdown(void);
 extern "C" __declspec(dllexport) int x4native_api_version(void);
 ```
 
-### Internal Types
-
-```cpp
-typedef void (*X4NativeEventCallback)(const char* event_name,
-                                      void* data, void* userdata);
-
-typedef struct X4HookContext {
-    const char* function_name;
-    void**      args;           // Array of pointers to each argument
-    void*       result;         // Pointer to return value buffer
-    int         skip_original;  // OR-gate: any setter causes skip
-    void*       userdata;
-} X4HookContext;
-
-typedef int (*X4HookCallback)(X4HookContext* ctx);
-```
-
 ### X4NativeAPI Struct
 
-> **Source of truth:** `sdk/x4native_extension.h`. This section is a summary; if it disagrees with the header, the header wins.
+> **Source of truth:** `sdk/x4native_extension.h`. The authoritative layout, field-by-field doc comments, and ordering live there. This section describes what the struct contains at a conceptual level — read the header for the actual ABI.
+>
+> **Extension authors:** you should never need this section. Use `x4n::` from `x4native.h` instead. The struct is documented here only for framework contributors and for anyone wiring a new language binding.
 
-```cpp
-struct X4NativeAPI {
-    int api_version;
+`X4NativeAPI` is a single struct of function pointers and context fields, passed by the core into every extension's `x4native_init(X4NativeAPI*)`. It groups the following capability areas (exact field names and signatures in the header):
 
-    // Event System
-    int  (*subscribe)(const char* event_name,
-                      X4NativeEventCallback callback, void* userdata,
-                      void* _api_ptr);
-    void (*unsubscribe)(int subscription_id);
-    void (*raise_event)(const char* event_name, void* data);
+| Area | Purpose |
+|---|---|
+| `api_version` | ABI version check — extensions report `X4NATIVE_API_VERSION`; core rejects mismatches |
+| Event system | `subscribe` / `unsubscribe` / `raise_event` — pub-sub over string event names |
+| Lua bridge | `raise_lua_event` (C++ → Lua) and `register_lua_bridge` (Lua → C++) |
+| Logging | `log(level, msg)` — writes to the per-extension log file via the routing context below |
+| Info | Game version, X4Native version, absolute path to the calling extension's folder |
+| Game API | `game` (X4GameFunctions* table), `get_game_function` (named lookup), counts, `exe_base`, `game_types_build` |
+| Hook system | `hook_before` / `hook_after` / `unhook` — wrapped by `x4n::hook::before/after` templates |
+| Hook plumbing | `_ensure_detour` / `_run_before_hooks` / `_run_after_hooks` — invoked by the `x4n::hook` templates, not by extensions |
+| Internal resolution | `resolve_internal` — looks up non-exported (RE'd) game functions via `internal_functions.json` |
+| MD events | `md_subscribe_before` / `md_subscribe_after` — O(1) dispatch by MD event type_id |
+| Stash | `stash_set/get/remove/clear` — in-memory K/V surviving `/reloadui` and hot-reload; wrapped by `x4n::stash` |
+| Per-extension context | `_ext_id`, `_ext_display_name`, `_ext_priority`, `_ext_subscription_ids`, `_ext_log_handle`, `_ext_log_fn`, `_ext_init_log_fn`, `_ext_log_named_fn`, `_ext_info` — the core populates these per-extension so `log()` and other routing end up in the right place |
+| Runtime offsets | `offsets` — pre-computed version-dependent values (read via `x4n::offsets()`) |
+| Settings | `get_setting_bool/number/string` and `set_setting_bool/number/string` — per-extension user settings (wrapped by `x4n::settings`) |
+| Reserved | `_reserved[N]` trailing slots for future additions without breaking ABI |
 
-    // Lua Bridge (outbound: C++ -> Lua)
-    int  (*raise_lua_event)(const char* event_name, const char* param);
-
-    // Lua Bridge (inbound: Lua -> C++)
-    int  (*register_lua_bridge)(const char* lua_event, const char* cpp_event);
-
-    // Logging (routes to global x4native.log; per-extension routing uses _reserved[4])
-    void (*log)(int level, const char* message);
-
-    // Info
-    const char* (*get_game_version)(void);
-    const char* (*get_x4native_version)(void);
-    const char* extension_path;
-
-    // Game API
-    struct X4GameFunctions* game;
-    void* (*get_game_function)(const char* name);
-    int game_func_count;
-    int game_types_build;
-
-    // Hook System (wrapped by x4n::hook)
-    int  (*hook_before)(const char* function_name,
-                        X4HookCallback callback, void* userdata,
-                        void* _api_ptr);
-    int  (*hook_after)(const char* function_name,
-                       X4HookCallback callback, void* userdata,
-                       void* _api_ptr);
-    void (*unhook)(int hook_id);
-
-    // Internal hook plumbing (used by x4n::hook templates, not for direct use)
-    void* (*_ensure_detour)(const char* function_name, void* detour_fn);
-    void  (*_run_before_hooks)(X4HookContext* ctx);
-    void  (*_run_after_hooks)(X4HookContext* ctx);
-
-    // Internal function resolution (non-exported game functions via RVA database)
-    void* (*resolve_internal)(const char* name);
-
-    // Stash — in-memory key-value, survives /reloadui + hot-reload, lost on game exit
-    // Wrapped by x4n::stash in the C++ SDK.
-    int         (*stash_set)(const char* ns, const char* key,
-                             const void* data, uint32_t size);
-    const void* (*stash_get)(const char* ns, const char* key,
-                             uint32_t* out_size);
-    int         (*stash_remove)(const char* ns, const char* key);
-    void        (*stash_clear)(const char* ns);
-
-    void* _reserved[20];  // Framework-managed slots (per-extension context)
-};
-```
-
-The `_reserved` slots are used internally by the framework for per-extension state (log handles, extension name, priority). See `x4native_extension.h` for the slot layout.
+Everything prefixed with `_` is framework-managed. Extensions read through the `x4n::` wrappers; the C ABI is only meant to be stable, not ergonomic.
 
 ---
 

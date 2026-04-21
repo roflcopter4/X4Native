@@ -1,5 +1,4 @@
 {
-    "name": "event_test",
     "library": "native\\x4native_event_test.dll",
     "priority": 100,
     "min_api_version": 1

@@ -132,8 +132,18 @@ void SettingsManager::ensure_loaded(const std::string& extension_id,
                     break;
                 case SettingType::Dropdown:
                     if (it->is_string()) {
-                        ext.values[s.id] = it->get<std::string>();
-                        ++loaded;
+                        auto v = it->get<std::string>();
+                        bool ok = false;
+                        for (const auto& o : s.options)
+                            if (o.id == v) { ok = true; break; }
+                        if (ok) {
+                            ext.values[s.id] = std::move(v);
+                            ++loaded;
+                        } else {
+                            Logger::warn("Settings: '{}/{}' stored value '{}' "
+                                         "not in current options — using default '{}'",
+                                         extension_id, s.id, v, s.default_string);
+                        }
                     }
                     break;
             }
@@ -384,16 +394,18 @@ void SettingsManager::refresh_abi_current_values(ExtensionSettings& ext) {
             if constexpr (std::is_same_v<T, bool>)        info.current_bool   = v ? 1 : 0;
             else if constexpr (std::is_same_v<T, double>) info.current_number = v;
             else if constexpr (std::is_same_v<T, std::string>) {
-                // Map string value back to the stable option id pointer when
-                // possible so the proxy sees a pointer that outlives this call.
-                const char* resolved = nullptr;
+                // Map string value back to the stable option id pointer so the
+                // proxy sees a pointer owned by `schema` (immutable post-load).
+                //
+                // Invariant: `values[key]` for a Dropdown is always an id that
+                // exists in `s.options`. Enforced on every entry path:
+                //   - parse_one (schema default validation)
+                //   - ensure_loaded (user.json values validated against options)
+                //   - set_string  (rejects values not in options)
+                // If the lookup misses here the invariant has been broken.
+                const char* resolved = info.default_string;  // safe fallback (also in schema)
                 for (const auto& o : s.options) {
                     if (o.id == v) { resolved = o.id.c_str(); break; }
-                }
-                if (!resolved) {
-                    // Not in options — keep the raw stored std::string's c_str.
-                    if (auto* p = std::get_if<std::string>(&it->second))
-                        resolved = p->c_str();
                 }
                 info.current_string = resolved;
             }
@@ -497,15 +509,25 @@ static bool parse_one(const json& j, SettingSchema& out,
                     if (!opt.id.empty()) out.options.push_back(std::move(opt));
                 }
             }
-            if (j.contains("default") && j["default"].is_string())
-                out.default_string = j["default"].get<std::string>();
-            else if (!out.options.empty())
-                out.default_string = out.options.front().id;
             if (out.options.empty()) {
                 schema_warn(warnings,
                             "Settings: {}/{} dropdown has no options — skipping",
                             context, out.id);
                 return false;
+            }
+            if (j.contains("default") && j["default"].is_string()) {
+                out.default_string = j["default"].get<std::string>();
+                bool ok = false;
+                for (const auto& o : out.options)
+                    if (o.id == out.default_string) { ok = true; break; }
+                if (!ok) {
+                    schema_warn(warnings,
+                                "Settings: {}/{} default '{}' not in options — using '{}'",
+                                context, out.id, out.default_string, out.options.front().id);
+                    out.default_string = out.options.front().id;
+                }
+            } else {
+                out.default_string = out.options.front().id;
             }
             break;
     }

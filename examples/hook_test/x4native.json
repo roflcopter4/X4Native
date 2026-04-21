@@ -1,5 +1,4 @@
 {
-    "name": "hook_test",
     "library": "native\\x4native_hook_test.dll",
     "priority": 100,
     "min_api_version": 1

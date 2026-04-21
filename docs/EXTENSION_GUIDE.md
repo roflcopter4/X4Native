@@ -384,6 +384,8 @@ x4n::log::set_log_file("mymod_v2.log");
 }
 ```
 
+> **Fallback when the profile path is unresolvable.** If `GetSaveFolderPath()` returns empty — an edge case that shouldn't happen during a normal game session but is theoretically possible very early during core init — logs fall back to the extension's install folder (`extensions\<ext_id>\`) for the affected call. This applies to all three sinks: the default per-extension log, `set_log_file(name)` redirects, and `to_file(name)` one-shots. The relative-path safety checks (`..` and absolute-path rejection) still apply. Settings writes use the same profile path but do **not** fall back — they refuse to persist and log a warning instead, since settings are expected to survive extension updates.
+
 > **Migration from the old API** (removed, not deprecated):
 > | Old | New |
 > |---|---|
