@@ -205,6 +205,41 @@ static_assert(offsetof(X4Component, exists)     == 0xD1, "X4Component::exists of
 //   concept doesn't apply to Processingmodule.
 #define X4_PROCESSINGMODULE_PAUSED_FLAG_OFFSET       0x3B8  /* uint8, class 77 only — no timestamp field */
 
+// ---- Buildprocessor class offsets (class 10) ----
+// Buildprocessor is a sub-entity attached to a Construction Vehicle (buildership)
+// while it actively works on a BuildTask. It holds the runtime state of the current
+// build phase — started_at timestamp, pause timestamp, stage counter, total stages.
+// When the CV disengages (abandonbuildtime elapses, or build completes/aborts), the
+// buildprocessor's started_at resets to the -1.0 sentinel.
+//
+// FIND (build_started_at @ +0x258):
+//   GetBuildProcessorEstimatedTimeLeft @ 0x140150750 dispatches into
+//   sub_14034FC90. Inside, look for `if ( *(double *)(a1 + 600) <= -0.9999 )` — the
+//   sentinel check. The non-sentinel branch calls sub_14034FE00 which reads
+//   `result = *(double *)(a1 + 600);` and subtracts pause_at (+0x260) if set.
+//   sub_14034FDA0 (GetCurrentBuildProgress body) uses the same field for stage math.
+//   Set when the CV's buildprocessor begins work on a task; reset to -1.0 when
+//   the CV abandons / completes.
+// Verified: build 605025
+#define X4_BUILDPROCESSOR_STARTED_AT_OFFSET          0x258  /* double, player.age at current phase start; -1.0 = not processing */
+
+// FIND (build_paused_at @ +0x260):
+//   sub_14034FE00 (same function as above). After reading +0x258 as `result`, it
+//   reads `v4 = *(double *)(a1 + 608);` and if `v4 > -0.9999` returns
+//   `result + player.age - v4` — i.e. the pause-corrected start time. Same -1.0
+//   sentinel idiom as Production's paused_since.
+// Verified: build 605025
+#define X4_BUILDPROCESSOR_PAUSED_AT_OFFSET           0x260  /* double, player.age at pause; -1.0 = not paused */
+
+// FIND (build stage counters @ +0x268 / +0x26C):
+//   GetCurrentBuildProgress body sub_14034FDA0. Top-of-function guard reads
+//   `if ( !*(_DWORD *)(a1 + 616) || !*(_DWORD *)(a1 + 620) ) return 0.0;` — the
+//   current-stage (+0x268) and total-stages (+0x26C) counters. Final expression
+//   `(stage_helper_return + (float)((current - 1) * 100.0)) / total` yields % done.
+// Verified: build 605025
+#define X4_BUILDPROCESSOR_CURRENT_STAGE_OFFSET       0x268  /* int32, 1-indexed current build stage */
+#define X4_BUILDPROCESSOR_TOTAL_STAGES_OFFSET        0x26C  /* int32, total stages for this build */
+
 // Component registry — opaque, accessed only via ComponentRegistry_Find.
 typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 
