@@ -13,7 +13,12 @@
 // DO NOT EDIT - regenerate with: .\scripts\generate_class_ids.ps1
 // ==========================================================================
 
+#pragma once
+
 #ifdef __cplusplus
+# include <stdint.h>
+# include <string_view>
+
 namespace x4n {
 
 /// Entity class ID enum. Values are auto-generated per game build.
@@ -149,8 +154,9 @@ inline constexpr uint32_t GAMECLASS_SENTINEL = 120;
 /// Used by x4n::entity::find_ancestor() to pass GameClass into GetContextByClass,
 /// and by typed wrappers around IsComponentClass / IsRealComponentClass.
 /// Returns nullptr for out-of-range values (graceful fallback: caller gets null result).
-inline const char* class_name(GameClass c) {
-    static constexpr const char* NAMES[] = {
+constexpr char const *class_name(GameClass c)
+{
+    static constexpr char const *NAMES[] = {
         "accessory"                 , // 0 Accessory
         "adsign"                    , // 1 Adsign
         "adsignobject"              , // 2 Adsignobject
@@ -272,8 +278,9 @@ inline const char* class_name(GameClass c) {
         "triggerobject"             , // 118 Triggerobject
         "walkablemodule"             // 119 Walkablemodule
     };
+
     auto idx = static_cast<size_t>(c);
-    return idx < (sizeof(NAMES) / sizeof(NAMES[0])) ? NAMES[idx] : nullptr;
+    return idx < std::size(NAMES) ? NAMES[idx] : nullptr;
 }
 
 } // namespace x4n

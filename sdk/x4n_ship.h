@@ -33,7 +33,10 @@
 #include <cstring>
 #include <cstdio>
 
-namespace x4n { namespace ship {
+#pragma push_macro("ND")
+#define ND [[nodiscard]]
+
+namespace x4n::ship {
 
 // ---- Order param value struct ----
 
@@ -48,7 +51,7 @@ struct OrderParamValue {
 // Required because CreateOrderInternal reads it with movaps (SSE aligned load).
 
 struct alignas(16) AlignedStringView {
-    const char* data;
+    char const *data;
     size_t      length;
 };
 
@@ -66,17 +69,15 @@ struct alignas(16) AlignedStringView {
 ///   Mode 2: identical to 0 (game checks ==3 and ==1 only).
 ///
 enum class OrderMode : int {
-    Immediate = 0,  // Interrupt: execute now, self-destruct when done, previous resumes
-    Queue     = 1,  // Sequence: FIFO, persists through queue operations, can re-activate
-    Default   = 3,  // Standing: loops indefinitely when queue empty (one at a time)
+    Immediate = 0, // Interrupt: execute now, self-destruct when done, previous resumes
+    Queue     = 1, // Sequence: FIFO, persists through queue operations, can re-activate
+    Default   = 3, // Standing: loops indefinitely when queue empty (one at a time)
 };
 
 /// Lightweight typed handle for a ship entity.
 /// Constructor validates the entity is a Ship (any size class).
-class Ship {
-    UniverseID id_;
-    X4Component* comp_;
-
+class Ship : public entity::ComponentEntity
+{
     // ---------------------------------------------------------------
     // Order param setters — private implementation detail.
     // Callers use convenience order methods (order_patrol, etc.)
@@ -86,35 +87,59 @@ class Ship {
     //   2 = BOOL, 3 = NUMBER, 10 = ENTITY, 15 = SECTOR
     // ---------------------------------------------------------------
 
-    bool set_order_param_entity(void* order, uint32_t idx, UniverseID uid) {
-        if (!order) return false;
-        auto* g = game();
-        if (!g || !g->SetOrderParamInternal) return false;
-        OrderParamValue val{}; val.type = X4_ORDER_PARAM_TYPE_ENTITY; val.data = uid;
+    static bool set_order_param_entity(void *order, uint32_t idx, UniverseID uid)
+    {
+        if (!order)
+            return false;
+        auto *g = game();
+        if (!g || !g->SetOrderParamInternal)
+            return false;
+        OrderParamValue val = {
+            .type = X4_ORDER_PARAM_TYPE_ENTITY,
+            .data = uid,
+        };
         return g->SetOrderParamInternal(order, idx, &val) != 0;
     }
 
-    bool set_order_param_bool(void* order, uint32_t idx, bool value) {
-        if (!order) return false;
-        auto* g = game();
-        if (!g || !g->SetOrderParamInternal) return false;
-        OrderParamValue val{}; val.type = X4_ORDER_PARAM_TYPE_BOOL; val.data = value ? 1 : 0;
+    static bool set_order_param_bool(void *order, uint32_t idx, bool value)
+    {
+        if (!order)
+            return false;
+        auto *g = game();
+        if (!g || !g->SetOrderParamInternal)
+            return false;
+        OrderParamValue val = {
+            .type = X4_ORDER_PARAM_TYPE_BOOL,
+            .data = value ? UINT64_C(1) : UINT64_C(0),
+        };
         return g->SetOrderParamInternal(order, idx, &val) != 0;
     }
 
-    bool set_order_param_number(void* order, uint32_t idx, int64_t value) {
-        if (!order) return false;
-        auto* g = game();
-        if (!g || !g->SetOrderParamInternal) return false;
-        OrderParamValue val{}; val.type = X4_ORDER_PARAM_TYPE_NUMBER; val.data = static_cast<uint64_t>(value);
+    static bool set_order_param_number(void *order, uint32_t idx, int64_t value)
+    {
+        if (!order)
+            return false;
+        auto *g = game();
+        if (!g || !g->SetOrderParamInternal)
+            return false;
+        OrderParamValue val = {
+            .type = X4_ORDER_PARAM_TYPE_NUMBER,
+            .data = static_cast<uint64_t>(value),
+        };
         return g->SetOrderParamInternal(order, idx, &val) != 0;
     }
 
-    bool set_order_param_sector(void* order, uint32_t idx, UniverseID uid) {
-        if (!order) return false;
-        auto* g = game();
-        if (!g || !g->SetOrderParamInternal) return false;
-        OrderParamValue val{}; val.type = X4_ORDER_PARAM_TYPE_SECTOR; val.data = uid;
+    static bool set_order_param_sector(void *order, uint32_t idx, UniverseID uid)
+    {
+        if (!order)
+            return false;
+        auto *g = game();
+        if (!g || !g->SetOrderParamInternal)
+            return false;
+        OrderParamValue val = {
+            .type = X4_ORDER_PARAM_TYPE_SECTOR,
+            .data = uid,
+        };
         return g->SetOrderParamInternal(order, idx, &val) != 0;
     }
 
@@ -122,29 +147,25 @@ class Ship {
     /// Bypasses the player-ownership check in exported CreateOrder3.
     /// @param order_id  Order type name (e.g., "Patrol", "Attack", "TradeRoutine")
     /// @param mode      Queue (one-shot) or Default (standing/looping)
-    void* create_order(const char* order_id, OrderMode mode = OrderMode::Default) {
-        if (!valid()) return nullptr;
-        auto* g = game();
-        if (!g || !g->CreateOrderInternal) return nullptr;
+    void *create_order(char const *order_id, OrderMode mode = OrderMode::Default)
+    {
+        if (!valid())
+            return nullptr;
+        auto *g = game();
+        if (!g || !g->CreateOrderInternal)
+            return nullptr;
 
-        AlignedStringView sv{ order_id, std::strlen(order_id) };
-        void* result = g->CreateOrderInternal(comp_, &sv, static_cast<int>(mode), 0);
-        if (!result) {
-            x4n::log::info("x4n::ship: create_order('{}') returned null. entity={}",
-                           order_id, static_cast<void*>(comp_));
-        }
+        auto  sv     = AlignedStringView{order_id, ::strlen(order_id)};
+        void *result = g->CreateOrderInternal(component(), &sv, static_cast<int>(mode), 0);
+        if (!result)
+            x4n::log::info("x4n::ship: create_order('{}') returned null. entity={}", order_id, static_cast<void *>(component()));
         return result;
     }
 
-public:
+  public:
     explicit Ship(UniverseID id)
-        : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_a(comp_, GameClass::Ship))
-            comp_ = nullptr;
-    }
-
-    bool valid() const { return comp_ != nullptr; }
-    UniverseID id() const { return id_; }
+        : ComponentEntity(id, GameClass::Ship)
+    {}
 
     // ---------------------------------------------------------------
     // Order methods — public API.
@@ -153,36 +174,48 @@ public:
 
     /// Patrol a sector. Engages hostiles on sight. Loops indefinitely.
     /// @param sector  0 = current zone
-    bool order_patrol(UniverseID sector = 0, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("Patrol", mode);
+    /// @param mode    Queue (one-shot) or Default (standing/looping)
+    bool order_patrol(UniverseID sector = 0, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("Patrol", mode);
         if (!order) return false;
         if (sector != 0) set_order_param_entity(order, 0, sector);
         return true;
     }
 
     /// Attack a specific target (ship or station).
-    bool order_attack(UniverseID target, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("Attack", mode);
+    /// @param target  Target to attack
+    /// @param mode    Queue (one-shot) or Default (standing/looping)
+    bool order_attack(UniverseID target, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("Attack", mode);
         if (!order) return false;
         return set_order_param_entity(order, 0, target);
     }
 
     /// Guard a station. Patrols station zone, responds to threats.
-    bool order_protect_station(UniverseID station, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("ProtectStation", mode);
+    /// @param station  Station to guard
+    /// @param mode     Queue (one-shot) or Default (standing/looping)
+    bool order_protect_station(UniverseID station, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("ProtectStation", mode);
         if (!order) return false;
         return set_order_param_entity(order, 0, station);
     }
 
     /// Trade autonomously. Uses ship's ware basket from commander.
-    bool order_trade_routine(OrderMode mode = OrderMode::Default) {
+    /// @param mode Queue (one-shot) or Default (standing/looping)
+    bool order_trade_routine(OrderMode mode = OrderMode::Default)
+    {
         return create_order("TradeRoutine", mode) != nullptr;
     }
 
     /// Mine autonomously. Uses ship's ware basket from commander.
     /// @param sector  0 = current area
-    bool order_mining_routine(UniverseID sector = 0, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("MiningRoutine", mode);
+    /// @param mode    Queue (one-shot) or Default (standing/looping)
+    bool order_mining_routine(UniverseID sector = 0, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("MiningRoutine", mode);
         if (!order) return false;
         if (sector != 0) set_order_param_entity(order, 1, sector);
         return true;
@@ -192,8 +225,10 @@ public:
     /// fires 'recon update' signal. Deploys satellites by default.
     /// @param sector       Target sector to scout
     /// @param deploy_sats  Deploy satellites at points of interest
-    bool order_recon(UniverseID sector, bool deploy_sats = true, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("Recon", mode);
+    /// @param mode         Queue (one-shot) or Default (standing/looping)
+    bool order_recon(UniverseID sector, bool deploy_sats = true, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("Recon", mode);
         if (!order) return false;
         if (sector != 0) set_order_param_entity(order, 0, sector);
         set_order_param_bool(order, 10, deploy_sats);
@@ -201,16 +236,19 @@ public:
     }
 
     /// Escort a ship in formation. Breaks formation on combat.
-    bool order_escort(UniverseID target, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("Escort", mode);
+    bool order_escort(UniverseID target, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("Escort", mode);
         if (!order) return false;
         return set_order_param_entity(order, 0, target);
     }
 
     /// Autonomous salvage collection.
     /// @param sector  0 = use job main sector / commander sector
-    bool order_salvage(UniverseID sector = 0, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("SalvageRoutine", mode);
+    /// @param mode    Queue (one-shot) or Default (standing/looping)
+    bool order_salvage(UniverseID sector = 0, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("SalvageRoutine", mode);
         if (!order) return false;
         if (sector != 0) set_order_param_sector(order, 0, sector);
         return true;
@@ -219,8 +257,10 @@ public:
     /// Fleet coordination from a flagship (L/XL). Coordinates subordinates.
     /// @param target         Ship or station to attack
     /// @param aggressiveness 0-100 (default 50)
-    bool order_tactical(UniverseID target, int32_t aggressiveness = 50, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("TacticalOrder", mode);
+    /// @param mode           Queue (one-shot) or Default (standing/looping)
+    bool order_tactical(UniverseID target, int32_t aggressiveness = 50, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("TacticalOrder", mode);
         if (!order) return false;
         set_order_param_entity(order, 0, target);
         set_order_param_number(order, 1, aggressiveness);
@@ -229,24 +269,33 @@ public:
 
     /// Piracy operations. Requires high pilot skill.
     /// @param sector  Operating area (0 = ship's cluster)
-    bool order_plunder(UniverseID sector = 0, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("Plunder", mode);
+    /// @param mode    Queue (one-shot) or Default (standing/looping)
+    bool order_plunder(UniverseID sector = 0, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("Plunder", mode);
         if (!order) return false;
         if (sector != 0) set_order_param_entity(order, 0, sector);
         return true;
     }
 
     /// Guard a specific ship (VIP escort).
-    bool order_protect_ship(UniverseID target, OrderMode mode = OrderMode::Default) {
-        void* order = create_order("ProtectShip", mode);
+    /// @param target Ship to guard
+    /// @param mode   Queue (one-shot) or Default (standing/looping)
+    bool order_protect_ship(UniverseID target, OrderMode mode = OrderMode::Default)
+    {
+        void *order = create_order("ProtectShip", mode);
         if (!order) return false;
         return set_order_param_entity(order, 0, target);
     }
 
     /// Construction vessel seeks build tasks.
-    bool order_supply_fleet(OrderMode mode = OrderMode::Default) {
+    /// @param mode Queue (one-shot) or Default (standing/looping)
+    bool order_supply_fleet(OrderMode mode = OrderMode::Default)
+    {
         return create_order("SupplyFleet", mode) != nullptr;
     }
 };
 
-}} // namespace x4n::ship
+} // namespace x4n::ship
+
+#pragma pop_macro("ND")

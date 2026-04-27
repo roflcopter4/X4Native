@@ -9,7 +9,7 @@
 //   - Extension compatibility checks
 // ---------------------------------------------------------------------------
 
-#include <string>
+#include "Common.h"
 
 namespace x4n {
 

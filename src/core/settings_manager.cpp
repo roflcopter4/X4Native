@@ -1,3 +1,4 @@
+#include "Common.h"
 #include "settings_manager.h"
 #include "event_system.h"
 #include "logger.h"

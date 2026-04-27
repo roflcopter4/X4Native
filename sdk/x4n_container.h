@@ -23,22 +23,19 @@
 #include "x4n_entity.h"
 #include <cstdint>
 
-namespace x4n { namespace container {
+#pragma push_macro("ND")
+#define ND [[nodiscard]]
+
+namespace x4n::container {
 
 /// Lightweight typed handle for a Container-class entity (station / ship).
 /// Constructor validates the entity IS-A Container via vtable IsOrDerivedFromClassID.
-class Container {
-    UniverseID id_;
-    X4Component* comp_;
-public:
+class Container : public entity::ComponentEntity
+{
+  public:
     explicit Container(UniverseID id)
-        : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_a(comp_, GameClass::Container))
-            comp_ = nullptr;
-    }
-
-    bool valid() const { return comp_ != nullptr; }
-    UniverseID id() const { return id_; }
+        : ComponentEntity(id, GameClass::Container)
+    {}
 
     /// Read the station-global price factor directly from the Container field
     /// at +0x7A0. Returns 1.0f if the component is invalid (matches engine
@@ -46,10 +43,13 @@ public:
     /// itself carries the "restore default" sentinel previously written.
     ///
     /// Works for NPC-owned containers (read path is not gated).
-    float get_global_price_factor() const {
-        if (!valid()) return 1.0f;
-        return *reinterpret_cast<const float*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_CONTAINER_PRICE_FACTOR_OFFSET);
+    ND float get_global_price_factor() const
+    {
+        if (!valid())
+            return 1.0f;
+        float ret;
+        memcpy(&ret, reinterpret_cast<uint8_t const *>(component()) + X4_CONTAINER_PRICE_FACTOR_OFFSET, sizeof ret);
+        return ret;
     }
 
     /// Set the station-global price factor via direct field write, bypassing
@@ -66,19 +66,21 @@ public:
     /// (both FFIs share the "not player-owned! Aborting call." sentinel).
     ///
     /// See docs/rev/STATE_MUTATION.md for the direct-mutation safety model.
-    void set_global_price_factor(float factor) {
-        if (!valid()) return;
+    void set_global_price_factor(float factor)
+    {
+        if (!valid())
+            return;
         float stored;
-        if (factor < 0.0f) {
-            stored = -1.0f;  // engine sentinel: "no override"
-        } else if (factor > 1.0f) {
+        if (factor < 0.0f)
+            stored = -1.0f; // engine sentinel: "no override"
+        else if (factor > 1.0f)
             stored = 1.0f;
-        } else {
+        else
             stored = factor;
-        }
-        *reinterpret_cast<float*>(
-            reinterpret_cast<uint8_t*>(comp_) + X4_CONTAINER_PRICE_FACTOR_OFFSET) = stored;
+        memcpy(reinterpret_cast<uint8_t *>(component()) + X4_CONTAINER_PRICE_FACTOR_OFFSET, &stored, sizeof stored);
     }
 };
 
-}} // namespace x4n::container
+} // namespace x4n::container
+
+#pragma pop_macro("ND")

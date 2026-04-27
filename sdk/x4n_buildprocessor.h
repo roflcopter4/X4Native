@@ -27,7 +27,10 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace x4n { namespace buildprocessor {
+#pragma push_macro("ND")
+#define ND [[nodiscard]]
+
+namespace x4n::buildprocessor {
 
 /// Lightweight typed handle for a Buildprocessor (GameClass 10).
 /// Constructor validates the entity is actually a Buildprocessor.
@@ -37,18 +40,12 @@ namespace x4n { namespace buildprocessor {
 /// abandonbuildtime elapses at ~1h of resource-wait). `started_at` is stamped
 /// on attach and reset to -1.0 on detach — so its value is "current phase
 /// start," not "task queue time."
-class Buildprocessor {
-    UniverseID id_;
-    X4Component* comp_;
-public:
+class Buildprocessor : public entity::ComponentEntity
+{
+  public:
     explicit Buildprocessor(UniverseID id)
-        : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_a(comp_, GameClass::Buildprocessor))
-            comp_ = nullptr;
-    }
-
-    bool valid() const { return comp_ != nullptr; }
-    UniverseID id() const { return id_; }
+        : ComponentEntity(id, GameClass::Buildprocessor)
+    {}
 
     /// `player.age` seconds at which the CV began processing the current
     /// BuildTask. Returns `-1.0` sentinel if the buildprocessor is invalid or
@@ -65,12 +62,16 @@ public:
     /// you need your own timer — this field only measures active CV-work time.
     ///
     /// See docs/rev/PRODUCTION_MODULES.md (to be extended) for IDA traces.
-    double started_at() const { return read_double_or(X4_BUILDPROCESSOR_STARTED_AT_OFFSET, -1.0); }
+    ND double started_at() const
+    {
+        return read_double_or(X4_BUILDPROCESSOR_STARTED_AT_OFFSET, -1.0);
+    }
 
     /// True iff this buildprocessor is currently processing a build.
     /// Equivalent to `started_at() > -0.9999` (sentinel check matching the
     /// engine's own test — see IDA sub_14034FE00).
-    bool is_processing() const {
+    ND bool is_processing() const
+    {
         return started_at() > -0.9999;
     }
 
@@ -79,31 +80,49 @@ public:
     /// as `paused_since()` on Production modules. The engine's
     /// GetBuildProcessorEstimatedTimeLeft uses this to subtract pause time
     /// from elapsed-since-start.
-    double paused_at() const { return read_double_or(X4_BUILDPROCESSOR_PAUSED_AT_OFFSET, -1.0); }
+    ND double paused_at() const
+    {
+        return read_double_or(X4_BUILDPROCESSOR_PAUSED_AT_OFFSET, -1.0);
+    }
 
     /// 1-indexed current build stage (0 if not processing). Stage count
     /// comes from the macro's build plan — a single station module may be
     /// composed of multiple stages. Paired with `total_stages()` yields
     /// overall progress %.
-    int32_t current_stage() const { return read_int32_or(X4_BUILDPROCESSOR_CURRENT_STAGE_OFFSET, 0); }
+    ND int32_t current_stage() const
+    {
+        return read_int32_or(X4_BUILDPROCESSOR_CURRENT_STAGE_OFFSET, 0);
+    }
 
     /// Total build stages for the current task's macro (0 if not processing).
     /// @see current_stage
-    int32_t total_stages() const { return read_int32_or(X4_BUILDPROCESSOR_TOTAL_STAGES_OFFSET, 0); }
+    ND int32_t total_stages() const
+    {
+        return read_int32_or(X4_BUILDPROCESSOR_TOTAL_STAGES_OFFSET, 0);
+    }
 
-private:
+  private:
     // Direct-field accessors. All fields are plain scalars at known offsets
     // in the Buildprocessor component, so we share one read path per type.
-    double read_double_or(std::ptrdiff_t offset, double fallback) const {
-        if (!valid()) return fallback;
-        return *reinterpret_cast<const double*>(
-            reinterpret_cast<const uint8_t*>(comp_) + offset);
+    ND double read_double_or(std::ptrdiff_t offset, double fallback) const
+    {
+        if (!valid())
+            return fallback;
+        double ret;
+        memcpy(&ret, reinterpret_cast<uint8_t const *>(component()) + offset, sizeof ret);
+        return ret;
     }
-    int32_t read_int32_or(std::ptrdiff_t offset, int32_t fallback) const {
-        if (!valid()) return fallback;
-        return *reinterpret_cast<const int32_t*>(
-            reinterpret_cast<const uint8_t*>(comp_) + offset);
+
+    ND int32_t read_int32_or(std::ptrdiff_t offset, int32_t fallback) const
+    {
+        if (!valid())
+            return fallback;
+        int32_t ret;
+        memcpy(&ret, reinterpret_cast<uint8_t const *>(component()) + offset, sizeof ret);
+        return ret;
     }
 };
 
-}} // namespace x4n::buildprocessor
+} // namespace x4n::buildprocessor
+
+#pragma pop_macro("ND")

@@ -13,34 +13,38 @@
 // (native/version_db/internal_functions.json) loaded at init time.
 // ---------------------------------------------------------------------------
 
-#include <string>
+#include "Common.h"
 #include <unordered_map>
 
 struct X4GameFunctions;
 
 namespace x4n {
 
-class GameAPI {
-public:
+class GameAPI
+{
+  public:
+    GameAPI() = delete;
+
     static bool init();
     static void shutdown();
 
     // Load internal function RVA database for the given game build.
     // Tries primary_build first (e.g. "900-beta2"), falls back to fallback_build
     // (e.g. "900") so beta builds can reuse the last known-good RVA entry.
-    static void load_internal_db(const std::string& ext_root,
-                                 const std::string& primary_build,
-                                 const std::string& fallback_build = {});
+    static void load_internal_db(
+        std::string const &ext_root,
+        std::string const &primary_build,
+        std::string const &fallback_build = {});
 
     // The resolved function pointer table (NULL if not initialized)
-    static X4GameFunctions* table();
+    static X4GameFunctions *table();
 
     // Named lookup for any exported function (typed or untyped)
-    static void* get_function(const char* name);
+    static void *get_function(char const *name);
 
     // Named lookup for internal (non-exported) functions via RVA database.
     // Returns resolved address or nullptr if not found for this game version.
-    static void* get_internal(const char* name);
+    static void *get_internal(char const *name);
 
     // X4.exe image base address (for resolving global RVAs)
     static uintptr_t exe_base();
@@ -50,10 +54,10 @@ public:
     static int total_count();
     static int internal_count();
 
-private:
+  private:
     static X4GameFunctions s_table;
     static bool s_initialized;
-    static std::unordered_map<std::string, void*> s_internal_funcs;
+    static std::unordered_map<std::string, void *> s_internal_funcs;
 };
 
 } // namespace x4n

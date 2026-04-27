@@ -9,14 +9,9 @@
 // Uses C++23 std::format — no external dependencies.
 // ---------------------------------------------------------------------------
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
+#include "Common.h"
 
 #include <format>
-#include <string>
-#include <string_view>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -62,10 +57,10 @@ public:
     // Used by both the framework log and per-extension logs.
     static HANDLE open_log(const std::string& log_path);
 
-    static void write(LogLevel level, std::string_view msg);
+    static void write(LogLevel level, std::string_view const &msg);
 
     // Write to an arbitrary HANDLE — used by per-extension log routing.
-    static void write_to(HANDLE h, LogLevel level, std::string_view msg);
+    static void write_to(HANDLE h, LogLevel level, std::string_view const &msg);
 
     template<typename... Args>
     static void debug([[maybe_unused]] std::format_string<Args...> fmt, [[maybe_unused]] Args&&... args) {

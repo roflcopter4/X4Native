@@ -9,6 +9,7 @@
 // copies the new build, LoadLibrary's it, and calls core_init() again.
 // ---------------------------------------------------------------------------
 
+#include "Common.h"
 #include "logger.h"
 #include "event_system.h"
 #include "extension_manager.h"
@@ -23,11 +24,7 @@
 #include <x4_manual_types.h>
 #include <MinHook.h>
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-
+#include <algorithm>
 #include <array>
 #include <string>
 #include <cmath>
@@ -38,6 +35,7 @@
 // Runtime-resolved game offsets (extern'd by extension_manager.cpp).
 // Integer fields are statically initialized from #defines.
 // Pointer fields (needing exe_base) are filled by populate_offsets() at startup.
+extern X4GameOffsets s_offsets;
 X4GameOffsets s_offsets = {
     // --- Pre-resolved pointers: nullptr until populate_offsets() ---
     .frame_game_time       = nullptr,
@@ -126,12 +124,12 @@ X4GameOffsets s_offsets = {
     .room_persistent = X4_ROOM_OFFSET_PERSISTENT,
 };
 
-static void*       g_lua       = nullptr;   // lua_State* (opaque here)
-static std::string g_ext_root;
-static std::string g_game_version;
-static std::string g_version_string;        // cached for get_version()
-static raise_lua_event_fn g_raise_lua_event = nullptr;  // proxy-provided Lua bridge
-static register_lua_bridge_fn g_register_lua_bridge = nullptr;  // proxy-provided Lua→C++ bridge
+static void                  *g_lua = nullptr; // lua_State* (opaque here)
+static std::string            g_ext_root;
+static std::string            g_game_version;
+static std::string            g_version_string;                // cached for get_version()
+static raise_lua_event_fn     g_raise_lua_event     = nullptr; // proxy-provided Lua bridge
+static register_lua_bridge_fn g_register_lua_bridge = nullptr; // proxy-provided Lua→C++ bridge
 
 // Stash — proxy-owned in-memory key-value, forwarded from CoreInitContext
 static stash_set_fn    g_stash_set    = nullptr;
@@ -142,17 +140,18 @@ static stash_clear_fn  g_stash_clear  = nullptr;
 // ---------------------------------------------------------------------------
 // Resolve pointer fields in s_offsets (requires exe_base, called once at startup)
 // ---------------------------------------------------------------------------
-static void resolve_offset_pointers(uintptr_t base) {
-    s_offsets.frame_game_time      = reinterpret_cast<double*>(base + X4_RVA_FRAME_GAME_TIME);
-    s_offsets.frame_raw_time       = reinterpret_cast<double*>(base + X4_RVA_FRAME_RAW_TIME);
-    s_offsets.frame_real_time      = reinterpret_cast<double*>(base + X4_RVA_FRAME_REAL_TIME);
-    s_offsets.frame_speed_mult     = reinterpret_cast<double*>(base + X4_RVA_FRAME_SPEED_MULT);
-    s_offsets.component_registry   = reinterpret_cast<void*>(base + X4_RVA_COMPONENT_REGISTRY);
-    s_offsets.game_universe        = reinterpret_cast<void*>(base + X4_RVA_GAME_UNIVERSE);
-    s_offsets.session_seed         = reinterpret_cast<uint64_t*>(base + X4_RVA_SESSION_SEED);
-    s_offsets.construction_plan_db = reinterpret_cast<void*>(base + X4_RVA_CONSTRUCTION_PLAN_DB);
-    s_offsets.macro_registry       = reinterpret_cast<void*>(base + X4_RVA_MACRO_REGISTRY);
-    s_offsets.radar_event_vtable   = reinterpret_cast<void*>(base + X4_RADAR_EVENT_VTABLE_RVA);
+static void resolve_offset_pointers(uintptr_t base)
+{
+    s_offsets.frame_game_time      = reinterpret_cast<double *>(base + X4_RVA_FRAME_GAME_TIME);
+    s_offsets.frame_raw_time       = reinterpret_cast<double *>(base + X4_RVA_FRAME_RAW_TIME);
+    s_offsets.frame_real_time      = reinterpret_cast<double *>(base + X4_RVA_FRAME_REAL_TIME);
+    s_offsets.frame_speed_mult     = reinterpret_cast<double *>(base + X4_RVA_FRAME_SPEED_MULT);
+    s_offsets.component_registry   = reinterpret_cast<void *>(base + X4_RVA_COMPONENT_REGISTRY);
+    s_offsets.game_universe        = reinterpret_cast<void *>(base + X4_RVA_GAME_UNIVERSE);
+    s_offsets.session_seed         = reinterpret_cast<uint64_t *>(base + X4_RVA_SESSION_SEED);
+    s_offsets.construction_plan_db = reinterpret_cast<void *>(base + X4_RVA_CONSTRUCTION_PLAN_DB);
+    s_offsets.macro_registry       = reinterpret_cast<void *>(base + X4_RVA_MACRO_REGISTRY);
+    s_offsets.radar_event_vtable   = reinterpret_cast<void *>(base + X4_RADAR_EVENT_VTABLE_RVA);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,12 +161,13 @@ static void resolve_offset_pointers(uintptr_t base) {
 // Reads timing data from known game globals (verified v9.00 build 900).
 // See docs/rev/GAME_LOOP.md for reverse engineering notes.
 
-static uintptr_t g_x4_base = 0;
-static void*     g_frame_tick_trampoline = nullptr;
+static uintptr_t g_x4_base               = 0;
+static void     *g_frame_tick_trampoline = nullptr;
 
-using FrameTickFn = void(__fastcall*)(void*, bool);
+using FrameTickFn = void(__fastcall *)(void *, bool);
 
-static void __fastcall frame_tick_detour(void* engineCtx, bool isSuspended) {
+static void __fastcall frame_tick_detour(void *engineCtx, bool isSuspended)
+{
     // Snapshot raw_time before the original runs
     double raw_time_before = *s_offsets.frame_raw_time;
 
@@ -176,20 +176,20 @@ static void __fastcall frame_tick_detour(void* engineCtx, bool isSuspended) {
 
     // Compute delta from the engine's own raw time accumulation
     double raw_time_after = *s_offsets.frame_raw_time;
-    double delta = raw_time_after - raw_time_before;
-    if (delta < 0.0) delta = 0.0;
+    double delta          = std::max(0.0, raw_time_after - raw_time_before);
 
     // Build event payload
-    X4NativeFrameUpdate update{};
-    update.delta            = delta;
-    update.game_time        = *s_offsets.frame_game_time;
-    update.real_time        = *s_offsets.frame_real_time;
-    update.fps              = *(float*)((uintptr_t)engineCtx + s_offsets.enginectx_fps);
-    update.speed_multiplier = (float)*s_offsets.frame_speed_mult;
-    update.is_suspended     = isSuspended;
-    update.frame_counter    = *(int*)((uintptr_t)engineCtx + s_offsets.enginectx_frame_counter);
+    X4NativeFrameUpdate update = {
+        .delta            = delta,
+        .game_time        = *s_offsets.frame_game_time,
+        .real_time        = *s_offsets.frame_real_time,
+        .fps              = *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(engineCtx) + s_offsets.enginectx_fps),
+        .speed_multiplier = static_cast<float>(*s_offsets.frame_speed_mult),
+        .is_suspended     = isSuspended,
+        .frame_counter    = *reinterpret_cast<int *>(reinterpret_cast<uintptr_t>(engineCtx) + s_offsets.enginectx_frame_counter),
+    };
 
-    auto* table = x4n::GameAPI::table();
+    auto *table        = x4n::GameAPI::table();
     update.game_paused = (table && table->IsGamePaused) ? table->IsGamePaused() : false;
 
     // Check for extension DLL changes and reload any that have autoreload enabled.
@@ -200,15 +200,17 @@ static void __fastcall frame_tick_detour(void* engineCtx, bool isSuspended) {
     x4n::EventSystem::fire("on_native_frame_update", &update);
 }
 
-static bool install_frame_tick_hook() {
-    void* target = x4n::GameAPI::get_internal("X4_FrameTick");
+static bool install_frame_tick_hook()
+{
+    void *target = x4n::GameAPI::get_internal("X4_FrameTick");
     if (!target) {
         x4n::Logger::warn("Native frame hook: X4_FrameTick not resolved (missing RVA for this build?)");
         return false;
     }
 
     g_x4_base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
-    if (!g_x4_base) return false;
+    if (!g_x4_base)
+        return false;
 
     MH_STATUS status = MH_CreateHook(target, &frame_tick_detour, &g_frame_tick_trampoline);
     if (status != MH_OK) {
@@ -227,8 +229,9 @@ static bool install_frame_tick_hook() {
     return true;
 }
 
-static void remove_frame_tick_hook() {
-    void* target = x4n::GameAPI::get_internal("X4_FrameTick");
+static void remove_frame_tick_hook()
+{
+    void *target = x4n::GameAPI::get_internal("X4_FrameTick");
     if (target && g_frame_tick_trampoline) {
         MH_DisableHook(target);
         MH_RemoveHook(target);
@@ -247,26 +250,29 @@ static void remove_frame_tick_hook() {
 // The original function creates a RadarVisibilityChangedEvent object; we
 // read entity_id and visible from it after it returns.
 
-static void* g_radar_event_trampoline = nullptr;
+static void *g_radar_event_trampoline = nullptr;
 
-using RadarEventBuildFn = void*(__fastcall*)(void*);
+static void *__fastcall radar_event_detour(void *property_data)
+{
+    using RadarEventBuildFn = void *(__fastcall *)(void *);
 
-static void* __fastcall radar_event_detour(void* property_data) {
     // Call original — creates the event object
-    void* event = reinterpret_cast<RadarEventBuildFn>(g_radar_event_trampoline)(property_data);
+    void *event = reinterpret_cast<RadarEventBuildFn>(g_radar_event_trampoline)(property_data);
     if (!event) return event;
 
     // Read event payload
     auto addr = reinterpret_cast<uintptr_t>(event);
-    X4RadarChangedEvent payload{};
-    payload.entity_id = *reinterpret_cast<uint64_t*>(addr + s_offsets.radar_event_entity_id);
-    payload.visible   = *reinterpret_cast<uint8_t*>(addr + s_offsets.radar_event_visible);
+    X4RadarChangedEvent payload{
+        .entity_id = *reinterpret_cast<uint64_t *>(addr + s_offsets.radar_event_entity_id),
+        .visible   = *reinterpret_cast<uint8_t *>(addr + s_offsets.radar_event_visible),
+    };
 
     x4n::EventSystem::fire("on_radar_changed", &payload);
     return event;
 }
 
-static bool install_radar_visibility_hook() {
+static bool install_radar_visibility_hook()
+{
     void* target = x4n::GameAPI::get_internal("RadarVisibilityChanged_BuildEvent");
     if (!target) {
         x4n::Logger::warn("Radar visibility hook: RadarVisibilityChanged_BuildEvent not resolved (missing RVA for this build?)");
@@ -291,7 +297,7 @@ static bool install_radar_visibility_hook() {
 }
 
 static void remove_radar_visibility_hook() {
-    void* target = x4n::GameAPI::get_internal("RadarVisibilityChanged_BuildEvent");
+    void *target = x4n::GameAPI::get_internal("RadarVisibilityChanged_BuildEvent");
     if (target && g_radar_event_trampoline) {
         MH_DisableHook(target);
         MH_RemoveHook(target);
@@ -305,51 +311,48 @@ static void remove_radar_visibility_hook() {
 // MinHook detour on EventQueue_InsertOrDispatch. O(1) dispatch via flat
 // arrays indexed by type_id. Extensions subscribe via on_md_before/after().
 
-static void* g_md_event_trampoline = nullptr;
+static void *g_md_event_trampoline = nullptr;
 
-static void __fastcall md_event_dispatch_detour(
-    void* event_source, void* event_object, double timestamp, char immediate)
+static void __fastcall md_event_dispatch_detour(void *event_source, void *event_object, double timestamp, char immediate)
 {
     uint32_t type_id = UINT32_MAX;
 
     if (event_object) {
         // Read type ID from vtable[1]: always `B8 imm32 C3` (mov eax, imm32; ret)
         __try {
-            auto vtable = *reinterpret_cast<void***>(event_object);
-            auto fn_bytes = reinterpret_cast<uint8_t*>(vtable[1]);
-            if (fn_bytes[0] == 0xB8 && fn_bytes[5] == 0xC3) {
-                type_id = *reinterpret_cast<uint32_t*>(fn_bytes + 1);
-            }
-        } __except(EXCEPTION_EXECUTE_HANDLER) {
+            auto vtable   = *static_cast<void ***>(event_object);
+            auto fn_bytes = static_cast<uint8_t *>(vtable[1]);
+            if (fn_bytes[0] == 0xB8 && fn_bytes[5] == 0xC3)
+                type_id = *reinterpret_cast<uint32_t *>(fn_bytes + 1);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
             type_id = UINT32_MAX;
         }
     }
 
     // Fire before-subscribers
     if (type_id < x4n::EventSystem::MAX_MD_TYPE) {
-        uint64_t source_id = event_source ?
-            *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(event_source) + 8) : 0;
+        uint64_t source_id = event_source
+            ? *reinterpret_cast<uint64_t *>(reinterpret_cast<uintptr_t>(event_source) + 8) : 0;
         X4MdEvent payload{type_id, source_id, timestamp, event_object};
         x4n::EventSystem::md_fire_before(type_id, &payload);
     }
 
     // Original dispatch — MD cue listeners fire here
-    using OrigFn = void(__fastcall*)(void*, void*, double, char);
-    reinterpret_cast<OrigFn>(g_md_event_trampoline)(
-        event_source, event_object, timestamp, immediate);
+    using OrigFn = void(__fastcall *)(void *, void *, double, char);
+    reinterpret_cast<OrigFn>(g_md_event_trampoline)(event_source, event_object, timestamp, immediate);
 
     // Fire after-subscribers
     if (type_id < x4n::EventSystem::MAX_MD_TYPE) {
-        uint64_t source_id = event_source ?
-            *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(event_source) + 8) : 0;
+        uint64_t  source_id = event_source ? *reinterpret_cast<uint64_t *>(reinterpret_cast<uintptr_t>(event_source) + 8) : 0;
         X4MdEvent payload{type_id, source_id, timestamp, event_object};
         x4n::EventSystem::md_fire_after(type_id, &payload);
     }
 }
 
-static bool install_md_event_hook() {
-    auto* table = x4n::GameAPI::table();
-    void* target = table ? reinterpret_cast<void*>(table->EventQueue_InsertOrDispatch) : nullptr;
+static bool install_md_event_hook()
+{
+    auto *table  = x4n::GameAPI::table();
+    void *target = table ? reinterpret_cast<void *>(table->EventQueue_InsertOrDispatch) : nullptr;
     if (!target) {
         x4n::Logger::warn("MD event hook: EventQueue_InsertOrDispatch not resolved (missing RVA for this build?)");
         return false;
@@ -368,14 +371,14 @@ static bool install_md_event_hook() {
         return false;
     }
 
-    x4n::Logger::info("MD event hook installed (on_md_before/on_md_after, {} type slots)",
-                      x4n::EventSystem::MAX_MD_TYPE);
+    x4n::Logger::info("MD event hook installed (on_md_before/on_md_after, {} type slots)", x4n::EventSystem::MAX_MD_TYPE);
     return true;
 }
 
-static void remove_md_event_hook() {
-    auto* table = x4n::GameAPI::table();
-    void* target = table ? reinterpret_cast<void*>(table->EventQueue_InsertOrDispatch) : nullptr;
+static void remove_md_event_hook()
+{
+    auto *table  = x4n::GameAPI::table();
+    void *target = table ? reinterpret_cast<void *>(table->EventQueue_InsertOrDispatch) : nullptr;
     if (target && g_md_event_trampoline) {
         MH_DisableHook(target);
         MH_RemoveHook(target);
@@ -388,34 +391,41 @@ static void remove_md_event_hook() {
 // Dispatch implementations (called by proxy via function pointers)
 // ---------------------------------------------------------------------------
 
-static void impl_discover_extensions() {
+static void impl_discover_extensions()
+{
     x4n::ExtensionManager::discover();
     x4n::ExtensionManager::load_all();
 }
 
-static void impl_raise_event(const char* event_name, const char* param) {
-    x4n::EventSystem::fire(event_name, const_cast<char*>(param));
+static void impl_raise_event(char const *event_name, char const *param)
+{
+    x4n::EventSystem::fire(event_name, const_cast<char *>(param));
 }
 
-static const char* impl_get_version() {
+static char const *impl_get_version()
+{
     return g_version_string.c_str();
 }
 
-static const char* impl_get_loaded_extensions() {
+static char const *impl_get_loaded_extensions()
+{
     return x4n::ExtensionManager::loaded_extensions_json();
 }
 
-static void impl_set_lua_state(void* L) {
+static void impl_set_lua_state(void *L)
+{
     g_lua = L;
     x4n::Logger::info("Lua state updated (UI reload)");
 }
 
-static void impl_log(int level, const char* message) {
+static void impl_log(int level, char const *message)
+{
     auto lv = static_cast<x4n::LogLevel>(level);
     x4n::Logger::write(lv, message);
 }
 
-static void impl_prepare_reload() {
+static void impl_prepare_reload()
+{
     x4n::Logger::info("Preparing for core hot-reload...");
     x4n::EventSystem::fire("on_before_reload");
     x4n::ExtensionManager::shutdown();
@@ -425,7 +435,8 @@ static void impl_prepare_reload() {
     x4n::HookManager::remove_all();
 }
 
-static void impl_shutdown() {
+static void impl_shutdown()
+{
     x4n::Logger::info("Core shutting down...");
     x4n::ExtensionManager::shutdown();
     x4n::SettingsManager::shutdown();
@@ -438,14 +449,20 @@ static void impl_shutdown() {
     x4n::Logger::shutdown();
 }
 
-static int impl_enumerate_settings(const char* ext_id, const SettingInfo** out) {
-    if (!ext_id) { if (out) *out = nullptr; return 0; }
+static int impl_enumerate_settings(char const *ext_id, SettingInfo const **out)
+{
+    if (!ext_id) {
+        if (out)
+            *out = nullptr;
+        return 0;
+    }
     return x4n::SettingsManager::enumerate(ext_id, out);
 }
 
-static void impl_set_extension_setting(const char* ext_id, const char* key,
-                                       const SettingValueC* value) {
-    if (!ext_id || !key || !value) return;
+static void impl_set_extension_setting(char const *ext_id, char const *key, SettingValueC const *value)
+{
+    if (!ext_id || !key || !value)
+        return;
     x4n::SettingsManager::set_from_abi(ext_id, key, *value);
 }
 
@@ -454,7 +471,8 @@ static void impl_set_extension_setting(const char* ext_id, const char* key,
 // ---------------------------------------------------------------------------
 
 extern "C" __declspec(dllexport)
-int core_init(CoreInitContext* ctx) {
+int core_init(CoreInitContext const *ctx)
+{
     g_lua      = ctx->lua_state;
     g_ext_root = ctx->ext_root;
 
@@ -475,8 +493,7 @@ int core_init(CoreInitContext* ctx) {
 
     // 4. Game API — resolve X4.exe function pointers
     x4n::GameAPI::init();
-    x4n::GameAPI::load_internal_db(g_ext_root, X4_GAME_VERSION_LABEL,
-                                    std::to_string(X4_GAME_TYPES_BUILD));
+    x4n::GameAPI::load_internal_db(g_ext_root, X4_GAME_VERSION_LABEL, std::to_string(X4_GAME_TYPES_BUILD));
 
     // 5. Logger — open file sink in <profile>\x4native\x4native.log and
     //    flush the buffer produced by steps 1-4.
@@ -498,16 +515,18 @@ int core_init(CoreInitContext* ctx) {
     install_md_event_hook();
 
     // 6. Extension manager
-    g_raise_lua_event = ctx->raise_lua_event;
+    g_raise_lua_event     = ctx->raise_lua_event;
     g_register_lua_bridge = ctx->register_lua_bridge;
-    g_stash_set    = ctx->stash_set;
-    g_stash_get    = ctx->stash_get;
-    g_stash_remove = ctx->stash_remove;
-    g_stash_clear  = ctx->stash_clear;
-    x4n::ExtensionManager::init(g_ext_root, g_game_version,
-                                g_raise_lua_event, g_register_lua_bridge,
-                                g_stash_set, g_stash_get,
-                                g_stash_remove, g_stash_clear);
+    g_stash_set           = ctx->stash_set;
+    g_stash_get           = ctx->stash_get;
+    g_stash_remove        = ctx->stash_remove;
+    g_stash_clear         = ctx->stash_clear;
+    x4n::ExtensionManager::init(
+        g_ext_root, g_game_version,
+        g_raise_lua_event, g_register_lua_bridge,
+        g_stash_set, g_stash_get,
+        g_stash_remove, g_stash_clear
+    );
 
     // 6. Fill the proxy's dispatch table
     ctx->dispatch->discover_extensions    = impl_discover_extensions;
@@ -526,13 +545,16 @@ int core_init(CoreInitContext* ctx) {
 }
 
 extern "C" __declspec(dllexport)
-void core_shutdown() {
+void core_shutdown()
+{
     impl_shutdown();
 }
 
 // ---------------------------------------------------------------------------
 // DllMain — intentionally minimal
 // ---------------------------------------------------------------------------
-BOOL APIENTRY DllMain(HMODULE, DWORD, LPVOID) {
+extern BOOL WINAPI DllMain(_In_ HINSTANCE hinstDll, _In_ DWORD fdwReason, _In_ LPVOID lpvReserved);
+BOOL WINAPI DllMain(_In_ HINSTANCE, _In_ DWORD, _In_ LPVOID)
+{
     return TRUE;
 }

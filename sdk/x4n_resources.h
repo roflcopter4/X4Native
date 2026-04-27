@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-namespace x4n { namespace resources {
+namespace x4n::resources {
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -38,9 +38,9 @@ namespace x4n { namespace resources {
 /// Per-ware accumulated resource data for a sector.
 /// Aggregated from all ResourceArea children sharing the same ware type.
 struct SectorResource {
-    std::string ware;       ///< Ware ID (e.g. "ore", "hydrogen", "silicon").
-    int64_t     yield;      ///< Total current yield across all resource areas.
-    int64_t     max_yield;  ///< Total max yield across all resource areas.
+    std::string ware;      ///< Ware ID (e.g. "ore", "hydrogen", "silicon").
+    int64_t     yield;     ///< Total current yield across all resource areas.
+    int64_t     max_yield; ///< Total max yield across all resource areas.
 
     /// Individual resource areas for this ware. Read-only, valid for current frame.
     /// Access per-area details via ra->definition (rating, gather speed, respawn, etc.).
@@ -53,21 +53,21 @@ struct SectorResource {
 namespace detail {
 
 struct RawAccum {
-    const char* ware;       // game-owned pointer (WareClass name)
-    int64_t     yield;
-    int64_t     max_yield;
+    const char*ware;       // game-owned pointer (WareClass name)
+    int64_t    yield;
+    int64_t    max_yield;
 };
 
 struct RawAreaRef {
-    uint32_t                accum_idx;
-    const X4ResourceArea*   ra;
+    uint32_t             accum_idx;
+    const X4ResourceArea*ra;
 };
 
 /// SEH-guarded collection. Returns count of ware entries in accum_buf.
 inline uint32_t collect_raw(
     UniverseID sector_id,
-    RawAccum* accum_buf, uint32_t max_wares,
-    RawAreaRef* area_buf, uint32_t max_areas, uint32_t* area_count)
+    RawAccum*  accum_buf, uint32_t max_wares,
+    RawAreaRef*area_buf, uint32_t  max_areas, uint32_t* area_count)
 {
     *area_count = 0;
     if (!accum_buf || max_wares == 0) return 0;
@@ -77,9 +77,9 @@ inline uint32_t collect_raw(
         if (!sector) return 0;
         if (!entity::is_a(sector, x4n::GameClass::Sector)) return 0;
 
-        auto base = reinterpret_cast<uintptr_t>(sector);
-        auto** begin = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_begin);
-        auto** end   = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_end);
+        auto  base  = reinterpret_cast<uintptr_t>(sector);
+        auto**begin = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_begin);
+        auto**end   = *reinterpret_cast<X4EntityBase***>(base + x4n::detail::offsets()->sector_resarea_vec_end);
         if (!begin || begin >= end) return 0;
 
         uint32_t wcount = 0;
@@ -88,8 +88,8 @@ inline uint32_t collect_raw(
             auto* ent = *it;
             if (!ent || !ent->id) continue;
 
-            auto* ra  = static_cast<X4ResourceArea*>(ent);
-            auto* def = ra->definition;
+            auto*ra  = static_cast<X4ResourceArea*>(ent);
+            auto*def = ra->definition;
             if (!def || !def->ware_class) continue;
 
             const char* name = def->ware_class->name();
@@ -148,11 +148,11 @@ inline std::vector<SectorResource> get_sector_resources(UniverseID sector_id)
     constexpr uint32_t MAX_WARES = 16;
     constexpr uint32_t MAX_AREAS = 256;
 
-    detail::RawAccum accum[MAX_WARES];
+    detail::RawAccum   accum[MAX_WARES];
     detail::RawAreaRef areas[MAX_AREAS];
-    uint32_t area_count = 0;
-    uint32_t n = detail::collect_raw(sector_id, accum, MAX_WARES,
-                                     areas, MAX_AREAS, &area_count);
+    uint32_t           area_count = 0;
+    uint32_t           n          = detail::collect_raw(sector_id, accum, MAX_WARES,
+                                                        areas, MAX_AREAS, &area_count);
 
     std::vector<SectorResource> results;
     results.reserve(n);
@@ -175,4 +175,4 @@ inline std::vector<SectorResource> get_sector_resources(UniverseID sector_id)
     return results;
 }
 
-}} // namespace x4n::resources
+} // namespace x4n::resources

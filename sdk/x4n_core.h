@@ -34,41 +34,44 @@ namespace x4n {
 // ---------------------------------------------------------------------------
 namespace detail {
 
-    // API pointer set by X4N_EXTENSION macro during x4native_init()
-    inline X4NativeAPI* g_api = nullptr;
+// API pointer set by X4N_EXTENSION macro during x4native_init()
+inline X4NativeAPI *g_api = nullptr;
 
-    // Trampoline: adapts void() callback to X4NativeEventCallback signature
-    inline void trampoline_void(const char*, void*, void* ud) {
-        reinterpret_cast<void(*)()>(ud)();
-    }
+// Trampoline: adapts void() callback to X4NativeEventCallback signature
+inline void trampoline_void(char const *, void *, void *ud)
+{
+    reinterpret_cast<void (*)()>(ud)();
+}
 
-    // Trampoline: adapts void(void*) callback to X4NativeEventCallback signature
-    inline void trampoline_data(const char*, void* data, void* ud) {
-        reinterpret_cast<void(*)(void*)>(ud)(data);
-    }
+// Trampoline: adapts void(void*) callback to X4NativeEventCallback signature
+inline void trampoline_data(char const *, void *data, void *ud)
+{
+    reinterpret_cast<void (*)(void *)>(ud)(data);
+}
 
-    // Trampoline: adapts void(const X4NativeFrameUpdate*) for native frame update events
-    inline void trampoline_frame_update(const char*, void* data, void* ud) {
-        reinterpret_cast<void(*)(const X4NativeFrameUpdate*)>(ud)(
-            static_cast<const X4NativeFrameUpdate*>(data));
-    }
+// Trampoline: adapts void(const X4NativeFrameUpdate*) for native frame update events
+inline void trampoline_frame_update(char const *, void *data, void *ud)
+{
+    reinterpret_cast<void (*)(X4NativeFrameUpdate const *)>(ud)(static_cast<X4NativeFrameUpdate const *>(data));
+}
 
-    // Trampoline: adapts void(const char*) callback for string event params
-    inline void trampoline_str(const char*, void* data, void* ud) {
-        reinterpret_cast<void(*)(const char*)>(ud)(
-            static_cast<const char*>(data));
-    }
+// Trampoline: adapts void(const char*) callback for string event params
+inline void trampoline_str(char const *, void *data, void *ud)
+{
+    reinterpret_cast<void (*)(char const *)>(ud)(static_cast<char const *>(data));
+}
 
-    // [OBSOLETE] Use x4n::md::on_radar_visibility_changed_before() instead.
-    inline void trampoline_radar_changed(const char*, void* data, void* ud) {
-        reinterpret_cast<void(*)(const X4RadarChangedEvent*)>(ud)(
-            static_cast<const X4RadarChangedEvent*>(data));
-    }
+// [OBSOLETE] Use x4n::md::on_radar_visibility_changed_before() instead.
+inline void trampoline_radar_changed(char const *, void *data, void *ud)
+{
+    reinterpret_cast<void (*)(X4RadarChangedEvent const *)>(ud)(static_cast<X4RadarChangedEvent const *>(data));
+}
 
-    // Runtime-resolved game offsets — internal, used by SDK inline functions.
-    inline const X4GameOffsets* offsets() {
-        return static_cast<const X4GameOffsets*>(g_api->offsets);
-    }
+// Runtime-resolved game offsets — internal, used by SDK inline functions.
+inline X4GameOffsets const *offsets()
+{
+    return static_cast<X4GameOffsets const *>(g_api->offsets);
+}
 
 } // namespace detail
 
@@ -77,17 +80,20 @@ namespace detail {
 // ---------------------------------------------------------------------------
 
 /// Typed game function table (exported + internal entries).
-inline X4GameFunctions* game() {
+inline X4GameFunctions *game()
+{
     return detail::g_api->game;
 }
 
 /// Named lookup for any exported function (returns NULL if not found).
-inline void* game_fn(const char* name) {
+inline void *game_fn(char const *name)
+{
     return detail::g_api->get_game_function(name);
 }
 
 /// Resolve a non-exported (internal) game function by name.
-inline void* game_internal(const char* name) {
+inline void *game_internal(char const *name)
+{
     return detail::g_api->resolve_internal(name);
 }
 
@@ -96,13 +102,13 @@ inline void* game_internal(const char* name) {
 // ---------------------------------------------------------------------------
 
 /// Game version string (e.g. "9.00")
-inline const char* game_version() { return detail::g_api->get_game_version(); }
+inline char const *game_version() { return detail::g_api->get_game_version(); }
 
 /// X4Native framework version string
-inline const char* version() { return detail::g_api->get_x4native_version(); }
+inline char const *version() { return detail::g_api->get_x4native_version(); }
 
 /// Absolute path to the calling extension's folder
-inline const char* path() { return detail::g_api->extension_path; }
+inline char const *path() { return detail::g_api->extension_path; }
 
 /// X4.exe image base address. Use for resolving global RVAs:
 ///   auto ptr = *reinterpret_cast<void**>(x4n::exe_base() + MY_RVA);

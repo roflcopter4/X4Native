@@ -23,47 +23,51 @@
 #include "x4n_resources.h"
 #include <cstdint>
 
-namespace x4n { namespace sector {
+#pragma push_macro("ND")
+#define ND [[nodiscard]]
+
+namespace x4n::sector {
 
 /// Lightweight typed handle for a sector entity.
 /// Constructor validates the entity is a Sector.
-class Sector {
-    UniverseID   id_;
-    X4Component* comp_;
-
-public:
+class Sector : public entity::ComponentEntity
+{
+  public:
     explicit Sector(UniverseID id)
-        : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_a(comp_, GameClass::Sector))
-            comp_ = nullptr;
-    }
-
-    bool valid() const { return comp_ != nullptr; }
-    UniverseID id() const { return id_; }
-    X4Component* component() const { return comp_; }
+        : ComponentEntity(id, GameClass::Sector)
+    {}
 
     /// Sunlight intensity from the parent cluster (Space+0x368).
     /// Walks parent chain to find a Space entity with the sunlight flag.
     /// Returns -1.0 if not available.
     /// @verified v9.00 build 604402 (IDA: sub_1407B51D0 sunlight getter)
-    float sunlight() const {
-        if (!valid()) return -1.0f;
-        auto* cur = reinterpret_cast<const X4Component*>(comp_->parent);
+    ND float sunlight() const
+    {
+        if (!valid())
+            return -1.0f;
+        auto *cur = static_cast<X4Component const *>(component()->parent);
         while (cur) {
-            auto p = reinterpret_cast<uintptr_t>(cur);
-            if (*reinterpret_cast<const uint8_t*>(p + detail::offsets()->space_has_sunlight))
-                return static_cast<float>(*reinterpret_cast<const double*>(p + detail::offsets()->space_sunlight));
-            cur = reinterpret_cast<const X4Component*>(cur->parent);
+            auto p = reinterpret_cast<uint8_t const *>(cur);
+            if (*(p + detail::offsets()->space_has_sunlight)) {
+                double val;
+                memcpy(&val, p + detail::offsets()->space_sunlight, sizeof val);
+                return static_cast<float>(val);
+            }
+            cur = static_cast<X4Component const *>(cur->parent);
         }
         return -1.0f;
     }
 
     /// All resource data for this sector (unfiltered, with per-area pointers).
     /// Area pointers valid for current frame only.
-    std::vector<resources::SectorResource> resources() const {
-        if (!comp_) return {};
+    ND std::vector<resources::SectorResource> resources() const
+    {
+        if (!valid())
+            return {};
         return resources::get_sector_resources(id_);
     }
 };
 
-}} // namespace x4n::sector
+} // namespace x4n::sector
+
+#pragma pop_macro("ND")

@@ -1,3 +1,4 @@
+#include "Common.h"
 #include "extension_manager.h"
 #include "logger.h"
 #include "event_system.h"
@@ -17,6 +18,7 @@ extern X4GameOffsets s_offsets;
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <ranges>
 #include <regex>
 
 namespace fs = std::filesystem;
@@ -24,45 +26,52 @@ using json = nlohmann::json;
 
 namespace x4n {
 
+using raise_lua_event_fn     = int (*)(char const *, char const *);
+using register_lua_bridge_fn = int (*)(char const *, char const *);
+
 std::vector<ExtensionInfo> ExtensionManager::s_extensions;
 std::string ExtensionManager::s_ext_root;
 std::string ExtensionManager::s_game_version;
-int  ExtensionManager::s_tick_frame    = 0;
-bool ExtensionManager::s_any_autoreload = false;
-static int (*s_raise_lua_event)(const char*, const char*) = nullptr;
-static int (*s_register_lua_bridge)(const char*, const char*) = nullptr;
-static stash_set_fn    s_stash_set    = nullptr;
-static stash_get_fn    s_stash_get    = nullptr;
-static stash_remove_fn s_stash_remove = nullptr;
-static stash_clear_fn  s_stash_clear  = nullptr;
+int         ExtensionManager::s_tick_frame     = 0;
+bool        ExtensionManager::s_any_autoreload = false;
+
+static raise_lua_event_fn     s_raise_lua_event     = nullptr;
+static register_lua_bridge_fn s_register_lua_bridge = nullptr;
+static stash_set_fn           s_stash_set           = nullptr;
+static stash_get_fn           s_stash_get           = nullptr;
+static stash_remove_fn        s_stash_remove        = nullptr;
+static stash_clear_fn         s_stash_clear         = nullptr;
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-void ExtensionManager::init(const std::string& ext_root, const std::string& game_version,
-                            int (*raise_lua_event)(const char*, const char*),
-                            int (*register_lua_bridge)(const char*, const char*),
-                            stash_set_fn stash_set,
-                            stash_get_fn stash_get,
-                            stash_remove_fn stash_remove,
-                            stash_clear_fn stash_clear) {
-    s_ext_root = ext_root;
-    s_game_version = game_version;
-    s_raise_lua_event = raise_lua_event;
+void ExtensionManager::init(
+    std::string const     &ext_root,
+    std::string const     &game_version,
+    raise_lua_event_fn     raise_lua_event,
+    register_lua_bridge_fn register_lua_bridge,
+    stash_set_fn           stash_set,
+    stash_get_fn           stash_get,
+    stash_remove_fn        stash_remove,
+    stash_clear_fn         stash_clear)
+{
+    s_ext_root            = ext_root;
+    s_game_version        = game_version;
+    s_raise_lua_event     = raise_lua_event;
     s_register_lua_bridge = register_lua_bridge;
-    s_stash_set    = stash_set;
-    s_stash_get    = stash_get;
-    s_stash_remove = stash_remove;
-    s_stash_clear  = stash_clear;
+    s_stash_set           = stash_set;
+    s_stash_get           = stash_get;
+    s_stash_remove        = stash_remove;
+    s_stash_clear         = stash_clear;
     s_extensions.clear();
 }
 
-void ExtensionManager::shutdown() {
+void ExtensionManager::shutdown()
+{
     // Unload in reverse priority order (reverse of load order)
-    for (auto it = s_extensions.rbegin(); it != s_extensions.rend(); ++it) {
-        unload_extension(*it);
-    }
+    for (ExtensionInfo &extension : std::ranges::reverse_view(s_extensions))
+        unload_extension(extension);
     s_extensions.clear();
     s_any_autoreload = false;
     s_tick_frame     = 0;
@@ -97,7 +106,7 @@ void ExtensionManager::discover() {
 
     Logger::info("Scanning for native extensions in: {}", extensions_dir.string());
 
-    for (const auto& entry : fs::directory_iterator(extensions_dir)) {
+    for (auto const & entry : fs::directory_iterator(extensions_dir)) {
         if (!entry.is_directory()) continue;
 
         // Skip ourselves
@@ -119,9 +128,9 @@ void ExtensionManager::discover() {
                 std::ifstream xml_file(content_xml);
                 std::string xml_content((std::istreambuf_iterator<char>(xml_file)),
                                          std::istreambuf_iterator<char>());
-                static const std::regex id_re  (R"xml(<content\b[^>]*\bid="([^"]+)")xml");
-                static const std::regex name_re(R"xml(<content\b[^>]*\bname="([^"]+)")xml");
-                std::smatch m;
+                static std::regex const id_re  (R"xml(<content\b[^>]*\bid="([^"]+)")xml");
+                static std::regex const name_re(R"xml(<content\b[^>]*\bname="([^"]+)")xml");
+                std::smatch             m;
                 if (std::regex_search(xml_content, m, id_re))
                     info.extension_id = m[1].str();
                 if (std::regex_search(xml_content, m, name_re))
@@ -163,7 +172,7 @@ void ExtensionManager::discover() {
 
     // Sort by priority (lower = loads first)
     std::sort(s_extensions.begin(), s_extensions.end(),
-              [](const ExtensionInfo& a, const ExtensionInfo& b) {
+              [](ExtensionInfo const & a, ExtensionInfo const & b) {
                   return a.priority < b.priority;
               });
 
@@ -174,7 +183,7 @@ void ExtensionManager::discover() {
 // Config parsing
 // ---------------------------------------------------------------------------
 
-bool ExtensionManager::parse_config(const std::string& json_path, ExtensionInfo& info) {
+bool ExtensionManager::parse_config(std::string const & json_path, ExtensionInfo& info) {
     std::ifstream file(json_path);
     if (!file.is_open()) {
         Logger::warn("Cannot open config: {}", json_path);
@@ -184,7 +193,7 @@ bool ExtensionManager::parse_config(const std::string& json_path, ExtensionInfo&
     json cfg;
     try {
         file >> cfg;
-    } catch (const json::parse_error& e) {
+    } catch (json::parse_error const & e) {
         Logger::error("JSON parse error in {}: {}", json_path, e.what());
         return false;
     }
@@ -241,7 +250,7 @@ static std::pair<X4NativeAPI*, ExtensionInfo*> resolve_ext(void* api_ptr) {
 
 // api_log_ext — routes x4n::log::info/warn/etc. to the extension's own log file.
 // Falls back to the global framework log if the handle is not set.
-static void api_log_ext(int level, const char* message, void* api_ptr) {
+static void api_log_ext(int level, char const * message, void* api_ptr) {
     auto lv = static_cast<x4n::LogLevel>(level);
     auto [api, _] = resolve_ext(api_ptr);
     if (api) {
@@ -258,7 +267,7 @@ static void api_log_ext(int level, const char* message, void* api_ptr) {
 // the extension's default log. Filename is relative to the extension's
 // subfolder (<profile>\x4native\<ext_id>\) — absolute paths and traversal
 // are rejected.
-static void api_init_log(const char* filename, void* api_ptr) {
+static void api_init_log(char const * filename, void* api_ptr) {
     auto [api, ext] = resolve_ext(api_ptr);
     if (!ext) return;
 
@@ -308,8 +317,8 @@ static void api_init_log(const char* filename, void* api_ptr) {
 // record, closes. Author-provided nested paths are allowed (intermediate
 // subfolders are created on first write) but absolute paths and `..`
 // segments are rejected — all writes stay inside the per-extension subfolder.
-static void api_log_named(int level, const char* message,
-                           const char* filename, void* api_ptr) {
+static void api_log_named(int level, char const *message, char const *filename, void *api_ptr)
+{
     if (!filename || !filename[0]) {
         api_log_ext(level, message, api_ptr);
         return;
@@ -360,11 +369,11 @@ void ExtensionManager::load_all() {
             Logger::error("Failed to load extension: {}", ext.display_name);
     }
     s_any_autoreload = std::any_of(s_extensions.begin(), s_extensions.end(),
-                                   [](const ExtensionInfo& e) { return e.autoreload && e.initialized; });
+                                   [](ExtensionInfo const & e) { return e.autoreload && e.initialized; });
     if (s_any_autoreload)
         Logger::info("Autoreload: watching {} extension(s) for DLL changes",
                      std::count_if(s_extensions.begin(), s_extensions.end(),
-                                   [](const ExtensionInfo& e) { return e.autoreload && e.initialized; }));
+                                   [](ExtensionInfo const & e) { return e.autoreload && e.initialized; }));
 }
 
 // SEH wrappers — must be in separate functions (no C++ objects requiring unwinding)
@@ -512,7 +521,7 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
                              + " (" + ext.extension_id + ")");
             // Flush warnings buffered during discovery (pre-log) so the
             // extension author sees them at the top of their own log.
-            for (const auto& [lv, msg] : ext.pending_warnings)
+            for (auto const & [lv, msg] : ext.pending_warnings)
                 Logger::write_to(ext.log_handle, lv, msg);
             ext.pending_warnings.clear();
         }
@@ -601,14 +610,17 @@ void ExtensionManager::tick() {
     }
 }
 
-void ExtensionManager::flush_pending_reloads() {
-    if (!s_any_autoreload) return;
+void ExtensionManager::flush_pending_reloads()
+{
+    if (!s_any_autoreload)
+        return;
 
     bool any_reloaded = false;
-    for (auto& ext : s_extensions) {
-        if (!ext.reload_pending) continue;
+    for (auto &ext : s_extensions) {
+        if (!ext.reload_pending)
+            continue;
         ext.reload_pending = false;
-        any_reloaded = true;
+        any_reloaded       = true;
 
         Logger::info("Hot-reloading extension: {}", ext.display_name);
         unload_extension(ext);
@@ -620,8 +632,8 @@ void ExtensionManager::flush_pending_reloads() {
     }
 
     if (any_reloaded)
-        s_any_autoreload = std::any_of(s_extensions.begin(), s_extensions.end(),
-                                       [](const ExtensionInfo& e) { return e.autoreload && e.initialized; });
+        s_any_autoreload = std::ranges::any_of(
+            s_extensions, [](ExtensionInfo const &e) { return e.autoreload && e.initialized; });
 }
 
 // ---------------------------------------------------------------------------
@@ -629,7 +641,7 @@ void ExtensionManager::flush_pending_reloads() {
 // ---------------------------------------------------------------------------
 
 // Static wrappers that forward to EventSystem / Logger
-static int api_subscribe(const char* event_name, X4NativeEventCallback cb, void* ud, void* api_ptr) {
+static int api_subscribe(char const * event_name, X4NativeEventCallback cb, void* ud, void* api_ptr) {
     int id = EventSystem::subscribe(event_name, cb, ud);
     // Track subscription for auto-cleanup on extension unload
     if (id > 0 && api_ptr) {
@@ -644,40 +656,40 @@ static void api_unsubscribe(int id) {
     EventSystem::unsubscribe(id);
 }
 
-static void api_raise_event(const char* event_name, void* data) {
+static void api_raise_event(char const * event_name, void* data) {
     EventSystem::fire(event_name, data);
 }
 
-static int api_raise_lua_event(const char* event_name, const char* param) {
+static int api_raise_lua_event(char const * event_name, char const * param) {
     if (s_raise_lua_event) return s_raise_lua_event(event_name, param);
     return -1;
 }
 
-static void api_log(int level, const char* message) {
+static void api_log(int level, char const * message) {
     auto lv = static_cast<LogLevel>(level);
     Logger::write(lv, message);
 }
 
-static const char* s_game_ver_cache;
-static const char* s_x4n_ver_cache = X4_GAME_VERSION_LABEL;
+static char const *s_game_ver_cache;
+static char const *s_x4n_ver_cache = X4_GAME_VERSION_LABEL;
 
-static const char* api_get_game_version() {
+static char const * api_get_game_version() {
     return s_game_ver_cache;
 }
 
-static const char* api_get_x4native_version() {
+static char const * api_get_x4native_version() {
     return s_x4n_ver_cache;
 }
 
 // Hook wrappers — extract extension context from the API pointer.
 // HookManager keys on extension_id (canonical unique), not display name.
-static int api_hook_before(const char* fn, X4HookCallback cb, void* ud, void* api_ptr) {
+static int api_hook_before(char const * fn, X4HookCallback cb, void* ud, void* api_ptr) {
     auto* api = static_cast<X4NativeAPI*>(api_ptr);
     int ext_priority = static_cast<int>(api->_ext_priority);
     return HookManager::hook_before(fn, cb, ud, ext_priority, api->_ext_id);
 }
 
-static int api_hook_after(const char* fn, X4HookCallback cb, void* ud, void* api_ptr) {
+static int api_hook_after(char const * fn, X4HookCallback cb, void* ud, void* api_ptr) {
     auto* api = static_cast<X4NativeAPI*>(api_ptr);
     int ext_priority = static_cast<int>(api->_ext_priority);
     return HookManager::hook_after(fn, cb, ud, ext_priority, api->_ext_id);
@@ -687,7 +699,7 @@ static void api_unhook(int hook_id) {
     HookManager::unhook(hook_id);
 }
 
-static void* api_ensure_detour(const char* fn, void* detour_fn) {
+static void* api_ensure_detour(char const * fn, void* detour_fn) {
     return HookManager::ensure_detour(fn, detour_fn);
 }
 
@@ -699,7 +711,7 @@ static void api_run_after_hooks(X4HookContext* ctx) {
     HookManager::run_after_hooks(ctx);
 }
 
-static void* api_resolve_internal(const char* name) {
+static void* api_resolve_internal(char const * name) {
     return GameAPI::get_internal(name);
 }
 
@@ -712,52 +724,52 @@ static int api_md_subscribe_after(uint32_t type_id, X4NativeEventCallback cb, vo
     return EventSystem::md_subscribe_after(type_id, cb, ud);
 }
 
-static int api_register_lua_bridge(const char* lua_event, const char* cpp_event) {
+static int api_register_lua_bridge(char const * lua_event, char const * cpp_event) {
     if (s_register_lua_bridge)
         return s_register_lua_bridge(lua_event, cpp_event);
     return -1;
 }
 
 // Settings wrappers — resolve the calling extension via _ext_info.
-static const char* ext_id_from_api(void* api_ptr) {
+static char const * ext_id_from_api(void* api_ptr) {
     if (!api_ptr) return nullptr;
     auto* api = static_cast<X4NativeAPI*>(api_ptr);
     auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
     return ext ? ext->extension_id.c_str() : nullptr;
 }
 
-static int api_get_setting_bool(const char* key, int fallback, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static int api_get_setting_bool(char const * key, int fallback, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return fallback;
     return SettingsManager::get_bool(id, key, fallback != 0) ? 1 : 0;
 }
 
-static double api_get_setting_number(const char* key, double fallback, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static double api_get_setting_number(char const * key, double fallback, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return fallback;
     return SettingsManager::get_number(id, key, fallback);
 }
 
-static const char* api_get_setting_string(const char* key, const char* fallback, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static char const * api_get_setting_string(char const * key, char const * fallback, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return fallback;
     return SettingsManager::get_string(id, key, fallback);
 }
 
-static void api_set_setting_bool(const char* key, int value, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static void api_set_setting_bool(char const * key, int value, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return;
     SettingsManager::set_bool(id, key, value != 0);
 }
 
-static void api_set_setting_number(const char* key, double value, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static void api_set_setting_number(char const * key, double value, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return;
     SettingsManager::set_number(id, key, value);
 }
 
-static void api_set_setting_string(const char* key, const char* value, void* api_ptr) {
-    const char* id = ext_id_from_api(api_ptr);
+static void api_set_setting_string(char const * key, char const * value, void* api_ptr) {
+    char const * id = ext_id_from_api(api_ptr);
     if (!id || !key) return;
     SettingsManager::set_string(id, key, value ? value : "");
 }
@@ -815,15 +827,16 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
 // JSON serialization of loaded extensions
 // ---------------------------------------------------------------------------
 
-const char* ExtensionManager::loaded_extensions_json() {
+char const *ExtensionManager::loaded_extensions_json()
+{
     json arr = json::array();
-    for (const auto& ext : s_extensions) {
+    for (auto const &ext : s_extensions) {
         if (ext.initialized) {
             arr.push_back({
-                {"id", ext.extension_id},
+                {"id",           ext.extension_id},
                 {"display_name", ext.display_name},
-                {"path", ext.path},
-                {"priority", ext.priority}
+                {"path",         ext.path        },
+                {"priority",     ext.priority    }
             });
         }
     }

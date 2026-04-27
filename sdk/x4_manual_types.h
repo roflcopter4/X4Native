@@ -25,6 +25,14 @@
 
 #ifdef __cplusplus
 extern "C" {
+#else
+# include <assert.h>
+# include <stdbool.h>
+# ifdef _MSC_VER
+#  define alignas(x) __declspec(align(x)) 
+# else
+#  include <stdalign.h>
+# endif
 #endif
 
 // ======== FRAMEWORK TYPES ================================================
@@ -90,12 +98,12 @@ typedef struct X4RadarChangedEvent {
 // Has its own vtable. this ptr = &component->definition.
 // vtable[3] = GetName(), vtable[4] = GetMacroName() — both return MSVC std::string*.
 typedef struct X4DefinitionInterface {
-    void** vtable;
+    void **vtable;
 #ifdef __cplusplus
     /// Call vtable[3] GetName() — returns raw std::string* (caller handles SSO).
-    void* GetName()      { return reinterpret_cast<void*(*)(X4DefinitionInterface*)>(vtable[3])(this); }
+    [[nodiscard]] void *GetName() { return reinterpret_cast<void *(*)(X4DefinitionInterface *)>(vtable[3])(this); }
     /// Call vtable[4] GetMacroName() — returns raw std::string* (caller handles SSO).
-    void* GetMacroName() { return reinterpret_cast<void*(*)(X4DefinitionInterface*)>(vtable[4])(this); }
+    [[nodiscard]] void *GetMacroName() { return reinterpret_cast<void *(*)(X4DefinitionInterface *)>(vtable[4])(this); }
 #endif
 } X4DefinitionInterface;
 
@@ -119,12 +127,12 @@ typedef struct X4DefinitionInterface {
 //
 // @verified v9.00 build 605025 (in-game probe: Sector/Ship/ResourceArea)
 struct X4EntityBase {
-    void*      vtable;          // +0x00: main vtable (~800+ slots, see X4_VTABLE_* constants)
-    UniverseID id;              // +0x08: UniverseID (also raw generation seed — dual purpose)
-    void*      _unk_10;         // +0x10: null for Sector/ResourceArea, heap ptr for Ship. Purpose unknown.
-    void*      _type_meta;      // +0x18: per-type constant (.text ptr). Same for all instances of same class. Factory/dispatch related.
-    void*      _unk_20;         // +0x20: instance-specific ptr (null for ResourceArea). Purpose unknown.
-    void*      _unk_28;         // +0x28: instance-specific ptr (null for ResourceArea). Purpose unknown.
+    void      *vtable;       // +0x00: main vtable (~800+ slots, see X4_VTABLE_* constants)
+    UniverseID id;           // +0x08: UniverseID (also raw generation seed — dual purpose)
+    void      *_unk_10;      // +0x10: null for Sector/ResourceArea, heap ptr for Ship. Purpose unknown.
+    void      *_type_meta;   // +0x18: per-type constant (.text ptr). Same for all instances of same class. Factory/dispatch related.
+    void      *_unk_20;      // +0x20: instance-specific ptr (null for ResourceArea). Purpose unknown.
+    void      *_unk_28;      // +0x28: instance-specific ptr (null for ResourceArea). Purpose unknown.
 };
 static_assert(offsetof(X4EntityBase, vtable) == 0x00, "X4EntityBase vtable offset");
 static_assert(offsetof(X4EntityBase, id)     == 0x08, "X4EntityBase id offset");
@@ -136,17 +144,17 @@ static_assert(offsetof(X4EntityBase, id)     == 0x08, "X4EntityBase id offset");
 // but diverge after +0x10 — do NOT cast them to X4Component for field access.
 struct X4Component : X4EntityBase {
     X4DefinitionInterface definition; // +0x30: embedded sub-object (8 bytes — just the vtable ptr)
-    void*     ctrl_vtable;       // +0x38: shared_ptr control block vtable
-    int32_t   ref_count;         // +0x40: atomic reference count
-    int32_t   weak_count;        // +0x44: atomic weak ref / lifecycle state (1->2->3)
-    uint8_t   _pad_48[0x20];    // +0x48..+0x67: unresolved
-    int32_t   class_id;          // +0x68: DEPRECATED — NOT the runtime class ID. Use game_class() instead.
-    uint8_t   _pad_6C[0x04];    // +0x6C..+0x6F: padding
-    void*     parent;            // +0x70: parent X4Component* (null for galaxy root)
-    uint8_t   _pad_78[0x30];    // +0x78..+0xA7: unresolved (48 bytes)
-    void*     children;          // +0xA8: child container ptr (group-indexed partition array, 32-byte buckets)
-    uint8_t   _pad_B0[0x21];    // +0xB0..+0xD0: unresolved
-    uint8_t   exists;            // +0xD1: existence flag (0=destroyed, nonzero=alive)
+    void   *ctrl_vtable;   // +0x38: shared_ptr control block vtable
+    int32_t ref_count;     // +0x40: atomic reference count
+    int32_t weak_count;    // +0x44: atomic weak ref / lifecycle state (1->2->3)
+    uint8_t _pad_48[0x20]; // +0x48..+0x67: unresolved
+    int32_t class_id;      // +0x68: DEPRECATED — NOT the runtime class ID. Use game_class() instead.
+    uint8_t _pad_6C[0x04]; // +0x6C..+0x6F: padding
+    void   *parent;        // +0x70: parent X4Component* (null for galaxy root)
+    uint8_t _pad_78[0x30]; // +0x78..+0xA7: unresolved (48 bytes)
+    void   *children;      // +0xA8: child container ptr (group-indexed partition array, 32-byte buckets)
+    uint8_t _pad_B0[0x21]; // +0xB0..+0xD0: unresolved
+    uint8_t exists;        // +0xD1: existence flag (0=destroyed, nonzero=alive)
 
     // For game_class() and is_a(), use x4n::entity::game_class(comp) and
     // x4n::entity::is_a(comp, cls) from x4n_entity.h. These require the
@@ -372,9 +380,9 @@ typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 // Likely stable across builds (PRNG design, not tunable), but verify on major engine changes.
 // Found inside MD_EvalSeed_AutoAdvance (0x140C10590 in build 602526).
 // Verified: build 605025 (algorithm constants, stable across builds)
-#define X4_SEED_LCG_MULTIPLIER  0x5851F42D4C957F2DULL
-#define X4_SEED_LCG_ADDEND     0x14057B7EF767814FULL
-#define X4_SEED_LCG_ROTATE     30
+#define X4_SEED_LCG_MULTIPLIER  UINT64_C(0x5851F42D4C957F2D)
+#define X4_SEED_LCG_ADDEND      UINT64_C(0x14057B7EF767814F)
+#define X4_SEED_LCG_ROTATE      30
 
 // ---- Global data RVA: Session seed ----
 // WARNING: data address changes between builds. Re-verify on game updates.
@@ -391,28 +399,28 @@ typedef struct X4ComponentRegistry_ X4ComponentRegistry;
 // FIND: Enum init near 0x140752xxx, data table near 0x142479xxx, 22 entries.
 // Verified: build 605025 (enum values unchanged, addresses may drift)
 typedef enum X4RoomType {
-    X4_ROOMTYPE_BAR               = 0,
-    X4_ROOMTYPE_CASINO            = 1,
-    X4_ROOMTYPE_CORRIDOR          = 2,
-    X4_ROOMTYPE_CREWQUARTERS      = 3,
-    X4_ROOMTYPE_EMBASSY           = 4,
-    X4_ROOMTYPE_FACTIONREP        = 5,
-    X4_ROOMTYPE_GENERATORROOM     = 6,
-    X4_ROOMTYPE_INFRASTRUCTURE    = 7,
+    X4_ROOMTYPE_BAR                = 0,
+    X4_ROOMTYPE_CASINO             = 1,
+    X4_ROOMTYPE_CORRIDOR           = 2,
+    X4_ROOMTYPE_CREWQUARTERS       = 3,
+    X4_ROOMTYPE_EMBASSY            = 4,
+    X4_ROOMTYPE_FACTIONREP         = 5,
+    X4_ROOMTYPE_GENERATORROOM      = 6,
+    X4_ROOMTYPE_INFRASTRUCTURE     = 7,
     X4_ROOMTYPE_INTELLIGENCEOFFICE = 8,
-    X4_ROOMTYPE_LIVINGROOM        = 9,
-    X4_ROOMTYPE_MANAGER           = 10,
-    X4_ROOMTYPE_OFFICE            = 11,
-    X4_ROOMTYPE_PLAYEROFFICE      = 12,
-    X4_ROOMTYPE_PRISON            = 13,
-    X4_ROOMTYPE_SECURITY          = 14,
-    X4_ROOMTYPE_SERVERROOM        = 15,
-    X4_ROOMTYPE_SERVICEROOM       = 16,
-    X4_ROOMTYPE_SHIPTRADERCORNER  = 17,
-    X4_ROOMTYPE_TRADERCORNER      = 18,
-    X4_ROOMTYPE_TRAFFICCONTROL    = 19,
-    X4_ROOMTYPE_WARROOM           = 20,
-    X4_ROOMTYPE_NONE              = 21,
+    X4_ROOMTYPE_LIVINGROOM         = 9,
+    X4_ROOMTYPE_MANAGER            = 10,
+    X4_ROOMTYPE_OFFICE             = 11,
+    X4_ROOMTYPE_PLAYEROFFICE       = 12,
+    X4_ROOMTYPE_PRISON             = 13,
+    X4_ROOMTYPE_SECURITY           = 14,
+    X4_ROOMTYPE_SERVERROOM         = 15,
+    X4_ROOMTYPE_SERVICEROOM        = 16,
+    X4_ROOMTYPE_SHIPTRADERCORNER   = 17,
+    X4_ROOMTYPE_TRADERCORNER       = 18,
+    X4_ROOMTYPE_TRAFFICCONTROL     = 19,
+    X4_ROOMTYPE_WARROOM            = 20,
+    X4_ROOMTYPE_NONE               = 21,
 } X4RoomType;
 
 // ---- Room property offsets within Room entity (class 82) ----
@@ -509,24 +517,24 @@ typedef enum X4RoomType {
 // Verified: build 605025 (PlanEntry_Construct @ 0x140D11660 decompiled,
 //   528-byte allocation confirmed at call sites, all field offsets matched)
 typedef struct alignas(16) X4PlanEntry {
-    int64_t   id;                   // +0:   unique ID (auto-assigned from atomic counter if 0)
-    void*     macro_ptr;            // +8:   MacroData* (from MacroRegistry_Lookup)
-    void*     connection_ptr;       // +16:  ConnectionEntry* on THIS module (nullptr = auto/root)
-    void*     predecessor;          // +24:  X4PlanEntry* predecessor (nullptr = root module)
-    void*     pred_connection_ptr;  // +32:  ConnectionEntry* on PREDECESSOR module (nullptr = auto)
-    uint8_t   pad_40[8];           // +40:  padding (observed zero)
-    float     pos_x;               // +48:  position X relative to station origin
-    float     pos_y;               // +52:  position Y
-    float     pos_z;               // +56:  position Z
-    float     pos_w;               // +60:  padding (typically 0.0)
-    float     rot_row0[4];         // +64:  rotation matrix row 0 [r0x, r0y, r0z, 0]
-    float     rot_row1[4];         // +80:  rotation matrix row 1 [r1x, r1y, r1z, 0]
-    float     rot_row2[4];         // +96:  rotation matrix row 2 [r2x, r2y, r2z, 0]
-    uint8_t   loadout[408];        // +112: equipment loadout (init by sub_1400EF140)
-    uint8_t   is_fixed;            // +520: fixed/immovable flag
-    uint8_t   is_modified;         // +521: modified flag
-    uint8_t   is_bookmark;         // +522: bookmark flag
-    uint8_t   pad_end[5];          // +523: padding to 528 bytes (16-byte aligned)
+    int64_t id;                  // +0:   unique ID (auto-assigned from atomic counter if 0)
+    void   *macro_ptr;           // +8:   MacroData* (from MacroRegistry_Lookup)
+    void   *connection_ptr;      // +16:  ConnectionEntry* on THIS module (nullptr = auto/root)
+    void   *predecessor;         // +24:  X4PlanEntry* predecessor (nullptr = root module)
+    void   *pred_connection_ptr; // +32:  ConnectionEntry* on PREDECESSOR module (nullptr = auto)
+    uint8_t pad_40[8];           // +40:  padding (observed zero)
+    float   pos_x;               // +48:  position X relative to station origin
+    float   pos_y;               // +52:  position Y
+    float   pos_z;               // +56:  position Z
+    float   pos_w;               // +60:  padding (typically 0.0)
+    float   rot_row0[4];         // +64:  rotation matrix row 0 [r0x, r0y, r0z, 0]
+    float   rot_row1[4];         // +80:  rotation matrix row 1 [r1x, r1y, r1z, 0]
+    float   rot_row2[4];         // +96:  rotation matrix row 2 [r2x, r2y, r2z, 0]
+    uint8_t loadout[408];        // +112: equipment loadout (init by sub_1400EF140)
+    uint8_t is_fixed;            // +520: fixed/immovable flag
+    uint8_t is_modified;         // +521: modified flag
+    uint8_t is_bookmark;         // +522: bookmark flag
+    uint8_t pad_end[5];          // +523: padding to 528 bytes (16-byte aligned)
 } X4PlanEntry;
 #define X4_PLAN_ENTRY_SIZE  sizeof(X4PlanEntry)  /* 528 */
 
@@ -584,11 +592,14 @@ struct X4WareClass {
     uint64_t name_len;          // +0x20 — string length
     uint64_t name_cap;          // +0x28 — SSO capacity; >= 16 means name_buf is a char*
 
-    const char* name() const {
+#ifdef __cplusplus
+    [[nodiscard]] char const *name() const
+    {
         if (name_cap >= 16)
-            return *reinterpret_cast<const char* const*>(&name_buf[0]);
+            return *reinterpret_cast<char const *const *>(&name_buf[0]);
         return &name_buf[0];
     }
+#endif
 };
 static_assert(offsetof(X4WareClass, name_buf) == 0x10, "WareClass name_buf offset");
 static_assert(offsetof(X4WareClass, name_len) == 0x20, "WareClass name_len offset");
@@ -609,30 +620,33 @@ static_assert(offsetof(X4WareClass, name_cap) == 0x28, "WareClass name_cap offse
 // @verified v9.00 build 605025
 struct X4RegionYieldDef {
     // +0x00: definition ID std::string (MSVC layout: buf[16] + len + cap = 0x20 bytes)
-    char          id_buf[16];            // +0x00 — SSO buffer or char* (MSVC SSO)
-    uint64_t      id_len;               // +0x10
-    uint64_t      id_cap;               // +0x18
-    X4WareClass*  ware_class;           // +0x20 — XML "ware": ware type (ore, hydrogen, etc.)
-    void*         boundary_data;        // +0x28 — parsed from <boundary> child element
-    bool          random_rotation[3];   // +0x30 — XML randompitch/randomyaw/randomroll (order TBD)
-    char          _pad0[0x05];          // +0x33 — alignment padding
-    int64_t       max_yield;            // +0x38 — XML "yield": total yield amount. cur always <= max.
-    float         object_yield_factor;  // +0x40 — XML "objectyieldfactor": per-object yield scale (mineral/scrap). Default 1.0.
-    float         gather_speed_factor;  // +0x44 — XML "gatherspeedfactor": mining speed scale (gas). Default 1.0.
-    float         respawn_delay;        // +0x48 — XML "respawndelay" × 60: seconds before respawn. -60 = no respawn.
-    int32_t       rating;               // +0x4C — XML "rating": star rating × 3 (0–15). 15 = 5 stars.
-    uint32_t      yield_tag_idx;        // +0x50 — XML "tag": compatibility tag index (global table lookup)
-    char          _pad1[0x04];          // +0x54 — alignment padding
-    void*         scan_effect;          // +0x58 — XML "scaneffect": effect definition ptr (scaneffectcolor baked in)
-    int32_t       scan_effect_amount;   // +0x60 — XML "scaneffectamount": scan result effect count. Default 1.
-    float         scan_effect_intensity;// +0x64 — XML "scaneffectintensity": scan result opacity/volume. Default 1.0.
+    char         id_buf[16];            // +0x00 — SSO buffer or char* (MSVC SSO)
+    uint64_t     id_len;                // +0x10
+    uint64_t     id_cap;                // +0x18
+    X4WareClass *ware_class;            // +0x20 — XML "ware": ware type (ore, hydrogen, etc.)
+    void        *boundary_data;         // +0x28 — parsed from <boundary> child element
+    bool         random_rotation[3];    // +0x30 — XML randompitch/randomyaw/randomroll (order TBD)
+    uint8_t      _pad0[0x05];           // +0x33 — alignment padding
+    int64_t      max_yield;             // +0x38 — XML "yield": total yield amount. cur always <= max.
+    float        object_yield_factor;   // +0x40 — XML "objectyieldfactor": per-object yield scale (mineral/scrap). Default 1.0.
+    float        gather_speed_factor;   // +0x44 — XML "gatherspeedfactor": mining speed scale (gas). Default 1.0.
+    float        respawn_delay;         // +0x48 — XML "respawndelay" × 60: seconds before respawn. -60 = no respawn.
+    int32_t      rating;                // +0x4C — XML "rating": star rating × 3 (0–15). 15 = 5 stars.
+    uint32_t     yield_tag_idx;         // +0x50 — XML "tag": compatibility tag index (global table lookup)
+    uint8_t      _pad1[0x04];           // +0x54 — alignment padding
+    void        *scan_effect;           // +0x58 — XML "scaneffect": effect definition ptr (scaneffectcolor baked in)
+    int32_t      scan_effect_amount;    // +0x60 — XML "scaneffectamount": scan result effect count. Default 1.
+    float        scan_effect_intensity; // +0x64 — XML "scaneffectintensity": scan result opacity/volume. Default 1.0.
 
+#ifdef __cplusplus
     /// Read definition ID from the inline std::string.
-    const char* id() const {
+    [[nodiscard]] char const *id() const
+    {
         if (id_cap >= 16)
-            return *reinterpret_cast<const char* const*>(&id_buf[0]);
+            return *reinterpret_cast<char const *const *>(&id_buf[0]);
         return &id_buf[0];
     }
+#endif
 };
 static_assert(offsetof(X4RegionYieldDef, ware_class)           == 0x20, "RegionYieldDef ware_class offset");
 static_assert(offsetof(X4RegionYieldDef, boundary_data)        == 0x28, "RegionYieldDef boundary_data offset");
@@ -660,14 +674,14 @@ static_assert(offsetof(X4RegionYieldDef, scan_effect_intensity)== 0x64, "RegionY
 //   RA+0x1E0 (pending flag).
 // @verified v9.00 build 605025
 struct X4ResourceArea : X4EntityBase {
-    X4RegionYieldDef*  definition;      // +0x30 — static definition (ware, max yield, params)
-    void*              parent;          // +0x38 — parent/container ptr (used in respawn)
-    char               _pad1[0x40];     // +0x40
-    int64_t            current_yield;   // +0x80 — live yield (depletes with mining, regenerates)
-    char               _pad2[0x148];    // +0x88
-    double             discovery_time;  // +0x1D0 — player discovery timestamp (game time)
-    void*              respawn_job;     // +0x1D8 — active respawn job ptr (null if not respawning)
-    uint8_t            respawn_pending; // +0x1E0 — set to 1 when respawn queued
+    X4RegionYieldDef *definition; // +0x030 — static definition (ware, max yield, params)
+    void    *parent;              // +0x038 — parent/container ptr (used in respawn)
+    uint8_t  _pad1[0x40];         // +0x040
+    int64_t  current_yield;       // +0x080 — live yield (depletes with mining, regenerates)
+    uint8_t  _pad2[0x148];        // +0x088
+    double   discovery_time;      // +0x1D0 — player discovery timestamp (game time)
+    void    *respawn_job;         // +0x1D8 — active respawn job ptr (null if not respawning)
+    uint8_t  respawn_pending;     // +0x1E0 — set to 1 when respawn queued
 };
 static_assert(offsetof(X4ResourceArea, id)              == 0x08,  "ResourceArea id offset");
 static_assert(offsetof(X4ResourceArea, definition)      == 0x30,  "ResourceArea definition offset");
@@ -683,10 +697,10 @@ static_assert(offsetof(X4ResourceArea, respawn_pending) == 0x1E0, "ResourceArea 
 // For typed callbacks, include x4_md_events.h (auto-generated).
 
 typedef struct X4MdEvent {
-    uint32_t  type_id;          // Event type (matches x4_md_events.h constants)
-    uint64_t  source_id;        // EventSource entity Universe ID
-    double    timestamp;        // Game time
-    void*     raw_event;        // Raw event object (read fields via x4_md_events.h structs)
+    uint32_t type_id;   // Event type (matches x4_md_events.h constants)
+    uint64_t source_id; // EventSource entity Universe ID
+    double   timestamp; // Game time
+    void    *raw_event; // Raw event object (read fields via x4_md_events.h structs)
 } X4MdEvent;
 
 

@@ -17,14 +17,10 @@
 // SEH wrapping per callback — crashing callbacks are auto-disabled.
 // ---------------------------------------------------------------------------
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
+#include "Common.h"
 
 #include <x4native_extension.h>
 
-#include <string>
 #include <vector>
 #include <unordered_map>
 #include <mutex>

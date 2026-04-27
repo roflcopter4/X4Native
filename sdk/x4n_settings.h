@@ -48,39 +48,45 @@ namespace settings {
 
 /// Read a boolean setting. Returns `fallback` if the key is missing or
 /// declared with a different type.
-inline bool get_bool(const char* key, bool fallback = false) {
-    auto* api = detail::g_api;
+inline bool get_bool(char const *key, bool fallback = false)
+{
+    auto *api = detail::g_api;
     return api->get_setting_bool(key, fallback ? 1 : 0, api) != 0;
 }
 
 /// Read a numeric setting (slider).
-inline double get_number(const char* key, double fallback = 0.0) {
-    auto* api = detail::g_api;
+inline double get_number(char const *key, double fallback = 0.0)
+{
+    auto *api = detail::g_api;
     return api->get_setting_number(key, fallback, api);
 }
 
 /// Read a string setting (dropdown — returns the selected option id).
-inline const char* get_string(const char* key, const char* fallback = "") {
-    auto* api = detail::g_api;
+inline char const *get_string(char const *key, char const *fallback = "")
+{
+    auto *api = detail::g_api;
     return api->get_setting_string(key, fallback, api);
 }
 
 /// Write a boolean setting. Persists to disk and fires `on_setting_changed`.
-inline void set_bool(const char* key, bool value) {
-    auto* api = detail::g_api;
+inline void set_bool(char const *key, bool value)
+{
+    auto *api = detail::g_api;
     api->set_setting_bool(key, value ? 1 : 0, api);
 }
 
 /// Write a numeric setting. Value is clamped to the declared [min, max] range.
-inline void set_number(const char* key, double value) {
-    auto* api = detail::g_api;
+inline void set_number(char const *key, double value)
+{
+    auto *api = detail::g_api;
     api->set_setting_number(key, value, api);
 }
 
 /// Write a string (dropdown) setting. Value must match one of the declared
 /// option ids; other values are rejected with a warning.
-inline void set_string(const char* key, const char* value) {
-    auto* api = detail::g_api;
+inline void set_string(char const *key, char const *value)
+{
+    auto *api = detail::g_api;
     api->set_setting_string(key, value, api);
 }
 
@@ -102,28 +108,26 @@ inline void set_string(const char* key, const char* value) {
 using SettingChanged = X4NativeSettingChanged;
 
 namespace detail {
-    // Trampoline: adapts void(const X4NativeSettingChanged&) to the raw
-    // X4NativeEventCallback signature.
-    inline void trampoline_setting_changed(const char*, void* data, void* ud) {
-        reinterpret_cast<void(*)(const X4NativeSettingChanged&)>(ud)(
-            *static_cast<const X4NativeSettingChanged*>(data));
-    }
+// Trampoline: adapts void(const X4NativeSettingChanged&) to the raw
+// X4NativeEventCallback signature.
+inline void trampoline_setting_changed(char const *, void *data, void *ud)
+{
+    auto fn = reinterpret_cast<void (*)(X4NativeSettingChanged const &)>(ud);
+    fn(*static_cast<X4NativeSettingChanged const *>(data));
 }
+} // namespace detail
 
 /// Subscribe to setting changes **for this extension only**. The callback
 /// fires whenever one of your own keys is written (via UI or code). Returns
 /// the subscription id; pass to x4n::off() to unsubscribe.
 ///
 /// Under the hood, subscribes to "on_setting_changed:<your extension_id>".
-inline int on_setting_changed(void (*cb)(const X4NativeSettingChanged& info)) {
-    auto* api = ::x4n::detail::g_api;
-    char name[256];
-    std::snprintf(name, sizeof(name), "on_setting_changed:%s",
-                  api->_ext_id ? api->_ext_id : "");
-    return api->subscribe(name,
-                          detail::trampoline_setting_changed,
-                          reinterpret_cast<void*>(cb),
-                          api);
+inline int on_setting_changed(void (*cb)(X4NativeSettingChanged const &info))
+{
+    auto *api = ::x4n::detail::g_api;
+    char  name[256];
+    (void)sprintf_s(name, std::size(name), "on_setting_changed:%s", api->_ext_id ? api->_ext_id : "");
+    return api->subscribe(name, detail::trampoline_setting_changed, reinterpret_cast<void *>(cb), api);
 }
 
 // The core also fires the unscoped "on_setting_changed" for observers that

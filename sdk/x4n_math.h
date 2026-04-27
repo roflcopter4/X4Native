@@ -14,7 +14,8 @@
 
 #include "x4n_core.h"
 
-namespace x4n { namespace math {
+namespace x4n::math
+{
 
 /// Radian-to-degree conversion factor.
 /// GetObjectPositionInSector returns radians, SetObjectSectorPos expects degrees.
@@ -24,7 +25,8 @@ constexpr float RAD_TO_DEG = 180.0f / 3.14159265f;
 /// Formula: next = ROR64(seed * multiplier + addend, 30)
 /// @stability STABLE — algorithm constants, not data offsets. Unlikely to change.
 /// @verified v9.00 build 600626
-inline uint64_t advance_seed(uint64_t seed) {
+inline uint64_t advance_seed(uint64_t seed)
+{
     uint64_t lcg = seed * X4_SEED_LCG_MULTIPLIER + X4_SEED_LCG_ADDEND;
     return (lcg >> X4_SEED_LCG_ROTATE) | (lcg << (64 - X4_SEED_LCG_ROTATE));
 }
@@ -32,13 +34,14 @@ inline uint64_t advance_seed(uint64_t seed) {
 /// Compute FNV-1a hash of a lowercased string (engine convention).
 /// Used by MacroRegistry, ConstructionPlanDB, and connection lookups.
 /// @stability STABLE — standard hash algorithm, not data offsets.
-inline uint64_t fnv1a_lower(const char* str) {
+inline uint64_t fnv1a_lower(char const *str)
+{
     uint64_t hash = 2166136261ULL;
-    for (const char* p = str; *p; p++) {
+    for (char const *p = str; *p; ++p) {
         char c = (*p >= 'A' && *p <= 'Z') ? (*p + 32) : *p;
-        hash = static_cast<int8_t>(c) ^ (16777619ULL * hash);
+        hash   = static_cast<int8_t>(c) ^ (16777619ULL * hash);
     }
     return hash;
 }
 
-}} // namespace x4n::math
+} // namespace x4n::math

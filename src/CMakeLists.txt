@@ -21,6 +21,39 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/native")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/native")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/native")
 
+set(sdk_headers
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_offsets.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_types.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_manual_types.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_md_events.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_buildprocessor.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_container.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_core.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_entity.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_events.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_galaxy.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_hooks.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_log.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_math.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_memory.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_module.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_plans.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_resources.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_rooms.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_sector.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_settings.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_ship.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_stash.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_station.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4n_visibility.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4native.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4native_extension.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_func_table.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_class_ids.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_func_list.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_internal_func_list.h
+)
+
 # ---------------------------------------------------------------------------
 # Dependencies (fetched at configure time)
 # ---------------------------------------------------------------------------
@@ -57,9 +90,15 @@ target_include_directories(minhook PUBLIC ${minhook_SOURCE_DIR}/include)
 # ---------------------------------------------------------------------------
 # Proxy DLL — thin, stable, ~100 lines
 # ---------------------------------------------------------------------------
+set(x4native_64_headers
+    common/lua_api.h
+    common/x4native_defs.h
+)
 add_library(x4native_64 SHARED
     proxy/proxy.cpp
     common/lua_api.cpp
+    ${x4native_64_headers}
+    ${sdk_headers}
 )
 
 target_include_directories(x4native_64 PRIVATE
@@ -84,6 +123,15 @@ set_target_properties(x4native_64 PROPERTIES
 # ---------------------------------------------------------------------------
 # Core DLL — hot-reloadable, contains all framework logic
 # ---------------------------------------------------------------------------
+set(x4native_core_headers
+    core/event_system.h
+    core/extension_manager.h
+    core/game_api.h
+    core/hook_manager.h
+    core/logger.h
+    core/settings_manager.h
+    core/version.h
+)
 add_library(x4native_core SHARED
     core/core.cpp
     core/logger.cpp
@@ -93,6 +141,9 @@ add_library(x4native_core SHARED
     core/hook_manager.cpp
     core/settings_manager.cpp
     core/version.cpp
+    
+    ${x4native_core_headers}
+    ${sdk_headers}
 )
 
 target_include_directories(x4native_core PRIVATE
@@ -111,6 +162,25 @@ set_target_properties(x4native_core PROPERTIES
     PREFIX ""
     OUTPUT_NAME "x4native_core"
 )
+
+if(MSVC)
+    #file(GLOB_RECURSE ALL_SOURCES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.h")
+    foreach(source_file ${x4native_64_headers})
+        #cmake_path(GET source_file FILENAME basename)
+        string(REPLACE "/" "\\" source_file "${source_file}")
+        source_group("Header Files" FILES "${source_file}")
+    endforeach()
+    foreach(source_file ${x4native_core_headers})
+        string(REPLACE "/" "\\" source_file "${source_file}")
+        source_group("Header Files" FILES "${source_file}")
+    endforeach()
+    foreach(source_file ${sdk_headers})
+        string(REPLACE "/" "\\" source_file "${source_file}")
+        source_group("SDK" FILES "${source_file}")
+    endforeach()
+    target_compile_options(x4native_64 PUBLIC "/MP" "/EHsc" "/utf-8" "/Zc:__cplusplus" "/Zc:preprocessor")
+    target_compile_options(x4native_core PUBLIC "/MP" "/EHsc" "/utf-8" "/Zc:__cplusplus" "/Zc:preprocessor")
+endif()
 
 # ---------------------------------------------------------------------------
 # Install rules — targets go into native/ under the install prefix

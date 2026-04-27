@@ -6,7 +6,7 @@
 // events are dispatched by the core DLL or forwarded from Lua.
 // ---------------------------------------------------------------------------
 
-#include <string>
+#include "Common.h"
 #include <functional>
 #include <unordered_map>
 #include <array>

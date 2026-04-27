@@ -35,53 +35,58 @@
 #include <string_view>
 #include <utility>
 
-namespace x4n {
-namespace log {
+namespace x4n::log {
 
 namespace detail {
 
     // Levels — must match X4NATIVE_LOG_* in x4native_extension.h.
-    constexpr int LV_DEBUG = X4NATIVE_LOG_DEBUG;
-    constexpr int LV_INFO  = X4NATIVE_LOG_INFO;
-    constexpr int LV_WARN  = X4NATIVE_LOG_WARN;
-    constexpr int LV_ERROR = X4NATIVE_LOG_ERROR;
+constexpr int LV_DEBUG = X4NATIVE_LOG_DEBUG;
+constexpr int LV_INFO  = X4NATIVE_LOG_INFO;
+constexpr int LV_WARN  = X4NATIVE_LOG_WARN;
+constexpr int LV_ERROR = X4NATIVE_LOG_ERROR;
 
-    // Format into a fixed-size stack buffer (same cost as the old printf path).
-    // Falls back to std::format if the untruncated message would exceed the
-    // buffer — format_to_n's `size` field reports the *required* length, not
-    // the truncated one, so that's our overflow signal.
-    template<class... Args>
-    inline std::string format_msg(std::format_string<Args...> fmt, Args&&... args) {
-        char buf[1024];
-        auto result = std::format_to_n(buf, sizeof(buf) - 1, fmt,
-                                       std::forward<Args>(args)...);
-        if (result.size <= static_cast<std::ptrdiff_t>(sizeof(buf) - 1))
-            return std::string(buf, result.out);
-        // Overflow: format into an allocating string.
-        return std::format(fmt, std::forward<Args>(args)...);
-    }
+// Format into a fixed-size stack buffer (same cost as the old printf path).
+// Falls back to std::format if the untruncated message would exceed the
+// buffer — format_to_n's `size` field reports the *required* length, not
+// the truncated one, so that's our overflow signal.
+template <class... Args>
+inline std::string format_msg(std::format_string<Args...> fmt, Args &&...args)
+{
+    char buf[1024];
+    auto result = std::format_to_n(buf, sizeof(buf) - 1, fmt, std::forward<Args>(args)...);
+    if (result.size() <= static_cast<std::ptrdiff_t>(sizeof(buf) - 1))
+        return std::string(buf, result.out);
+    // Overflow: format into an allocating string.
+    return std::format(fmt, std::forward<Args>(args)...);
+}
 
-    // Write to the calling extension's log file (routes via _ext_log_fn).
-    inline void write_ext(int level, std::string_view msg) {
-        auto* api = ::x4n::detail::g_api;
-        auto fn = reinterpret_cast<void(*)(int, const char*, void*)>(api->_ext_log_fn);
-        if (fn) fn(level, std::string(msg).c_str(), api);
-        else    api->log(level, std::string(msg).c_str());
-    }
+// Write to the calling extension's log file (routes via _ext_log_fn).
+inline void write_ext(int level, std::string_view const &msg)
+{
+    auto *api = ::x4n::detail::g_api;
+    auto  fn  = reinterpret_cast<void (*)(int, char const *, void *)>(api->_ext_log_fn);
+    if (fn)
+        fn(level, std::string(msg).c_str(), api);
+    else
+        api->log(level, std::string(msg).c_str());
+}
 
-    // Write to the framework log (x4native.log).
-    inline void write_global(int level, std::string_view msg) {
-        ::x4n::detail::g_api->log(level, std::string(msg).c_str());
-    }
+// Write to the framework log (x4native.log).
+inline void write_global(int level, std::string_view const &msg)
+{
+    ::x4n::detail::g_api->log(level, std::string(msg).c_str());
+}
 
-    // Write to a named file in the extension's folder.
-    inline void write_named(int level, const char* filename, std::string_view msg) {
-        auto* api = ::x4n::detail::g_api;
-        auto fn = reinterpret_cast<void(*)(int, const char*, const char*, void*)>(
-                       api->_ext_log_named_fn);
-        if (fn) fn(level, std::string(msg).c_str(), filename, api);
-        else    write_ext(level, msg);
-    }
+// Write to a named file in the extension's folder.
+inline void write_named(int level, char const *filename, std::string_view const &msg)
+{
+    auto *api = ::x4n::detail::g_api;
+    auto  fn  = reinterpret_cast<void (*)(int, char const *, char const *, void *)>(api->_ext_log_named_fn);
+    if (fn)
+        fn(level, std::string(msg).c_str(), filename, api);
+    else
+        write_ext(level, msg);
+}
 
 } // namespace detail
 
@@ -101,39 +106,41 @@ inline void info (std::string_view msg) { detail::write_ext(detail::LV_INFO,  ms
 inline void warn (std::string_view msg) { detail::write_ext(detail::LV_WARN,  msg); }
 inline void error(std::string_view msg) { detail::write_ext(detail::LV_ERROR, msg); }
 
-template<class... Args>
+template <class... Args>
     requires (sizeof...(Args) > 0)
-inline void debug(std::format_string<Args...> fmt, Args&&... args) {
-    detail::write_ext(detail::LV_DEBUG,
-                      detail::format_msg(fmt, std::forward<Args>(args)...));
+void debug(std::format_string<Args...> fmt, Args &&...args)
+{
+    detail::write_ext(detail::LV_DEBUG, detail::format_msg(fmt, std::forward<Args>(args)...));
 }
-template<class... Args>
+template <class... Args>
     requires (sizeof...(Args) > 0)
-inline void info(std::format_string<Args...> fmt, Args&&... args) {
-    detail::write_ext(detail::LV_INFO,
-                      detail::format_msg(fmt, std::forward<Args>(args)...));
+void info(std::format_string<Args...> fmt, Args &&...args)
+{
+    detail::write_ext(detail::LV_INFO, detail::format_msg(fmt, std::forward<Args>(args)...));
 }
-template<class... Args>
+template <class... Args>
     requires (sizeof...(Args) > 0)
-inline void warn(std::format_string<Args...> fmt, Args&&... args) {
-    detail::write_ext(detail::LV_WARN,
-                      detail::format_msg(fmt, std::forward<Args>(args)...));
+void warn(std::format_string<Args...> fmt, Args &&...args)
+{
+    detail::write_ext(detail::LV_WARN, detail::format_msg(fmt, std::forward<Args>(args)...));
 }
-template<class... Args>
+template <class... Args>
     requires (sizeof...(Args) > 0)
-inline void error(std::format_string<Args...> fmt, Args&&... args) {
-    detail::write_ext(detail::LV_ERROR,
-                      detail::format_msg(fmt, std::forward<Args>(args)...));
+void error(std::format_string<Args...> fmt, Args &&...args)
+{
+    detail::write_ext(detail::LV_ERROR, detail::format_msg(fmt, std::forward<Args>(args)...));
 }
 
 // ---------------------------------------------------------------------------
 // Redirect the default log file for this extension.
 // filename is relative to the per-extension log folder (or absolute).
 // ---------------------------------------------------------------------------
-inline void set_log_file(const char* filename) {
-    auto* api = ::x4n::detail::g_api;
-    auto fn = reinterpret_cast<void(*)(const char*, void*)>(api->_ext_init_log_fn);
-    if (fn) fn(filename, api);
+inline void set_log_file(char const *filename)
+{
+    auto *api = ::x4n::detail::g_api;
+    auto  fn  = reinterpret_cast<void (*)(char const *, void *)>(api->_ext_init_log_fn);
+    if (fn)
+        fn(filename, api);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,30 +148,37 @@ inline void set_log_file(const char* filename) {
 // should be scoped to the extension's own file.
 // ---------------------------------------------------------------------------
 struct global_sink {
-    void debug(std::string_view msg) const { detail::write_global(detail::LV_DEBUG, msg); }
-    void info (std::string_view msg) const { detail::write_global(detail::LV_INFO,  msg); }
-    void warn (std::string_view msg) const { detail::write_global(detail::LV_WARN,  msg); }
-    void error(std::string_view msg) const { detail::write_global(detail::LV_ERROR, msg); }
+    static void debug(std::string_view const &msg) { detail::write_global(detail::LV_DEBUG, msg); }
+    static void info (std::string_view const &msg) { detail::write_global(detail::LV_INFO,  msg); }
+    static void warn (std::string_view const &msg) { detail::write_global(detail::LV_WARN,  msg); }
+    static void error(std::string_view const &msg) { detail::write_global(detail::LV_ERROR, msg); }
 
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void debug(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_global(detail::LV_DEBUG,
-                             detail::format_msg(fmt, std::forward<Args>(args)...));
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    static void debug(std::format_string<Args...> fmt, Args &&...args)
+    {
+        detail::write_global(detail::LV_DEBUG, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void info(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_global(detail::LV_INFO,
-                             detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    static void info(std::format_string<Args...> fmt, Args &&...args)
+    {
+        detail::write_global(detail::LV_INFO, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void warn(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_global(detail::LV_WARN,
-                             detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    static void warn(std::format_string<Args...> fmt, Args &&...args)
+    {
+        detail::write_global(detail::LV_WARN, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void error(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_global(detail::LV_ERROR,
-                             detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    static void error(std::format_string<Args...> fmt, Args &&...args)
+    {
+        detail::write_global(detail::LV_ERROR, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
 };
 inline constexpr global_sink global;
@@ -176,39 +190,45 @@ inline constexpr global_sink global;
 // Created per call via x4n::log::to_file("name.log"); zero-cost temporary.
 // ---------------------------------------------------------------------------
 struct file_sink {
-    const char* filename;
+    char const *filename;
 
-    void debug(std::string_view msg) const { detail::write_named(detail::LV_DEBUG, filename, msg); }
-    void info (std::string_view msg) const { detail::write_named(detail::LV_INFO,  filename, msg); }
-    void warn (std::string_view msg) const { detail::write_named(detail::LV_WARN,  filename, msg); }
-    void error(std::string_view msg) const { detail::write_named(detail::LV_ERROR, filename, msg); }
+    void debug(std::string_view const &msg) const { detail::write_named(detail::LV_DEBUG, filename, msg); }
+    void info (std::string_view const &msg) const { detail::write_named(detail::LV_INFO,  filename, msg); }
+    void warn (std::string_view const &msg) const { detail::write_named(detail::LV_WARN,  filename, msg); }
+    void error(std::string_view const &msg) const { detail::write_named(detail::LV_ERROR, filename, msg); }
 
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void debug(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_named(detail::LV_DEBUG, filename,
-                            detail::format_msg(fmt, std::forward<Args>(args)...));
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    void debug(std::format_string<Args...> fmt, Args &&...args) const
+    {
+        detail::write_named(detail::LV_DEBUG, filename, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void info(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_named(detail::LV_INFO, filename,
-                            detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    void info(std::format_string<Args...> fmt, Args &&...args) const
+    {
+        detail::write_named(detail::LV_INFO, filename, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void warn(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_named(detail::LV_WARN, filename,
-                            detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    void warn(std::format_string<Args...> fmt, Args &&...args) const
+    {
+        detail::write_named(detail::LV_WARN, filename, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
-    template<class... Args> requires (sizeof...(Args) > 0)
-    void error(std::format_string<Args...> fmt, Args&&... args) const {
-        detail::write_named(detail::LV_ERROR, filename,
-                            detail::format_msg(fmt, std::forward<Args>(args)...));
+
+    template <class... Args>
+        requires (sizeof...(Args) > 0)
+    void error(std::format_string<Args...> fmt, Args &&...args) const
+    {
+        detail::write_named(detail::LV_ERROR, filename, detail::format_msg(fmt, std::forward<Args>(args)...));
     }
 };
 /// Build a temporary sink that writes to a named file under this extension's
 /// subfolder in the user profile (`<profile>\x4native\<extension_id>\<name>`).
 /// Usage:
 ///     x4n::log::to_file("events.log").info("event: {}", id);
-inline file_sink to_file(const char* name) { return {name}; }
+inline file_sink to_file(char const * name) { return {name}; }
 
-} // namespace log
-} // namespace x4n
+} // namespace x4n::log

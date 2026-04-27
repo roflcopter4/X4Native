@@ -11,12 +11,7 @@
 //   shutdown() → x4native_shutdown() + FreeLibrary (reverse order)
 // ---------------------------------------------------------------------------
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-
-#include <string>
+#include "Common.h"
 #include <vector>
 
 #include <x4native_extension.h>

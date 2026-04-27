@@ -12,39 +12,40 @@
 
 #include "x4n_core.h"
 
-namespace x4n { namespace rooms {
+namespace x4n::rooms {
 
 /// Convert an X4RoomType enum value to its lowercase string name.
 /// Returns nullptr for out-of-range or sentinel values.
 /// @stability STABLE — enum mapping, verified against game data.
 /// @verified v9.00 build 600626
-inline const char* roomtype_name(X4RoomType type) {
-    #define X4N_RT(e, s) case e: return s;
+[[nodiscard]] constexpr char const *roomtype_name(X4RoomType type)
+{
     switch (type) {
-        X4N_RT(X4_ROOMTYPE_BAR,               "bar")
-        X4N_RT(X4_ROOMTYPE_CASINO,            "casino")
-        X4N_RT(X4_ROOMTYPE_CORRIDOR,          "corridor")
-        X4N_RT(X4_ROOMTYPE_CREWQUARTERS,      "crewquarters")
-        X4N_RT(X4_ROOMTYPE_EMBASSY,           "embassy")
-        X4N_RT(X4_ROOMTYPE_FACTIONREP,        "factionrep")
-        X4N_RT(X4_ROOMTYPE_GENERATORROOM,     "generatorroom")
-        X4N_RT(X4_ROOMTYPE_INFRASTRUCTURE,    "infrastructure")
-        X4N_RT(X4_ROOMTYPE_INTELLIGENCEOFFICE,"intelligenceoffice")
-        X4N_RT(X4_ROOMTYPE_LIVINGROOM,        "livingroom")
-        X4N_RT(X4_ROOMTYPE_MANAGER,           "manager")
-        X4N_RT(X4_ROOMTYPE_OFFICE,            "office")
-        X4N_RT(X4_ROOMTYPE_PLAYEROFFICE,      "playeroffice")
-        X4N_RT(X4_ROOMTYPE_PRISON,            "prison")
-        X4N_RT(X4_ROOMTYPE_SECURITY,          "security")
-        X4N_RT(X4_ROOMTYPE_SERVERROOM,        "serverroom")
-        X4N_RT(X4_ROOMTYPE_SERVICEROOM,       "serviceroom")
-        X4N_RT(X4_ROOMTYPE_SHIPTRADERCORNER,  "shiptradercorner")
-        X4N_RT(X4_ROOMTYPE_TRADERCORNER,      "tradercorner")
-        X4N_RT(X4_ROOMTYPE_TRAFFICCONTROL,    "trafficcontrol")
-        X4N_RT(X4_ROOMTYPE_WARROOM,           "warroom")
-        default: return nullptr;
+    case X4_ROOMTYPE_BAR:                return "bar";
+    case X4_ROOMTYPE_CASINO:             return "casino";
+    case X4_ROOMTYPE_CORRIDOR:           return "corridor";
+    case X4_ROOMTYPE_CREWQUARTERS:       return "crewquarters";
+    case X4_ROOMTYPE_EMBASSY:            return "embassy";
+    case X4_ROOMTYPE_FACTIONREP:         return "factionrep";
+    case X4_ROOMTYPE_GENERATORROOM:      return "generatorroom";
+    case X4_ROOMTYPE_INFRASTRUCTURE:     return "infrastructure";
+    case X4_ROOMTYPE_INTELLIGENCEOFFICE: return "intelligenceoffice";
+    case X4_ROOMTYPE_LIVINGROOM:         return "livingroom";
+    case X4_ROOMTYPE_MANAGER:            return "manager";
+    case X4_ROOMTYPE_OFFICE:             return "office";
+    case X4_ROOMTYPE_PLAYEROFFICE:       return "playeroffice";
+    case X4_ROOMTYPE_PRISON:             return "prison";
+    case X4_ROOMTYPE_SECURITY:           return "security";
+    case X4_ROOMTYPE_SERVERROOM:         return "serverroom";
+    case X4_ROOMTYPE_SERVICEROOM:        return "serviceroom";
+    case X4_ROOMTYPE_SHIPTRADERCORNER:   return "shiptradercorner";
+    case X4_ROOMTYPE_TRADERCORNER:       return "tradercorner";
+    case X4_ROOMTYPE_TRAFFICCONTROL:     return "trafficcontrol";
+    case X4_ROOMTYPE_WARROOM:            return "warroom";
+    case X4_ROOMTYPE_NONE:
+    default: 
+        return nullptr;
     }
-    #undef X4N_RT
 }
 
-}} // namespace x4n::rooms
+} // namespace x4n::rooms

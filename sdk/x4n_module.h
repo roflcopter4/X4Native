@@ -23,74 +23,67 @@
 #include <cstdint>
 #include <string>
 
-namespace x4n { namespace module {
+#pragma push_macro("ND")
+#define ND [[nodiscard]]
+
+namespace x4n::module {
 
 /// Lightweight typed handle for a station module (production, processing, etc.).
 /// Constructor validates the entity is actually a Module class.
-class Module {
-    UniverseID id_;
-    X4Component* comp_;
-public:
+class Module : public entity::ComponentEntity
+{
+  public:
     explicit Module(UniverseID id)
-        : id_(id), comp_(entity::find_component(id)) {
-        if (comp_ && !entity::is_a(comp_, GameClass::Module))
-            comp_ = nullptr;
+        : ComponentEntity(id, GameClass::Module)
+    {}
+
+    ND bool is_production()  const { return valid() && entity::is_a(component(), GameClass::Production); }
+    ND bool is_processing()  const { return valid() && entity::is_a(component(), GameClass::Processingmodule); }
+    ND bool is_habitation()  const { return valid() && entity::is_a(component(), GameClass::Habitation); }
+    ND bool is_buildmodule() const { return valid() && entity::is_a(component(), GameClass::Buildmodule); }
+    ND bool is_storage()     const { return valid() && entity::is_a(component(), GameClass::Storage); }
+    ND bool is_defence()     const { return valid() && entity::is_a(component(), GameClass::Defencemodule); }
+    ND bool is_connection()  const { return valid() && entity::is_a(component(), GameClass::Connectionmodule); }
+
+    ND bool is_operational() const
+    {
+        auto *g = game();
+        return valid() && g && g->IsComponentOperational(id());
     }
 
-    bool valid() const { return comp_ != nullptr; }
-    UniverseID id() const { return id_; }
-
-    bool is_production() const {
-        return valid() && entity::is_a(comp_, GameClass::Production);
-    }
-    bool is_processing() const {
-        return valid() && entity::is_a(comp_, GameClass::Processingmodule);
-    }
-    bool is_habitation() const {
-        return valid() && entity::is_a(comp_, GameClass::Habitation);
-    }
-    bool is_buildmodule() const {
-        return valid() && entity::is_a(comp_, GameClass::Buildmodule);
-    }
-    bool is_storage() const {
-        return valid() && entity::is_a(comp_, GameClass::Storage);
-    }
-    bool is_defence() const {
-        return valid() && entity::is_a(comp_, GameClass::Defencemodule);
-    }
-    bool is_connection() const {
-        return valid() && entity::is_a(comp_, GameClass::Connectionmodule);
-    }
-    bool is_operational() const {
-        auto* g = game();
-        return valid() && g && g->IsComponentOperational(id_);
-    }
-
-    const char* macro() const {
-        return valid() ? entity::get_component_macro(comp_) : nullptr;
-    }
+    ND char const *macro() const { return valid() ? entity::get_component_macro(component()) : nullptr; }
 
     /// Extract ware_id from macro: "prod_gen_energycells_macro" -> "energycells".
     /// Returns empty string if macro doesn't match the production naming pattern.
-    std::string ware_id() const {
-        const char* m = macro();
-        if (!m) return {};
-        std::string s(m);
-        if (s.size() < 12) return {};
-        if (s.substr(s.size() - 6) != "_macro") return {};
-        if (s.substr(0, 5) != "prod_") return {};
-        auto pos = s.find('_', 5);
-        if (pos == std::string::npos) return {};
-        return s.substr(pos + 1, s.size() - 6 - pos - 1);
+    ND std::string ware_id() const
+    {
+        char const *m = macro();
+        if (!m)
+            return {};
+        std::string_view s(m);
+        if (s.size() < 12)
+            return {};
+        if (s.substr(s.size() - 6) != "_macro")
+            return {};
+        if (s.substr(0, 5) != "prod_")
+            return {};
+        size_t pos = s.find('_', 5);
+        if (pos == std::string::npos)
+            return {};
+        return std::string{s.substr(pos + 1, s.size() - 6 - pos - 1)};
     }
 
     /// Pause or resume this module via the game's FFI.
     /// @note FFI checks player ownership — may silently fail on NPC modules.
-    void set_paused(bool p) {
-        auto* g = game();
-        if (!valid() || !g) return;
-        if (is_production())       g->PauseProductionModule(id_, p);
-        else if (is_processing())  g->PauseProcessingModule(id_, p);
+    void set_paused(bool p)
+    {
+        auto *g = game();
+        if (!valid() || !g)
+            return;
+        if (is_production())
+            g->PauseProductionModule(id(), p);
+        else if (is_processing())
+            g->PauseProcessingModule(id(), p);
     }
 
     /// True iff this module has been manually paused.
@@ -103,17 +96,16 @@ public:
     ///
     /// See docs/rev/PRODUCTION_MODULES.md §5.3.
     /// Works for NPC-owned modules (read path is not gated; only the FFI write is).
-    bool is_paused() const {
-        if (!valid()) return false;
-        if (entity::is_a(comp_, GameClass::Production)) {
-            double t = *reinterpret_cast<const double*>(
-                reinterpret_cast<const uint8_t*>(comp_) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
+    ND bool is_paused() const
+    {
+        if (!valid())
+            return false;
+        if (entity::is_a(component(), GameClass::Production)) {
+            double t = *reinterpret_cast<double const *>(reinterpret_cast<uint8_t const *>(component()) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
             return t > -0.9999;
         }
-        if (entity::is_a(comp_, GameClass::Processingmodule)) {
-            return *(reinterpret_cast<const uint8_t*>(comp_)
-                      + X4_PROCESSINGMODULE_PAUSED_FLAG_OFFSET) != 0;
-        }
+        if (entity::is_a(component(), GameClass::Processingmodule))
+            return *(reinterpret_cast<uint8_t const *>(component()) + X4_PROCESSINGMODULE_PAUSED_FLAG_OFFSET) != 0;
         return false;
     }
 
@@ -130,11 +122,14 @@ public:
     /// Save-persistent — the timestamp survives save/load cycles.
     ///
     /// See docs/rev/PRODUCTION_MODULES.md §5.3.
-    double paused_since() const {
-        if (!is_production()) return -1.0;
-        return *reinterpret_cast<const double*>(
-            reinterpret_cast<const uint8_t*>(comp_) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
+    ND double paused_since() const
+    {
+        if (!is_production())
+            return -1.0;
+        return *reinterpret_cast<double const *>(reinterpret_cast<uint8_t const *>(component()) + X4_PRODUCTION_PAUSED_SINCE_OFFSET);
     }
 };
 
-}} // namespace x4n::module
+} // namespace x4n::module
+
+#pragma pop_macro("ND")
