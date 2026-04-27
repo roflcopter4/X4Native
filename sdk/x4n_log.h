@@ -54,7 +54,7 @@ inline std::string format_msg(std::format_string<Args...> fmt, Args &&...args)
 {
     char buf[1024];
     auto result = std::format_to_n(buf, sizeof(buf) - 1, fmt, std::forward<Args>(args)...);
-    if (result.size() <= static_cast<std::ptrdiff_t>(sizeof(buf) - 1))
+    if (result.size <= static_cast<std::ptrdiff_t>(sizeof(buf) - 1))
         return std::string(buf, result.out);
     // Overflow: format into an allocating string.
     return std::format(fmt, std::forward<Args>(args)...);

@@ -90,22 +90,30 @@ static std::pair<const PropChangeTypeEntry*, uint32_t> find_propchange_type_tabl
         }
 
         // Need 500+ sequential IDs with at least 400 valid strings.
-        // Additionally validate against known event names: RTTI "KilledEvent" → short "killed"
-        // should appear at the matching type_id index. This distinguishes the event type table
-        // from other sequential property tables in .rdata.
+        // Additionally validate against known event names to distinguish the event
+        // type table from other sequential property tables in .rdata.
+        //
+        // Use a position-independent search: count occurrences of known event
+        // short_names anywhere in the table. IDs shift between builds when
+        // Egosoft inserts/removes events (e.g. AttachShipToDockEvent inserted at
+        // id=29 in 606138 shifted every later id by +1), so fixed-index checks
+        // break silently. Name presence is stable across id reassignments.
         if (sequential >= 500 && valid_strings >= 400) {
-            // Spot-check: entry[29] should be "attacked" (AttackedEvent=29),
-            // entry[55] should be "buildfinished" (BuildFinishedEvent=55)
-            bool valid_event_table = false;
-            if (sequential > 55) {
-                auto& e29 = candidate[29];
-                auto& e55 = candidate[55];
-                if (e29.name && std::strcmp(e29.name, "attacked") == 0 &&
-                    e55.name && std::strcmp(e55.name, "buildfinished") == 0) {
-                    valid_event_table = true;
+            static constexpr const char* known_names[] = {
+                "attacked", "killed", "destroyed", "damaged",
+                "buildfinished", "buildcancelled", "activate",
+                "dockingrequested", "aiordercancelled", "airlockcycled"
+            };
+            uint32_t hits = 0;
+            for (uint32_t i = 0; i < sequential && i < 600; i++) {
+                const char* n = candidate[i].name;
+                auto sptr = reinterpret_cast<uintptr_t>(n);
+                if (sptr < exe_base || sptr >= exe_base + 0x20000000) continue;
+                for (const char* k : known_names) {
+                    if (std::strcmp(n, k) == 0) { ++hits; break; }
                 }
             }
-            if (valid_event_table) {
+            if (hits >= 5) {
                 return {candidate, sequential};
             }
         }
