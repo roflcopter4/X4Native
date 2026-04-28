@@ -29,16 +29,17 @@ extern "C" {
 typedef struct X4GameOffsets {
     // === Pre-resolved pointers (exe_base + RVA, computed once at startup) ===
     // Extensions dereference these directly — no arithmetic needed.
-    double   *frame_game_time;          // X4_RVA_FRAME_GAME_TIME
-    double   *frame_raw_time;           // X4_RVA_FRAME_RAW_TIME
-    double   *frame_real_time;          // X4_RVA_FRAME_REAL_TIME
-    double   *frame_speed_mult;         // X4_RVA_FRAME_SPEED_MULT
-    void     *component_registry;       // X4_RVA_COMPONENT_REGISTRY (ptr to registry ptr)
-    void     *game_universe;            // X4_RVA_GAME_UNIVERSE (ptr to universe ptr)
-    uint64_t *session_seed;             // X4_RVA_SESSION_SEED
-    void     *construction_plan_db;     // X4_RVA_CONSTRUCTION_PLAN_DB (ptr to plan DB ptr)
-    void     *macro_registry;           // X4_RVA_MACRO_REGISTRY (ptr to macro registry ptr)
-    void     *radar_event_vtable;       // X4_RADAR_EVENT_VTABLE_RVA
+    double*   frame_game_time;          // X4_RVA_FRAME_GAME_TIME
+    double*   frame_raw_time;           // X4_RVA_FRAME_RAW_TIME
+    double*   frame_real_time;          // X4_RVA_FRAME_REAL_TIME
+    double*   frame_speed_mult;         // X4_RVA_FRAME_SPEED_MULT
+    void*     component_registry;       // X4_RVA_COMPONENT_REGISTRY (ptr to registry ptr)
+    void*     faction_registry;         // X4_RVA_FACTION_REGISTRY (ptr to registry; tree at +16, root at +24)
+    void*     game_universe;            // X4_RVA_GAME_UNIVERSE (ptr to universe ptr)
+    uint64_t* session_seed;             // X4_RVA_SESSION_SEED
+    void*     construction_plan_db;     // X4_RVA_CONSTRUCTION_PLAN_DB (ptr to plan DB ptr)
+    void*     macro_registry;           // X4_RVA_MACRO_REGISTRY (ptr to macro registry ptr)
+    void*     radar_event_vtable;       // X4_RADAR_EVENT_VTABLE_RVA
 
     // === Vtable slot indices (byte_offset / 8, ready for vtable[slot]) ===
     uint32_t  vtable_get_class_type;    // X4_VTABLE_GET_CLASS_TYPE / 8
