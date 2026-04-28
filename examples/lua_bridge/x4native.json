@@ -1,5 +1,5 @@
 {
     "library": "native\\x4native_lua_bridge.dll",
     "priority": 100,
-    "min_api_version": 1
+    "min_api_version": 2
 }

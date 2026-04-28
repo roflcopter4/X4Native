@@ -7,31 +7,51 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
+#include <memory>
 #include <system_error>
 
 namespace fs = std::filesystem;
 
 namespace x4n {
 
-HANDLE     Logger::s_handle = INVALID_HANDLE_VALUE;
+std::vector<std::pair<LogLevel, std::string>> Logger::s_buffer;
+Logger::HandleType Logger::s_handle = invalid_handle_value;
+bool       Logger::s_buffering = true;
+fs::path   Logger::s_mod_root;
+fs::path   Logger::s_profile_dir;
 std::mutex Logger::s_mutex;
 
-std::vector<std::pair<LogLevel, std::string>> Logger::s_buffer;
-bool        Logger::s_buffering = true;
-std::string Logger::s_mod_root;
-std::string Logger::s_profile_dir;
+static void output_debug_string(std::string const &msg)
+{
+#ifdef _WIN32
+    wchar_t stack_buf[512];
+    int size = ::MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), static_cast<int>(msg.size()), stack_buf, 512);
+    if (size > 0 && size < 512) {
+        stack_buf[size] = L'\0';
+        ::OutputDebugStringW(stack_buf);
+    } else {
+        // Fallback for long strings (rare)
+        size = ::MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), static_cast<int>(msg.size()), nullptr, 0);
+        auto wbuf = std::make_unique<wchar_t[]>(size + 1);
+        ::MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), static_cast<int>(msg.size()), wbuf.get(), size);
+        wbuf[size] = L'\0';
+        ::OutputDebugStringW(wbuf.get());
+    }
+#else
+    if (msg.ends_with('\n'))
+        fwrite(msg.c_str(), 1, msg.size(), stderr);
+    else
+        fprintf(stderr, "%.*s\n", msg.size(), msg.c_str());
+#endif
+}
 
 static constexpr char const *level_tag(LogLevel lv)
 {
     switch (lv) {
-    case LogLevel::Debug:
-        return "debug";
-    case LogLevel::Info:
-        return "info";
-    case LogLevel::Warn:
-        return "warn";
-    case LogLevel::Error:
-        return "error";
+    case LogLevel::Debug: return "debug";
+    case LogLevel::Info:  return "info";
+    case LogLevel::Warn:  return "warn";
+    case LogLevel::Error: return "error";
     }
     return "?";
 }
@@ -39,58 +59,78 @@ static constexpr char const *level_tag(LogLevel lv)
 // Rotation failures that aren't "the file doesn't exist" are surfaced via
 // OutputDebugStringA. We can't use the Logger itself here: open_log runs
 // during Logger bring-up, so recursion would be unsafe.
-static void log_rotate_error(char const *op, std::string const &path)
+static void log_rotate_error(char const *op, fs::path const &path, std::error_code const &ec)
 {
-    DWORD err = GetLastError();
-    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+    if (ec.value() == 0)
         return;
-    std::string msg = "X4Native: log "s + op + " '" + path + "' failed (GLE=" + std::to_string(err) + ")\n";
-    OutputDebugStringA(msg.c_str());
+#ifdef _WIN32
+    if (ec.value() == ERROR_FILE_NOT_FOUND || ec.value() == ERROR_PATH_NOT_FOUND)
+        return;
+#else
+    if (ec.value() == ENOENT)
+        return;
+#endif
+
+    std::string msg = std::format("X4Native: log {} '{}' failed ({} -> {})\n",
+                                  op, path.string(), ec.value(), ec.message());
+    output_debug_string(msg);
 }
 
-HANDLE Logger::open_log(std::string const &log_path)
+Logger::HandleType Logger::open_log(std::filesystem::path const &log_path)
 {
     static constexpr int MAX_BACKUPS = 4;
 
-    std::string base = log_path;
-    if (base.size() >= 4 && base.ends_with(".log"sv))
-        base.resize(base.size() - 4);
+    std::error_code ec;
+    std::string base = fs::path(log_path).replace_extension().string();
 
-    std::string oldest = base + ".4.log";
-    if (!DeleteFileA(oldest.c_str()))
-        log_rotate_error("delete", oldest);
+    auto oldest = fs::path(base + ".4.log");
+    if (!fs::remove(oldest, ec))
+        log_rotate_error("delete", oldest, ec);
 
     for (int i = MAX_BACKUPS - 1; i >= 1; --i) {
-        std::string src = base + "." + std::to_string(i) + ".log";
-        std::string dst = base + "." + std::to_string(i + 1) + ".log";
-        if (!MoveFileA(src.c_str(), dst.c_str()))
-            log_rotate_error("rotate", src);
+        auto src = fs::path(base + '.' + std::to_string(i) + ".log");
+        if (fs::exists(src)) {
+            auto dst = fs::path(base + '.' + std::to_string(i + 1) + ".log");
+            fs::rename(src, dst, ec);
+            if (ec)
+                log_rotate_error("rotate", src, ec);
+        }
     }
-    std::string first_backup = base + ".1.log";
-    if (!MoveFileA(log_path.c_str(), first_backup.c_str()))
-        log_rotate_error("rotate", log_path);
+    if (fs::exists(log_path)) {
+        auto first_backup = fs::path(base + ".1.log");
+        fs::rename(log_path, first_backup, ec);
+        if (ec)
+            log_rotate_error("rotate", log_path, ec);
+    }
 
-    HANDLE h = CreateFileA(log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+#ifdef _WIN32
+    HANDLE h = CreateFileW(log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE)
-        log_rotate_error("open", log_path);
+        log_rotate_error("open", log_path, std::error_code(static_cast<int>(::GetLastError()), std::system_category()));
+#else
+    int h = open(log_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (h == -1)
+        log_rotate_error("open", log_path, std::error_code(errno, std::system_category()));
+#endif
+
     return h;
 }
 
-void Logger::init(std::string const &mod_root)
+void Logger::init(fs::path const &mod_root)
 {
     std::scoped_lock lock(s_mutex);
     s_mod_root  = mod_root;
     s_buffering = true;
     s_buffer.clear();
-    s_handle = INVALID_HANDLE_VALUE;
+    s_handle = invalid_handle_value;
 }
 
-std::string Logger::profile_log_dir()
+fs::path Logger::profile_log_dir()
 {
     if (!s_profile_dir.empty())
         return s_profile_dir;
 
-    X4GameFunctions *game = GameAPI::table();
+    auto *game = GameAPI::table();
     if (!game || !game->GetSaveFolderPath)
         return {};
 
@@ -100,8 +140,10 @@ std::string Logger::profile_log_dir()
 
     // GetSaveFolderPath returns "<profile>\save\" — strip the save/ suffix
     // to get the profile root, then append our own subfolder.
-    fs::path save_folder(raw);
-    fs::path profile = save_folder.has_filename() ? save_folder.parent_path() : save_folder.parent_path().parent_path();
+    fs::path save_folder = raw;
+    fs::path profile = save_folder.has_filename()
+        ? save_folder.parent_path()
+        : save_folder.parent_path().parent_path();
 
     fs::path dir = profile / "x4native";
     std::error_code ec;
@@ -110,30 +152,24 @@ std::string Logger::profile_log_dir()
         return {};
 
     // Store with trailing separator so callers can concat a filename directly.
-    s_profile_dir = dir.string();
-    if (!s_profile_dir.empty() && s_profile_dir.back() != '\\' && s_profile_dir.back() != '/')
-        s_profile_dir += '\\';
+    s_profile_dir = std::move(dir);
     return s_profile_dir;
 }
 
-std::string Logger::profile_ext_dir(std::string const &extension_id)
+fs::path Logger::profile_ext_dir(std::string const &extension_id)
 {
     if (extension_id.empty())
         return {};
-    std::string base = profile_log_dir();
+    fs::path base = profile_log_dir();
     if (base.empty())
         return {};
 
-    fs::path dir = fs::path(base) / extension_id;
+    fs::path dir = base / extension_id;
     std::error_code ec;
-    fs::create_directories(dir, ec);
+    create_directories(dir, ec);
     if (ec)
         return {};
-
-    std::string out = dir.string();
-    if (!out.empty() && out.back() != '\\' && out.back() != '/')
-        out += '\\';
-    return out;
+    return dir;
 }
 
 bool Logger::is_safe_relative_name(std::string const &name, char const *ctx)
@@ -142,12 +178,13 @@ bool Logger::is_safe_relative_name(std::string const &name, char const *ctx)
         warn("{}: empty filename rejected", ctx ? ctx : "path");
         return false;
     }
-    fs::path path(name);
+    auto path = fs::path(name);
     if (path.is_absolute()) {
         warn("{}: absolute path rejected: '{}'", ctx ? ctx : "path", name);
         return false;
     }
-    if (std::ranges::any_of(path, [](fs::path const &part) { return part == L".."; })) {
+    static fs::path const dotdot = "..";
+    if (std::ranges::any_of(path, [](fs::path const &part) { return part == dotdot; })) {
         warn("{}: '..' in path rejected: '{}'", ctx ? ctx : "path", name);
         return false;
     }
@@ -156,11 +193,11 @@ bool Logger::is_safe_relative_name(std::string const &name, char const *ctx)
 
 void Logger::open_files()
 {
-    std::string dir = profile_log_dir();
+    fs::path dir = profile_log_dir();
     if (dir.empty())
         dir = s_mod_root; // fallback: write next to the extension
 
-    HANDLE h = open_log(dir + "x4native.log");
+    HandleType h = open_log(dir / "x4native.log");
 
     std::vector<std::pair<LogLevel, std::string>> pending;
     {
@@ -169,9 +206,8 @@ void Logger::open_files()
         s_buffering = false;
         pending.swap(s_buffer);
     }
-
-    if (h == INVALID_HANDLE_VALUE) {
-        OutputDebugStringW(L"X4Native: Failed to open framework log file\n");
+    if (h == invalid_handle_value) {
+        output_debug_string("X4Native: Failed to open framework log file\n");
         return;
     }
 
@@ -183,10 +219,9 @@ void Logger::open_files()
 void Logger::shutdown()
 {
     std::scoped_lock lock(s_mutex);
-    if (s_handle != INVALID_HANDLE_VALUE) {
-        FlushFileBuffers(s_handle);
-        CloseHandle(s_handle);
-        s_handle = INVALID_HANDLE_VALUE;
+    if (s_handle != invalid_handle_value) {
+        flush_and_close_handle(s_handle);
+        s_handle = invalid_handle_value;
     }
     s_buffer.clear();
     s_buffering = false;
@@ -197,17 +232,24 @@ void Logger::shutdown()
 // Write `line` to `h` under `mtx`, then (outside the lock) optionally flush.
 // Flushing outside the lock keeps high-volume log callers from serialising
 // on disk sync — FlushFileBuffers is thread-safe per MSDN.
-static void write_handle(std::mutex &mtx, HANDLE h, LogLevel level, std::string const &line)
+static void write_handle(std::mutex &mtx, Logger::HandleType h, LogLevel level, std::string const &line)
 {
-    bool should_flush = false;
-    if (h != INVALID_HANDLE_VALUE) {
-        std::scoped_lock lock(mtx);
-        DWORD written;
-        WriteFile(h, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
-        should_flush = level >= LogLevel::Info;
-    }
-    if (should_flush)
-        FlushFileBuffers(h);
+    if (h == Logger::invalid_handle_value)
+        return;
+    std::unique_lock lock(mtx);
+
+#ifdef _WIN32
+    ::DWORD written;
+    ::WriteFile(h, line.data(), static_cast<::DWORD>(line.size()), &written, nullptr);
+    lock.unlock();
+    if (level >= LogLevel::Info)
+        ::FlushFileBuffers(h);
+#else
+    ::write(h, line.data(), line.size());
+    lock.unlock();
+    if (level >= LogLevel::Info)
+        ::fsync(h);
+#endif
 }
 
 void Logger::write(LogLevel level, std::string_view const &msg)
@@ -217,27 +259,63 @@ void Logger::write(LogLevel level, std::string_view const &msg)
 
     // Decide buffer vs file in a single critical section so we never race
     // with open_files() swapping s_buffering/s_handle.
-    HANDLE h;
+    HandleType h;
     {
         std::scoped_lock lock(s_mutex);
         if (s_buffering) {
             s_buffer.emplace_back(level, std::string(msg));
-            OutputDebugStringA(line.c_str());
+            output_debug_string(line);
             return;
         }
         h = s_handle;
     }
-
     write_handle(s_mutex, h, level, line);
-    OutputDebugStringA(line.c_str());
+    output_debug_string(line);
 }
 
-void Logger::write_to(HANDLE h, LogLevel level, std::string_view const &msg)
+void Logger::write_to(HandleType h, LogLevel level, std::string_view const &msg)
 {
     auto now  = std::chrono::system_clock::now();
     auto line = std::format("[{:%Y-%m-%d %H:%M:%S}] [{}] {}\n", now, level_tag(level), msg);
     write_handle(s_mutex, h, level, line);
-    OutputDebugStringA(line.c_str());
+    output_debug_string(line);
 }
+
+
+void Logger::flush_handle(HandleType h)
+{
+    if (h == invalid_handle_value)
+        return;
+#ifdef _WIN32
+    ::FlushFileBuffers(h);
+#else
+    ::fsync(h);
+#endif
+}
+
+void Logger::close_handle(HandleType h)
+{
+    if (h == invalid_handle_value)
+        return;
+#ifdef _WIN32
+    ::CloseHandle(h);
+#else
+    ::fsync(h);
+#endif
+}
+
+void Logger::flush_and_close_handle(HandleType h)
+{
+    if (h == invalid_handle_value)
+        return;
+#ifdef _WIN32
+    ::FlushFileBuffers(h);
+    ::CloseHandle(h);
+#else
+    ::close(h);
+    ::fsync(h);
+#endif
+}
+
 
 } // namespace x4n

@@ -11,26 +11,22 @@
 #include <x4_game_func_table.h>
 #include <x4_game_offsets.h>
 
-// Runtime-resolved offsets populated by core.cpp::populate_offsets()
-extern X4GameOffsets s_offsets;
-
 #include <nlohmann/json.hpp>
-#include <filesystem>
-#include <fstream>
 #include <algorithm>
+#include <fstream>
 #include <ranges>
 #include <regex>
+
+// Runtime-resolved offsets populated by core.cpp::populate_offsets()
+extern X4GameOffsets s_offsets;
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 namespace x4n {
 
-using raise_lua_event_fn     = int (*)(char const *, char const *);
-using register_lua_bridge_fn = int (*)(char const *, char const *);
-
 std::vector<ExtensionInfo> ExtensionManager::s_extensions;
-std::string ExtensionManager::s_ext_root;
+fs::path    ExtensionManager::s_ext_root;
 std::string ExtensionManager::s_game_version;
 int         ExtensionManager::s_tick_frame     = 0;
 bool        ExtensionManager::s_any_autoreload = false;
@@ -47,7 +43,7 @@ static stash_clear_fn         s_stash_clear         = nullptr;
 // ---------------------------------------------------------------------------
 
 void ExtensionManager::init(
-    std::string const     &ext_root,
+    fs::path               ext_root,
     std::string const     &game_version,
     raise_lua_event_fn     raise_lua_event,
     register_lua_bridge_fn register_lua_bridge,
@@ -56,7 +52,7 @@ void ExtensionManager::init(
     stash_remove_fn        stash_remove,
     stash_clear_fn         stash_clear)
 {
-    s_ext_root            = ext_root;
+    s_ext_root            = std::move(ext_root);
     s_game_version        = game_version;
     s_raise_lua_event     = raise_lua_event;
     s_register_lua_bridge = register_lua_bridge;
@@ -81,7 +77,8 @@ void ExtensionManager::shutdown()
 // Discovery — scan sibling extension folders for x4native.json
 // ---------------------------------------------------------------------------
 
-void ExtensionManager::discover() {
+void ExtensionManager::discover()
+{
     // If extensions are already loaded, shut them down first.
     // This handles save-load and /reloadui where Lua re-executes
     // and calls discover_extensions() again.
@@ -94,10 +91,9 @@ void ExtensionManager::discover() {
     // We scan the parent "extensions\" dir for sibling extensions
     // Note: trailing separator means parent_path() just strips it,
     // so we need parent_path() twice (or strip trailing sep first).
-    fs::path ext_path = fs::path(s_ext_root);
-    fs::path extensions_dir = ext_path.has_filename()
-        ? ext_path.parent_path()
-        : ext_path.parent_path().parent_path();
+    fs::path extensions_dir = s_ext_root.has_filename()
+        ? s_ext_root.parent_path()
+        : s_ext_root.parent_path().parent_path();
 
     if (!fs::is_directory(extensions_dir)) {
         Logger::warn("Extension discovery: cannot find extensions dir: {}", extensions_dir.string());
@@ -106,75 +102,76 @@ void ExtensionManager::discover() {
 
     Logger::info("Scanning for native extensions in: {}", extensions_dir.string());
 
-    for (auto const & entry : fs::directory_iterator(extensions_dir)) {
-        if (!entry.is_directory()) continue;
-
+    for (fs::directory_entry const &entry : fs::directory_iterator(extensions_dir))
+    {
+        if (!entry.is_directory())
+            continue;
         // Skip ourselves
-        auto dir_name = entry.path().filename().string();
-        if (dir_name == "x4native") continue;
-
-        auto config_path = entry.path() / "x4native.json";
-        if (!fs::exists(config_path)) continue;
-
+        auto dir_name = entry.path().filename();
+        if (dir_name == "x4native")
+            continue;
+        fs::path config_path = entry.path() / "x4native.json";
+        if (!fs::exists(config_path))
+            continue;
         ExtensionInfo info;
-        info.path = entry.path().string() + "\\";
+        info.path = entry.path().string();
+        if (!parse_config(config_path, info))
+            continue;
 
-        if (parse_config(config_path.string(), info)) {
-            // Identity comes from content.xml — X4 enforces id uniqueness.
-            // The regex anchors on `<content ...>` so a stray `id=` attribute
-            // elsewhere in the file can't hijack the match.
-            auto content_xml = entry.path() / "content.xml";
-            if (fs::exists(content_xml)) {
-                std::ifstream xml_file(content_xml);
-                std::string xml_content((std::istreambuf_iterator<char>(xml_file)),
-                                         std::istreambuf_iterator<char>());
-                static std::regex const id_re  (R"xml(<content\b[^>]*\bid="([^"]+)")xml");
-                static std::regex const name_re(R"xml(<content\b[^>]*\bname="([^"]+)")xml");
-                std::smatch             m;
-                if (std::regex_search(xml_content, m, id_re))
-                    info.extension_id = m[1].str();
-                if (std::regex_search(xml_content, m, name_re))
-                    info.display_name = m[1].str();
-            }
-            // Fallbacks: content.xml missing or lacking these attributes is a
-            // degenerate case (X4 wouldn't load the extension either). Still,
-            // keep loading — framework-side we use extension_id everywhere.
-            if (info.extension_id.empty())
-                info.extension_id = dir_name;
-            if (info.display_name.empty())
-                info.display_name = info.extension_id;
+        // Identity comes from content.xml — X4 enforces id uniqueness.
+        // The regex anchors on `<content ...>` so a stray `id=` attribute
+        // elsewhere in the file can't hijack the match.
+        fs::path content_xml = entry.path() / "content.xml";
+        if (fs::exists(content_xml)) {
+            auto xml_file = std::ifstream(content_xml);
+            auto xml_data = std::string(std::istreambuf_iterator<char>(xml_file), std::istreambuf_iterator<char>());
 
-            // Deprecated: legacy "name" in x4native.json. Warn (and track so
-            // the warning also reaches the extension's own log once open).
-            if (!info.json_name.empty()) {
-                auto msg = std::format(
-                    "x4native.json: 'name' field is deprecated "
-                    "(ignored in favour of content.xml id/name) — remove from {}",
-                    config_path.string());
-                Logger::warn("{}", msg);
-                info.pending_warnings.push_back({LogLevel::Warn, std::move(msg)});
-            }
+            static auto const id_re   = std::regex(R"xml(<content\b[^>]*\bid="([^"]+)")xml",   std::regex_constants::ECMAScript | std::regex_constants::optimize);
+            static auto const name_re = std::regex(R"xml(<content\b[^>]*\bname="([^"]+)")xml", std::regex_constants::ECMAScript | std::regex_constants::optimize);
 
-            Logger::info("Discovered extension: {} (id={}, priority={}, api={})",
-                         info.display_name, info.extension_id,
-                         info.priority, info.api_version);
-
-            // Register settings now that we know the extension_id.
-            if (!info.settings_schema.empty()) {
-                SettingsManager::register_extension(info.extension_id,
-                                                    std::move(info.settings_schema));
-                info.settings_schema.clear();  // moved out; keep the vector empty
-            }
-
-            s_extensions.push_back(std::move(info));
+            std::smatch m;
+            if (std::regex_search(xml_data, m, id_re))
+                info.extension_id = m[1].str();
+            if (std::regex_search(xml_data, m, name_re))
+                info.display_name = m[1].str();
         }
+        // Fallbacks: content.xml missing or lacking these attributes is a
+        // degenerate case (X4 wouldn't load the extension either). Still,
+        // keep loading — framework-side we use extension_id everywhere.
+        if (info.extension_id.empty())
+            info.extension_id = dir_name.string();
+        if (info.display_name.empty())
+            info.display_name = info.extension_id;
+
+        // Deprecated: legacy "name" in x4native.json. Warn (and track so
+        // the warning also reaches the extension's own log once open).
+        if (!info.json_name.empty()) {
+            auto msg = std::format("x4native.json: 'name' field is deprecated (ignored in favour of content.xml id/name) — remove from {}",
+                                   config_path.string());
+            Logger::warn("{}", msg);
+            info.pending_warnings.emplace_back(LogLevel::Warn, std::move(msg));
+        }
+
+        Logger::info("Discovered extension: {} (id={}, priority={}, api={})",
+                     info.display_name, info.extension_id,
+                     info.priority, info.api_version);
+
+        // Register settings now that we know the extension_id.
+        if (!info.settings_schema.empty()) {
+            SettingsManager::register_extension(info.extension_id, std::move(info.settings_schema));
+            info.settings_schema.clear();  // moved out; keep the vector empty
+        }
+
+        s_extensions.emplace_back(std::move(info));
     }
 
     // Sort by priority (lower = loads first)
-    std::sort(s_extensions.begin(), s_extensions.end(),
-              [](ExtensionInfo const & a, ExtensionInfo const & b) {
-                  return a.priority < b.priority;
-              });
+    std::ranges::sort(
+        s_extensions,
+        [](ExtensionInfo const &a, ExtensionInfo const &b) {
+            return a.priority < b.priority;
+        }
+    );
 
     Logger::info("Discovered {} native extension(s)", s_extensions.size());
 }
@@ -183,10 +180,11 @@ void ExtensionManager::discover() {
 // Config parsing
 // ---------------------------------------------------------------------------
 
-bool ExtensionManager::parse_config(std::string const & json_path, ExtensionInfo& info) {
+bool ExtensionManager::parse_config(fs::path const &json_path, ExtensionInfo &info)
+{
     std::ifstream file(json_path);
     if (!file.is_open()) {
-        Logger::warn("Cannot open config: {}", json_path);
+        Logger::warn("Cannot open config: {}", json_path.string());
         return false;
     }
 
@@ -194,42 +192,47 @@ bool ExtensionManager::parse_config(std::string const & json_path, ExtensionInfo
     try {
         file >> cfg;
     } catch (json::parse_error const & e) {
-        Logger::error("JSON parse error in {}: {}", json_path, e.what());
+        Logger::error("JSON parse error in {}: {}", json_path.string(), e.what());
         return false;
     }
 
     // Required: library
-    if (!cfg.contains("library") || !cfg["library"].is_string()) {
-        Logger::warn("Config missing 'library': {}", json_path);
+    auto it = cfg.find("library");
+    if (it == cfg.end() || !it->is_string()) {
+        Logger::warn("Config missing 'library': {}", json_path.string());
         return false;
     }
 
-    std::string dll_rel = cfg["library"].get<std::string>();
-    info.dll_path = info.path + dll_rel;
+    info.dll_path = fs::path(info.path) / it->get<std::string>();
 
     // Optional: legacy "name" field. Identity now comes from content.xml.
     // Stored so we can log a deprecation warning once the logger is open.
-    if (cfg.contains("name") && cfg["name"].is_string())
-        info.json_name = cfg["name"].get<std::string>();
+    it = cfg.find("name");
+    if (it != cfg.end() && it->is_string())
+        info.json_name = it->get<std::string>();
 
-    if (cfg.contains("logfile") && cfg["logfile"].is_string())
-        info.log_name = cfg["logfile"].get<std::string>();
+    it = cfg.find("logfile");
+    if (it != cfg.end() && it->is_string())
+        info.log_name = it->get<std::string>();
 
-    if (cfg.contains("priority") && cfg["priority"].is_number_integer())
-        info.priority = cfg["priority"].get<int>();
+    it = cfg.find("priority");
+    if (it != cfg.end() && it->is_number_integer())
+        info.priority = it->get<int>();
 
-    if (cfg.contains("min_api_version") && cfg["min_api_version"].is_number_integer())
-        info.api_version = cfg["min_api_version"].get<int>();
+    it = cfg.find("min_api_version");
+    if (it != cfg.end() && it->is_number_integer())
+        info.api_version = it->get<int>();
 
-    if (cfg.contains("autoreload") && cfg["autoreload"].is_boolean())
-        info.autoreload = cfg["autoreload"].get<bool>();
+    it = cfg.find("autoreload");
+    if (it != cfg.end() && it->is_boolean())
+        info.autoreload = it->get<bool>();
 
     // Settings schema — optional. Actual registration happens in discover()
     // once we know the extension_id (pulled from content.xml). Context string
     // uses the folder path so warnings reference a concrete file.
-    if (cfg.contains("settings"))
-        SettingsManager::parse_schema_array(cfg["settings"], info.settings_schema,
-                                            json_path, &info.pending_warnings);
+    it = cfg.find("settings");
+    if (it != cfg.end())
+        SettingsManager::parse_schema_array(*it, info.settings_schema, json_path.string(), &info.pending_warnings);
 
     return true;
 }
@@ -241,75 +244,75 @@ bool ExtensionManager::parse_config(std::string const & json_path, ExtensionInfo
 // Resolves the (api, ext) pair from a `void* api_ptr` argument passed by the
 // SDK-side log wrappers. Returns {nullptr, nullptr} if anything is missing.
 // `ext` being null is the caller's early-return condition.
-static std::pair<X4NativeAPI*, ExtensionInfo*> resolve_ext(void* api_ptr) {
-    if (!api_ptr) return {nullptr, nullptr};
-    auto* api = static_cast<X4NativeAPI*>(api_ptr);
-    auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
+static std::pair<X4NativeAPI *, ExtensionInfo *> resolve_ext(void *api_ptr)
+{
+    if (!api_ptr)
+        return {nullptr, nullptr};
+    auto *api = static_cast<X4NativeAPI *>(api_ptr);
+    auto *ext = static_cast<ExtensionInfo *>(api->_ext_info);
     return {api, ext};
 }
 
 // api_log_ext — routes x4n::log::info/warn/etc. to the extension's own log file.
 // Falls back to the global framework log if the handle is not set.
-static void api_log_ext(int level, char const * message, void* api_ptr) {
-    auto lv = static_cast<x4n::LogLevel>(level);
+static void api_log_ext(int level, char const *message, void *api_ptr)
+{
+    auto lv       = static_cast<LogLevel>(level);
     auto [api, _] = resolve_ext(api_ptr);
     if (api) {
-        HANDLE h = static_cast<HANDLE>(api->_ext_log_handle);
-        if (h && h != INVALID_HANDLE_VALUE) {
-            x4n::Logger::write_to(h, lv, message);
+        Logger::HandleType h = api->_ext_log_handle;
+        if (h && h != Logger::invalid_handle_value) {
+            Logger::write_to(h, lv, message);
             return;
         }
     }
-    x4n::Logger::write(lv, message);
+    Logger::write(lv, message);
 }
 
 // api_init_log — called by x4n::log::set_log_file("filename") to redirect
 // the extension's default log. Filename is relative to the extension's
 // subfolder (<profile>\x4native\<ext_id>\) — absolute paths and traversal
 // are rejected.
-static void api_init_log(char const * filename, void* api_ptr) {
+static void api_init_log(char const *filename, void *api_ptr)
+{
+    if (!filename || !filename[0])
+        return;
     auto [api, ext] = resolve_ext(api_ptr);
-    if (!ext) return;
-
-    if (!filename || !filename[0]) return;
-
-    if (!Logger::is_safe_relative_name(
-            filename,
-            ("Extension '" + ext->display_name + "': set_log_file()").c_str()))
+    if (!ext)
+        return;
+    std::string context = "Extension '" + ext->display_name + "': set_log_file()";
+    if (!Logger::is_safe_relative_name(filename, context.c_str()))
         return;
 
-    auto ext_dir = Logger::profile_ext_dir(ext->extension_id);
-    std::string base = ext_dir.empty() ? ext->path : ext_dir;
-    std::string new_path = base + filename;
+    fs::path ext_dir  = Logger::profile_ext_dir(ext->extension_id);
+    fs::path base     = ext_dir.empty() ? ext->path : ext_dir;
+    fs::path new_path = base / filename;
 
     // Ensure any author-requested intermediate directories exist.
     std::error_code ec;
-    fs::create_directories(fs::path(new_path).parent_path(), ec);
+    fs::create_directories(new_path.parent_path(), ec);
     if (ec) {
         Logger::warn("Extension '{}': set_log_file() failed to create '{}': {}",
-                     ext->display_name, new_path, ec.message());
+                     ext->display_name, new_path.string(), ec.message());
         return;
     }
 
-    HANDLE new_h = Logger::open_log(new_path);
-    if (new_h == INVALID_HANDLE_VALUE) {
+    Logger::HandleType new_h = Logger::open_log(new_path);
+    if (new_h == Logger::invalid_handle_value) {
         Logger::warn("Extension '{}': set_log_file() could not open '{}'",
-                     ext->display_name, new_path);
+                     ext->display_name, new_path.string());
         return;
     }
 
     // Close the old handle only after the new one opened successfully.
-    HANDLE old_h = static_cast<HANDLE>(api->_ext_log_handle);
-    if (old_h && old_h != INVALID_HANDLE_VALUE) {
-        FlushFileBuffers(old_h);
-        CloseHandle(old_h);
-    }
+    Logger::HandleType old_h = api->_ext_log_handle;
+    Logger::flush_and_close_handle(old_h);
 
     ext->log_handle      = new_h;
     ext->log_path        = new_path;
     api->_ext_log_handle = new_h;
-    x4n::Logger::write_to(new_h, x4n::LogLevel::Info,
-                           "Extension log initialized: " + new_path);
+
+    Logger::write_to(new_h, LogLevel::Info, "Extension log initialized: " + new_path.string());
 }
 
 // api_log_named — backs x4n::log::to_file("name").info(...).
@@ -324,37 +327,41 @@ static void api_log_named(int level, char const *message, char const *filename, 
         return;
     }
     auto [api, ext] = resolve_ext(api_ptr);
-    if (!ext) return;
-
-    if (!Logger::is_safe_relative_name(
-            filename,
-            ("Extension '" + ext->display_name + "': to_file()").c_str()))
+    if (!ext)
+        return;
+    if (!Logger::is_safe_relative_name(filename, ("Extension '" + ext->display_name + "': to_file()").c_str()))
         return;
 
-    auto ext_dir = Logger::profile_ext_dir(ext->extension_id);
-    std::string base = ext_dir;
+    fs::path base = Logger::profile_ext_dir(ext->extension_id);
     if (base.empty()) {
         // Profile unreachable — fall back to the extension folder, same as
         // earlier releases. The relative-name guard above still prevents
         // traversal even in this fallback.
         base = api->extension_path ? api->extension_path : "";
-        if (base.empty()) return;
+        if (base.empty())
+            return;
     }
 
-    fs::path full = fs::path(base) / filename;
+    fs::path full = base / filename;
     // Ensure any author-requested intermediate directories exist.
     std::error_code ec;
     fs::create_directories(full.parent_path(), ec);
-    if (ec) return;
+    if (ec)
+        return;
 
-    HANDLE h = CreateFileA(full.string().c_str(),
-                           GENERIC_WRITE | FILE_APPEND_DATA,
-                           FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h != INVALID_HANDLE_VALUE) {
-        SetFilePointer(h, 0, nullptr, FILE_END);
-        x4n::Logger::write_to(h, static_cast<x4n::LogLevel>(level), message);
-        CloseHandle(h);
+#ifdef _WIN32
+    HANDLE h = ::CreateFileW(
+        full.c_str(), GENERIC_WRITE | FILE_APPEND_DATA, FILE_SHARE_READ,
+        nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h != INVALID_HANDLE_VALUE)
+        ::SetFilePointer(h, 0, nullptr, FILE_END);
+#else
+    int h = ::open(full.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+#endif
+
+    if (h != Logger::invalid_handle_value) {
+        Logger::write_to(h, static_cast<LogLevel>(level), message);
+        Logger::close_handle(h);
     }
 }
 
@@ -362,22 +369,25 @@ static void api_log_named(int level, char const *message, char const *filename, 
 // Loading — LoadLibrary + resolve exports + SEH-wrapped init
 // ---------------------------------------------------------------------------
 
-void ExtensionManager::load_all() {
-    for (auto& ext : s_extensions) {
+void ExtensionManager::load_all()
+{
+    for (ExtensionInfo &ext : s_extensions) {
         auto result = load_extension(ext);
         if (result == LoadResult::failed)
             Logger::error("Failed to load extension: {}", ext.display_name);
     }
-    s_any_autoreload = std::any_of(s_extensions.begin(), s_extensions.end(),
-                                   [](ExtensionInfo const & e) { return e.autoreload && e.initialized; });
-    if (s_any_autoreload)
-        Logger::info("Autoreload: watching {} extension(s) for DLL changes",
-                     std::count_if(s_extensions.begin(), s_extensions.end(),
-                                   [](ExtensionInfo const & e) { return e.autoreload && e.initialized; }));
+    auto count = std::ranges::count_if(
+        s_extensions, [](ExtensionInfo const &e) { return e.autoreload && e.initialized; }
+    );
+    if (count > 0) {
+        s_any_autoreload = true;
+        Logger::info("Autoreload: watching {} extension(s) for DLL changes", count);
+    }
 }
 
 // SEH wrappers — must be in separate functions (no C++ objects requiring unwinding)
-static int seh_call_api_version(ExtensionInfo::api_version_fn fn) {
+static int seh_call_api_version(ExtensionInfo::api_version_fn fn)
+{
     __try {
         return fn();
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -385,7 +395,8 @@ static int seh_call_api_version(ExtensionInfo::api_version_fn fn) {
     }
 }
 
-static int seh_call_init(ExtensionInfo::init_fn fn, X4NativeAPI* api) {
+static int seh_call_init(ExtensionInfo::init_fn fn, X4NativeAPI *api)
+{
     __try {
         return fn(api);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -393,7 +404,8 @@ static int seh_call_init(ExtensionInfo::init_fn fn, X4NativeAPI* api) {
     }
 }
 
-static void seh_call_shutdown(ExtensionInfo::shutdown_fn fn) {
+static void seh_call_shutdown(ExtensionInfo::shutdown_fn fn)
+{
     __try {
         fn();
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -401,13 +413,13 @@ static void seh_call_shutdown(ExtensionInfo::shutdown_fn fn) {
     }
 }
 
-ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext) {
+ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo &ext)
+{
     // Check if the X4 extension is enabled in-game
-    auto* game = GameAPI::table();
+    auto *game = GameAPI::table();
     if (game && game->IsExtensionEnabled) {
         if (!game->IsExtensionEnabled(ext.extension_id.c_str(), false)) {
-            Logger::info("Extension '{}' (id={}) is disabled in-game — skipping",
-                         ext.display_name, ext.extension_id);
+            Logger::info("Extension '{}' (id={}) is disabled in-game — skipping", ext.display_name, ext.extension_id);
             return LoadResult::skipped;
         }
     }
@@ -421,52 +433,52 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
 
     // Check DLL exists
     if (!fs::exists(ext.dll_path)) {
-        Logger::error("Extension '{}' DLL not found: {}", ext.display_name, ext.dll_path);
+        Logger::error("Extension '{}' DLL not found: {}", ext.display_name, ext.dll_path.string());
         return LoadResult::failed;
     }
 
-    // Copy-on-load: keep the original unlocked so the extension can be rebuilt
-    // while the game is running. The live copy is what gets LoadLibrary'd.
-    fs::path src(ext.dll_path);
-    ext.dll_live_path = (src.parent_path() / (src.stem().string() + "_live" + src.extension().string())).string();
-    if (!CopyFileA(ext.dll_path.c_str(), ext.dll_live_path.c_str(), FALSE)) {
-        Logger::error("Extension '{}': CopyFile failed (error={})", ext.display_name, GetLastError());
-        return LoadResult::failed;
+    std::error_code ec;
+    {
+        // Copy-on-load: keep the original unlocked so the extension can be rebuilt
+        // while the game is running. The live copy is what gets LoadLibrary'd.
+        fs::path const &src  = ext.dll_path;
+        fs::path        dest = src.parent_path() / (src.stem().string() + "_live" + src.extension().string());
+        if (!fs::copy_file(src, dest, fs::copy_options::overwrite_existing, ec)) {
+            Logger::error("Extension '{}': copy_file failed ({})", ext.display_name, ec.message());
+            return LoadResult::failed;
+        }
+        ext.dll_live_path = std::move(dest);
     }
 
-    // Snapshot the original DLL's mtime so tick() can detect future changes
-    WIN32_FILE_ATTRIBUTE_DATA mtime_attr = {};
-    if (GetFileAttributesExA(ext.dll_path.c_str(), GetFileExInfoStandard, &mtime_attr))
-        ext.dll_mtime = mtime_attr.ftLastWriteTime;
+    auto mtime = std::filesystem::last_write_time(ext.dll_path, ec);
+    if (!ec)
+        ext.dll_mtime = mtime;
 
-    ext.module = LoadLibraryA(ext.dll_live_path.c_str());
+    ext.module = ::LoadLibraryW(ext.dll_live_path.c_str());
     if (!ext.module) {
         Logger::error("Extension '{}': LoadLibrary failed (error={})",
-                      ext.display_name, GetLastError());
-        DeleteFileA(ext.dll_live_path.c_str());
+                      ext.display_name, ::GetLastError());
+        fs::remove(ext.dll_live_path, ec);
         return LoadResult::failed;
     }
 
     // Resolve required exports
-    ext.fn_api_version = reinterpret_cast<ExtensionInfo::api_version_fn>(
-        GetProcAddress(ext.module, "x4native_api_version"));
-    ext.fn_init = reinterpret_cast<ExtensionInfo::init_fn>(
-        GetProcAddress(ext.module, "x4native_init"));
-    ext.fn_shutdown = reinterpret_cast<ExtensionInfo::shutdown_fn>(
-        GetProcAddress(ext.module, "x4native_shutdown"));
+    ext.fn_api_version = reinterpret_cast<ExtensionInfo::api_version_fn>(GetProcAddress(ext.module, "x4native_api_version"));
+    ext.fn_init        = reinterpret_cast<ExtensionInfo::init_fn>(GetProcAddress(ext.module, "x4native_init"));
+    ext.fn_shutdown    = reinterpret_cast<ExtensionInfo::shutdown_fn>(GetProcAddress(ext.module, "x4native_shutdown"));
 
-    auto unload_live = [&] {
-        FreeLibrary(ext.module);
+    auto unload_live = [&ext] {
+        ::FreeLibrary(ext.module);
         ext.module = nullptr;
-        DeleteFileA(ext.dll_live_path.c_str());
+        std::error_code ignored_ec;
+        fs::remove(ext.dll_live_path, ignored_ec);
         ext.dll_live_path.clear();
         // Close per-extension log if it was already opened (log open happens after this
         // lambda is defined, but ext.log_handle starts as INVALID_HANDLE_VALUE so early
         // failure paths are safe — they simply skip the close)
-        if (ext.log_handle != INVALID_HANDLE_VALUE) {
-            FlushFileBuffers(ext.log_handle);
-            CloseHandle(ext.log_handle);
-            ext.log_handle = INVALID_HANDLE_VALUE;
+        if (ext.log_handle != Logger::invalid_handle_value) {
+            Logger::flush_and_close_handle(ext.log_handle);
+            ext.log_handle = Logger::invalid_handle_value;
         }
         ext.log_path.clear();
     };
@@ -500,28 +512,26 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
     // (still relative to the subfolder, no traversal).
     // If the profile can't be resolved, fall back to the extension folder.
     {
-        auto ext_dir = Logger::profile_ext_dir(ext.extension_id);
-        std::string log_dir = ext_dir.empty() ? ext.path : ext_dir;
+        fs::path ext_dir = Logger::profile_ext_dir(ext.extension_id);
+        fs::path log_dir = ext_dir.empty() ? ext.path : ext_dir;
 
         if (ext.log_name.empty()) {
-            ext.log_path = log_dir + ext.extension_id + ".log";
-        } else if (Logger::is_safe_relative_name(ext.log_name,
-                        ("Extension '" + ext.display_name + "': 'logfile'").c_str())) {
-            ext.log_path = log_dir + ext.log_name;
+            ext.log_path = log_dir / (ext.extension_id + ".log");
+        } else if (Logger::is_safe_relative_name(ext.log_name, ("Extension '" + ext.display_name + "': 'logfile'").c_str())) {
+            ext.log_path = log_dir / ext.log_name;
         } else {
-            ext.log_path = log_dir + ext.extension_id + ".log";
+            ext.log_path = log_dir / (ext.extension_id + ".log");
         }
         ext.log_handle = Logger::open_log(ext.log_path);
-        if (ext.log_handle == INVALID_HANDLE_VALUE) {
+        if (ext.log_handle == Logger::invalid_handle_value) {
             Logger::warn("Extension '{}': could not open log at '{}'",
-                         ext.display_name, ext.log_path);
+                         ext.display_name, ext.log_path.string());
         } else {
             Logger::write_to(ext.log_handle, LogLevel::Info,
-                             "X4Native extension log — " + ext.display_name
-                             + " (" + ext.extension_id + ")");
+                             "X4Native extension log — " + ext.display_name + " (" + ext.extension_id + ")");
             // Flush warnings buffered during discovery (pre-log) so the
             // extension author sees them at the top of their own log.
-            for (auto const & [lv, msg] : ext.pending_warnings)
+            for (auto const &[lv, msg] : ext.pending_warnings)
                 Logger::write_to(ext.log_handle, lv, msg);
             ext.pending_warnings.clear();
         }
@@ -529,7 +539,6 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
 
     // Build the API struct for this extension (stored in ExtensionInfo,
     // persists until shutdown — extensions keep a pointer to it)
-    ext.api = {};
     fill_api(ext.api, ext);
 
     // SEH-wrapped init call
@@ -551,7 +560,8 @@ ExtensionManager::LoadResult ExtensionManager::load_extension(ExtensionInfo& ext
     return LoadResult::ok;
 }
 
-void ExtensionManager::unload_extension(ExtensionInfo& ext) {
+void ExtensionManager::unload_extension(ExtensionInfo &ext)
+{
     if (ext.initialized && ext.fn_shutdown) {
         Logger::info("Shutting down extension: {}", ext.display_name);
         seh_call_shutdown(ext.fn_shutdown);
@@ -564,20 +574,20 @@ void ExtensionManager::unload_extension(ExtensionInfo& ext) {
     // Remove any hooks this extension registered (must happen before FreeLibrary
     // since hook callbacks point into the extension's DLL code). Keyed on
     // extension_id — the canonical unique identifier.
-    HookManager::remove_all_for_extension(ext.extension_id.c_str());
+    HookManager::remove_all_for_extension(ext.extension_id);
     if (ext.module) {
-        FreeLibrary(ext.module);
+        ::FreeLibrary(ext.module);
         ext.module = nullptr;
     }
     if (!ext.dll_live_path.empty()) {
-        DeleteFileA(ext.dll_live_path.c_str());
+        std::error_code ignored_ec;
+        fs::remove(ext.dll_live_path, ignored_ec);
         ext.dll_live_path.clear();
     }
     // Close per-extension log (after shutdown so the extension can log until the end)
-    if (ext.log_handle != INVALID_HANDLE_VALUE) {
-        FlushFileBuffers(ext.log_handle);
-        CloseHandle(ext.log_handle);
-        ext.log_handle = INVALID_HANDLE_VALUE;
+    if (ext.log_handle != Logger::invalid_handle_value) {
+        Logger::flush_and_close_handle(ext.log_handle);
+        ext.log_handle = Logger::invalid_handle_value;
     }
     ext.log_path.clear();  // reset so load_extension recomputes from log_name on hot-reload
 
@@ -591,20 +601,20 @@ void ExtensionManager::unload_extension(ExtensionInfo& ext) {
 
 static constexpr int AUTORELOAD_TICK_INTERVAL = 120;  // frames between mtime checks (~2s @60fps)
 
-void ExtensionManager::tick() {
-    if (!s_any_autoreload) return;
-    if (++s_tick_frame < AUTORELOAD_TICK_INTERVAL) return;
+void ExtensionManager::tick()
+{
+    if (!s_any_autoreload || ++s_tick_frame < AUTORELOAD_TICK_INTERVAL)
+        return;
     s_tick_frame = 0;
-
-    for (auto& ext : s_extensions) {
-        if (!ext.autoreload || !ext.initialized || ext.reload_pending) continue;
-
-        WIN32_FILE_ATTRIBUTE_DATA attr = {};
-        if (!GetFileAttributesExA(ext.dll_path.c_str(), GetFileExInfoStandard, &attr)) continue;
-
-        if (CompareFileTime(&attr.ftLastWriteTime, &ext.dll_mtime) > 0) {
-            Logger::info("Extension '{}': DLL changed on disk, queuing hot-reload",
-                         ext.display_name);
+    for (ExtensionInfo &ext : s_extensions) {
+        if (!ext.autoreload || !ext.initialized || ext.reload_pending)
+            continue;
+        std::error_code ec;
+        auto mtime = fs::last_write_time(ext.dll_path, ec);
+        if (ec)
+            continue;
+        if (ext.dll_mtime < mtime) {
+            Logger::info("Extension '{}': DLL changed on disk, queuing hot-reload", ext.display_name);
             ext.reload_pending = true;
         }
     }
@@ -614,9 +624,8 @@ void ExtensionManager::flush_pending_reloads()
 {
     if (!s_any_autoreload)
         return;
-
     bool any_reloaded = false;
-    for (auto &ext : s_extensions) {
+    for (ExtensionInfo &ext : s_extensions) {
         if (!ext.reload_pending)
             continue;
         ext.reload_pending = false;
@@ -631,9 +640,12 @@ void ExtensionManager::flush_pending_reloads()
             Logger::error("Extension '{}': hot-reload failed", ext.display_name);
     }
 
-    if (any_reloaded)
+    if (any_reloaded) {
         s_any_autoreload = std::ranges::any_of(
-            s_extensions, [](ExtensionInfo const &e) { return e.autoreload && e.initialized; });
+            s_extensions,
+            [](ExtensionInfo const &e) { return e.autoreload && e.initialized; }
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -641,186 +653,222 @@ void ExtensionManager::flush_pending_reloads()
 // ---------------------------------------------------------------------------
 
 // Static wrappers that forward to EventSystem / Logger
-static int api_subscribe(char const * event_name, X4NativeEventCallback cb, void* ud, void* api_ptr) {
+static int api_subscribe(char const *event_name, X4NativeEventCallback cb, void *ud, void *api_ptr)
+{
     int id = EventSystem::subscribe(event_name, cb, ud);
     // Track subscription for auto-cleanup on extension unload
     if (id > 0 && api_ptr) {
-        auto* api = static_cast<X4NativeAPI*>(api_ptr);
-        auto* ids = static_cast<std::vector<int>*>(api->_ext_subscription_ids);
-        if (ids) ids->push_back(id);
+        auto *api = static_cast<X4NativeAPI *>(api_ptr);
+        if (auto *ids = static_cast<std::vector<int> *>(api->_ext_subscription_ids))
+            ids->emplace_back(id);
     }
     return id;
 }
 
-static void api_unsubscribe(int id) {
+static void api_unsubscribe(int id)
+{
     EventSystem::unsubscribe(id);
 }
 
-static void api_raise_event(char const * event_name, void* data) {
+static void api_raise_event(char const *event_name, void *data)
+{
     EventSystem::fire(event_name, data);
 }
 
-static int api_raise_lua_event(char const * event_name, char const * param) {
-    if (s_raise_lua_event) return s_raise_lua_event(event_name, param);
+static int api_raise_lua_event(char const *event_name, char const *param)
+{
+    if (s_raise_lua_event)
+        return s_raise_lua_event(event_name, param);
     return -1;
 }
 
-static void api_log(int level, char const * message) {
+static void api_log(int level, char const *message)
+{
     auto lv = static_cast<LogLevel>(level);
     Logger::write(lv, message);
 }
 
 static char const *s_game_ver_cache;
-static char const *s_x4n_ver_cache = X4_GAME_VERSION_LABEL;
+static constexpr char const *s_x4n_ver_cache = X4_GAME_VERSION_LABEL;
 
-static char const * api_get_game_version() {
+static char const *api_get_game_version()
+{
     return s_game_ver_cache;
 }
 
-static char const * api_get_x4native_version() {
+static char const *api_get_x4native_version()
+{
     return s_x4n_ver_cache;
 }
 
 // Hook wrappers — extract extension context from the API pointer.
 // HookManager keys on extension_id (canonical unique), not display name.
-static int api_hook_before(char const * fn, X4HookCallback cb, void* ud, void* api_ptr) {
-    auto* api = static_cast<X4NativeAPI*>(api_ptr);
-    int ext_priority = static_cast<int>(api->_ext_priority);
+static int api_hook_before(char const *fn, X4HookCallback cb, void *ud, void *api_ptr)
+{
+    auto *api          = static_cast<X4NativeAPI *>(api_ptr);
+    int   ext_priority = static_cast<int>(api->_ext_priority);
     return HookManager::hook_before(fn, cb, ud, ext_priority, api->_ext_id);
 }
 
-static int api_hook_after(char const * fn, X4HookCallback cb, void* ud, void* api_ptr) {
-    auto* api = static_cast<X4NativeAPI*>(api_ptr);
-    int ext_priority = static_cast<int>(api->_ext_priority);
+static int api_hook_after(char const *fn, X4HookCallback cb, void *ud, void *api_ptr)
+{
+    auto *api          = static_cast<X4NativeAPI *>(api_ptr);
+    int   ext_priority = static_cast<int>(api->_ext_priority);
     return HookManager::hook_after(fn, cb, ud, ext_priority, api->_ext_id);
 }
 
-static void api_unhook(int hook_id) {
+static void api_unhook(int hook_id)
+{
     HookManager::unhook(hook_id);
 }
 
-static void* api_ensure_detour(char const * fn, void* detour_fn) {
+static void *api_ensure_detour(char const *fn, void *detour_fn)
+{
     return HookManager::ensure_detour(fn, detour_fn);
 }
 
-static void api_run_before_hooks(X4HookContext* ctx) {
+static void api_run_before_hooks(X4HookContext *ctx)
+{
     HookManager::run_before_hooks(ctx);
 }
 
-static void api_run_after_hooks(X4HookContext* ctx) {
+static void api_run_after_hooks(X4HookContext *ctx)
+{
     HookManager::run_after_hooks(ctx);
 }
 
-static void* api_resolve_internal(char const * name) {
+static void *api_resolve_internal(char const *name)
+{
     return GameAPI::get_internal(name);
 }
 
 // MD event subscription wrappers
-static int api_md_subscribe_before(uint32_t type_id, X4NativeEventCallback cb, void* ud, void* /*api*/) {
+static int api_md_subscribe_before(uint32_t type_id, X4NativeEventCallback cb, void *ud, void * /*api*/)
+{
     return EventSystem::md_subscribe_before(type_id, cb, ud);
 }
 
-static int api_md_subscribe_after(uint32_t type_id, X4NativeEventCallback cb, void* ud, void* /*api*/) {
+static int api_md_subscribe_after(uint32_t type_id, X4NativeEventCallback cb, void *ud, void * /*api*/)
+{
     return EventSystem::md_subscribe_after(type_id, cb, ud);
 }
 
-static int api_register_lua_bridge(char const * lua_event, char const * cpp_event) {
+static int api_register_lua_bridge(char const *lua_event, char const *cpp_event)
+{
     if (s_register_lua_bridge)
         return s_register_lua_bridge(lua_event, cpp_event);
     return -1;
 }
 
 // Settings wrappers — resolve the calling extension via _ext_info.
-static char const * ext_id_from_api(void* api_ptr) {
-    if (!api_ptr) return nullptr;
-    auto* api = static_cast<X4NativeAPI*>(api_ptr);
-    auto* ext = static_cast<ExtensionInfo*>(api->_ext_info);
+static char const *ext_id_from_api(void *api_ptr)
+{
+    if (!api_ptr)
+        return nullptr;
+    auto *api = static_cast<X4NativeAPI *>(api_ptr);
+    auto *ext = static_cast<ExtensionInfo *>(api->_ext_info);
     return ext ? ext->extension_id.c_str() : nullptr;
 }
 
-static int api_get_setting_bool(char const * key, int fallback, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return fallback;
+static int api_get_setting_bool(char const *key, int fallback, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return fallback;
     return SettingsManager::get_bool(id, key, fallback != 0) ? 1 : 0;
 }
 
-static double api_get_setting_number(char const * key, double fallback, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return fallback;
+static double api_get_setting_number(char const *key, double fallback, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return fallback;
     return SettingsManager::get_number(id, key, fallback);
 }
 
-static char const * api_get_setting_string(char const * key, char const * fallback, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return fallback;
+static char const *api_get_setting_string(char const *key, char const *fallback, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return fallback;
     return SettingsManager::get_string(id, key, fallback);
 }
 
-static void api_set_setting_bool(char const * key, int value, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return;
+static void api_set_setting_bool(char const *key, int value, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return;
     SettingsManager::set_bool(id, key, value != 0);
 }
 
-static void api_set_setting_number(char const * key, double value, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return;
+static void api_set_setting_number(char const *key, double value, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return;
     SettingsManager::set_number(id, key, value);
 }
 
-static void api_set_setting_string(char const * key, char const * value, void* api_ptr) {
-    char const * id = ext_id_from_api(api_ptr);
-    if (!id || !key) return;
+static void api_set_setting_string(char const *key, char const *value, void *api_ptr)
+{
+    char const *id = ext_id_from_api(api_ptr);
+    if (!id || !key)
+        return;
     SettingsManager::set_string(id, key, value ? value : "");
 }
 
-void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
+void ExtensionManager::fill_api(X4NativeAPI &api, ExtensionInfo &ext)
+{
     s_game_ver_cache = s_game_version.c_str();
 
-    api.api_version          = X4NATIVE_API_VERSION;
-    api.subscribe            = api_subscribe;
-    api.unsubscribe          = api_unsubscribe;
-    api.raise_event          = api_raise_event;
-    api.raise_lua_event      = api_raise_lua_event;
-    api.log                  = api_log;
-    api.get_game_version     = api_get_game_version;
-    api.get_x4native_version = api_get_x4native_version;
-    api.extension_path       = ext.path.c_str();
-    api.game                 = GameAPI::table();
-    api.get_game_function    = &GameAPI::get_function;
-    api.game_func_count      = GameAPI::total_count();
-    api.game_types_build     = X4_GAME_TYPES_BUILD;
-    api.hook_before          = api_hook_before;
-    api.hook_after           = api_hook_after;
-    api.unhook               = api_unhook;
-    api._ensure_detour       = api_ensure_detour;
-    api._run_before_hooks    = api_run_before_hooks;
-    api._run_after_hooks     = api_run_after_hooks;
-    api.resolve_internal     = api_resolve_internal;
-    api.exe_base             = GameAPI::exe_base();
-    api.register_lua_bridge  = api_register_lua_bridge;
-    api.md_subscribe_before  = api_md_subscribe_before;
-    api.md_subscribe_after   = api_md_subscribe_after;
-    api.stash_set            = s_stash_set;
-    api.stash_get            = s_stash_get;
-    api.stash_remove         = s_stash_remove;
-    api.stash_clear          = s_stash_clear;
-    api._ext_id               = ext.extension_id.c_str();
-    api._ext_display_name     = ext.display_name.c_str();
-    api._ext_priority         = static_cast<intptr_t>(ext.priority);
-    api._ext_subscription_ids = &ext.subscription_ids;
-    api._ext_log_handle       = ext.log_handle;
-    api._ext_log_fn           = reinterpret_cast<void*>(api_log_ext);
-    api._ext_init_log_fn      = reinterpret_cast<void*>(api_init_log);
-    api._ext_log_named_fn     = reinterpret_cast<void*>(api_log_named);
-    api._ext_info             = &ext;
-    api.offsets               = &s_offsets;
-    api.get_setting_bool      = api_get_setting_bool;
-    api.get_setting_number    = api_get_setting_number;
-    api.get_setting_string    = api_get_setting_string;
-    api.set_setting_bool      = api_set_setting_bool;
-    api.set_setting_number    = api_set_setting_number;
-    api.set_setting_string    = api_set_setting_string;
+    api = X4NativeAPI{
+        .api_version           = X4NATIVE_API_VERSION,
+        .subscribe             = api_subscribe,
+        .unsubscribe           = api_unsubscribe,
+        .raise_event           = api_raise_event,
+        .raise_lua_event       = api_raise_lua_event,
+        .register_lua_bridge   = api_register_lua_bridge,
+        .log                   = api_log,
+        .get_game_version      = api_get_game_version,
+        .get_x4native_version  = api_get_x4native_version,
+        .extension_path        = ext.path.c_str(),
+        .game                  = GameAPI::table(),
+        .get_game_function     = &GameAPI::get_function,
+        .game_func_count       = GameAPI::total_count(),
+        .game_types_build      = X4_GAME_TYPES_BUILD,
+        .exe_base              = GameAPI::exe_base(),
+        .hook_before           = api_hook_before,
+        .hook_after            = api_hook_after,
+        .unhook                = api_unhook,
+        ._ensure_detour        = api_ensure_detour,
+        ._run_before_hooks     = api_run_before_hooks,
+        ._run_after_hooks      = api_run_after_hooks,
+        .resolve_internal      = api_resolve_internal,
+        .md_subscribe_before   = api_md_subscribe_before,
+        .md_subscribe_after    = api_md_subscribe_after,
+        .stash_set             = s_stash_set,
+        .stash_get             = s_stash_get,
+        .stash_remove          = s_stash_remove,
+        .stash_clear           = s_stash_clear,
+        ._ext_id               = ext.extension_id.c_str(),
+        ._ext_display_name     = ext.display_name.c_str(),
+        ._ext_priority         = static_cast<intptr_t>(ext.priority),
+        ._ext_subscription_ids = &ext.subscription_ids,
+        ._ext_log_handle       = ext.log_handle,
+        ._ext_log_fn           = reinterpret_cast<void *>(api_log_ext),
+        ._ext_init_log_fn      = reinterpret_cast<void *>(api_init_log),
+        ._ext_log_named_fn     = reinterpret_cast<void *>(api_log_named),
+        ._ext_info             = &ext,
+        .offsets               = &s_offsets,
+        .get_setting_bool      = api_get_setting_bool,
+        .get_setting_number    = api_get_setting_number,
+        .get_setting_string    = api_get_setting_string,
+        .set_setting_bool      = api_set_setting_bool,
+        .set_setting_number    = api_set_setting_number,
+        .set_setting_string    = api_set_setting_string,
+        ._reserved             = {},
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -830,9 +878,9 @@ void ExtensionManager::fill_api(X4NativeAPI& api, ExtensionInfo& ext) {
 char const *ExtensionManager::loaded_extensions_json()
 {
     json arr = json::array();
-    for (auto const &ext : s_extensions) {
+    for (ExtensionInfo const &ext : s_extensions) {
         if (ext.initialized) {
-            arr.push_back({
+            arr.emplace_back(json{
                 {"id",           ext.extension_id},
                 {"display_name", ext.display_name},
                 {"path",         ext.path        },

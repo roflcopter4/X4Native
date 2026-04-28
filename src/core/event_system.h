@@ -7,43 +7,47 @@
 // ---------------------------------------------------------------------------
 
 #include "Common.h"
-#include <functional>
-#include <unordered_map>
 #include <array>
-#include <vector>
+#include <functional>
 #include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace x4n {
 
-using EventCallback = void(*)(const char* event_name, void* data, void* userdata);
+using EventCallback = void (*)(char const *event_name, void *data, void *userdata);
 
-class EventSystem {
-public:
+class EventSystem
+{
+  public:
+    EventSystem() = delete;
+
     static void init();
     static void shutdown();
 
     // Named event pub/sub
-    static int subscribe(const char* event_name, EventCallback callback, void* userdata = nullptr);
+    static int  subscribe(char const *event_name, EventCallback callback, void *userdata = nullptr);
     static void unsubscribe(int id);
-    static void fire(const char* event_name, void* data = nullptr);
+    static void fire(char const *event_name, void *data = nullptr);
 
     // MD event pub/sub (O(1) by type_id)
     static constexpr uint32_t MAX_MD_TYPE = 600;
-    static int  md_subscribe_before(uint32_t type_id, EventCallback callback, void* userdata = nullptr);
-    static int  md_subscribe_after(uint32_t type_id, EventCallback callback, void* userdata = nullptr);
-    static void md_fire_before(uint32_t type_id, void* payload);  // called by hook detour
-    static void md_fire_after(uint32_t type_id, void* payload);
 
-private:
+    static int  md_subscribe_before(uint32_t type_id, EventCallback callback, void *userdata = nullptr);
+    static int  md_subscribe_after(uint32_t type_id, EventCallback callback, void *userdata = nullptr);
+    static void md_fire_before(uint32_t type_id, void *payload); // called by hook detour
+    static void md_fire_after(uint32_t type_id, void *payload);
+
+  private:
     struct Subscription {
-        int            id;
-        EventCallback  callback;
-        void*          userdata;
+        int           id;
+        EventCallback callback;
+        void         *userdata;
     };
 
     static std::unordered_map<std::string, std::vector<Subscription>> s_subscribers;
-    static std::array<std::vector<Subscription>, MAX_MD_TYPE> s_md_before;
-    static std::array<std::vector<Subscription>, MAX_MD_TYPE> s_md_after;
+    static std::array<std::vector<Subscription>, MAX_MD_TYPE>         s_md_before;
+    static std::array<std::vector<Subscription>, MAX_MD_TYPE>         s_md_after;
     static std::mutex s_mutex;
     static int        s_next_id;
 };

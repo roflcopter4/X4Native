@@ -53,7 +53,7 @@ extern "C" {
 #define LUA_TTHREAD        8
 
 // ---- Resolved Lua function pointers --------------------------------------
-namespace x4n { namespace lua {
+namespace x4n::lua {
 
 /// Resolve all Lua function pointers from the host process.
 /// Call once at proxy init. Returns false if resolution fails.
@@ -111,10 +111,10 @@ extern int         (*L_ref)(lua_State* L, int t);
 extern void        (*L_unref)(lua_State* L, int t, int ref);
 
 // ---- Convenience inlines ------------------------------------------------
-inline void pop(lua_State* L, int n)                   { settop(L, -(n)-1); }
-inline void newtable(lua_State* L)                     { createtable(L, 0, 0); }
-inline void pushcfunction(lua_State* L, lua_CFunction f) { pushcclosure(L, f, 0); }
-inline const char* tostring(lua_State* L, int idx)     { return tolstring(L, idx, nullptr); }
-inline const char* L_checkstring(lua_State* L, int n)  { return L_checklstring(L, n, nullptr); }
+inline void       pop(lua_State* L, int n)                   { settop(L, -(n)-1); }
+inline void       newtable(lua_State* L)                     { createtable(L, 0, 0); }
+inline void       pushcfunction(lua_State* L, lua_CFunction f) { pushcclosure(L, f, 0); }
+inline const char*tostring(lua_State* L, int idx)     { return tolstring(L, idx, nullptr); }
+inline const char*L_checkstring(lua_State* L, int n)  { return L_checklstring(L, n, nullptr); }
 
-}} // namespace x4n::lua
+}

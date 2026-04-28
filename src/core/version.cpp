@@ -51,7 +51,7 @@ static std::string format_version(std::string const &raw)
         int  major = v / 100;
         int  minor = v % 100;
         char buf[32];
-        (void)sprintf_s(buf, std::size(buf), "%d.%02d", major, minor);
+        (void)snprintf(buf, std::size(buf), "%d.%02d", major, minor);
         return buf;
     } catch (...) {
         return raw; // Couldn't parse — return as-is

@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 #include "Common.h"
+#include <filesystem>
 #include <unordered_map>
 
 struct X4GameFunctions;
@@ -32,7 +33,7 @@ class GameAPI
     // Tries primary_build first (e.g. "900-beta2"), falls back to fallback_build
     // (e.g. "900") so beta builds can reuse the last known-good RVA entry.
     static void load_internal_db(
-        std::string const &ext_root,
+        std::filesystem::path const &ext_root,
         std::string const &primary_build,
         std::string const &fallback_build = {});
 
@@ -50,9 +51,9 @@ class GameAPI
     static uintptr_t exe_base();
 
     // Stats
-    static int resolved_count();
-    static int total_count();
-    static int internal_count();
+    static unsigned resolved_count();
+    static unsigned total_count();
+    static unsigned internal_count();
 
   private:
     static X4GameFunctions s_table;

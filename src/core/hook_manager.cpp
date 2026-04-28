@@ -84,7 +84,8 @@ void HookManager::remove_all()
 // Registration
 // ---------------------------------------------------------------------------
 
-int HookManager::hook_before(
+int HookManager::hook(
+    bool           is_before,
     char const    *function_name,
     X4HookCallback callback,
     void          *userdata,
@@ -100,20 +101,33 @@ int HookManager::hook_before(
         return -1;
 
     int id = s_next_id++;
-
-    hf->before_hooks.emplace_back(HookCallbackInfo{
+    std::vector<HookCallbackInfo> &cb_list = is_before ? hf->before_hooks : hf->after_hooks;
+    cb_list.emplace_back(HookCallbackInfo{
         .id             = id,
         .priority       = priority,
         .extension_name = ext_name ? ext_name : "",
         .callback       = callback,
         .userdata       = userdata,
         .enabled        = true,
-        .is_before      = true,
+        .is_before      = is_before,
     });
-    sort_callbacks(hf->before_hooks);
+    sort_callbacks(cb_list);
 
-    Logger::debug("HookManager: before-hook #{} on '{}' (ext={}, pri={})", id, function_name, ext_name ? ext_name : "?", priority);
+    Logger::debug(
+        "HookManager: {}-hook #{} on '{}' (ext={}, pri={})",
+        is_before ? "before" : "after", id, function_name,
+        ext_name ? ext_name : "?", priority);
     return id;
+}
+
+int HookManager::hook_before(
+    char const    *function_name,
+    X4HookCallback callback,
+    void          *userdata,
+    int            priority,
+    char const    *ext_name)
+{
+    return hook(true, function_name, callback, userdata, priority, ext_name);
 }
 
 int HookManager::hook_after(
@@ -123,20 +137,7 @@ int HookManager::hook_after(
     int            priority,
     char const    *ext_name)
 {
-    std::scoped_lock lock(s_mutex);
-    if (!s_initialized || !function_name || !callback)
-        return -1;
-
-    HookedFunction *hf = ensure_hooked(function_name);
-    if (!hf)
-        return -1;
-
-    int id = s_next_id++;
-    hf->after_hooks.push_back({id, priority, ext_name ? ext_name : "", callback, userdata, true, false});
-    sort_callbacks(hf->after_hooks);
-
-    Logger::debug("HookManager: after-hook #{} on '{}' (ext={}, pri={})", id, function_name, ext_name ? ext_name : "?", priority);
-    return id;
+    return hook(false, function_name, callback, userdata, priority, ext_name);
 }
 
 void HookManager::unhook(int hook_id)
@@ -146,7 +147,7 @@ void HookManager::unhook(int hook_id)
         return;
 
     for (auto &[name, hf] : s_hooks) {
-        auto remove_from = [&](std::vector<HookCallbackInfo> &cbs) -> bool {
+        auto remove_from = [&name, hook_id](std::vector<HookCallbackInfo> &cbs) -> bool {
             for (auto it = cbs.begin(); it != cbs.end(); ++it) {
                 if (it->id == hook_id) {
                     Logger::debug("HookManager: removed hook #{} from '{}'", hook_id, name);
@@ -169,18 +170,17 @@ void HookManager::unhook(int hook_id)
     }
 }
 
-void HookManager::remove_all_for_extension(char const *ext_name)
+void HookManager::remove_all_for_extension(std::string_view ext_name)
 {
     std::scoped_lock lock(s_mutex);
-    if (!s_initialized || !ext_name)
+    if (!s_initialized || ext_name.empty())
         return;
 
-    std::string en(ext_name);
     std::vector<std::string> empty_hooks;
 
     for (auto &[name, hf] : s_hooks) {
-        auto remove_matching = [&en](std::vector<HookCallbackInfo> &cbs) {
-            std::erase_if(cbs, [&en](HookCallbackInfo const &cb) { return cb.extension_name == en; });
+        auto remove_matching = [&ext_name](std::vector<HookCallbackInfo> &cbs) {
+            std::erase_if(cbs, [&ext_name](HookCallbackInfo const &cb) { return cb.extension_name == ext_name; });
         };
         remove_matching(hf.before_hooks);
         remove_matching(hf.after_hooks);
@@ -324,11 +324,12 @@ void HookManager::run_before_hooks(X4HookContext *ctx)
             std::scoped_lock lock(s_mutex);
             auto it = s_hooks.find(ctx->function_name);
             if (it != s_hooks.end()) {
-                for (HookCallbackInfo &h : it->second.before_hooks)
+                for (HookCallbackInfo &h : it->second.before_hooks) {
                     if (h.id == hook.id) {
                         h.enabled = false;
                         break;
                     }
+                }
             }
         }
     }
@@ -357,11 +358,12 @@ void HookManager::run_after_hooks(X4HookContext *ctx)
             std::scoped_lock lock(s_mutex);
             auto it = s_hooks.find(ctx->function_name);
             if (it != s_hooks.end()) {
-                for (auto &h : it->second.after_hooks)
+                for (auto &h : it->second.after_hooks) {
                     if (h.id == hook.id) {
                         h.enabled = false;
                         break;
                     }
+                }
             }
         }
     }

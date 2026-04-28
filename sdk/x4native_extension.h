@@ -31,7 +31,7 @@ extern "C" {
 #include <stdint.h>
 
 // ---- Version & constants -------------------------------------------------
-#define X4NATIVE_API_VERSION  1
+#define X4NATIVE_API_VERSION  2
 
 #define X4NATIVE_OK     0
 #define X4NATIVE_ERROR  1
@@ -49,41 +49,41 @@ extern "C" {
 // Payload fired on the "on_setting_changed" event. Only the field matching
 // `type` is meaningful. Strings live only for the duration of the callback.
 typedef struct X4NativeSettingChanged {
-    const char* extension_id;
-    const char* key;
-    int         type;     // X4N_SETTING_*
-    int         b;
-    double      d;
-    const char* s;
+    char const *extension_id;
+    char const *key;
+    int         type; // X4N_SETTING_*
+    union {
+        int         b;
+        double      d;
+        char const *s;
+    };
 } X4NativeSettingChanged;
 
 // ---- Export macro ---------------------------------------------------------
-#ifdef _MSC_VER
-  #define X4NATIVE_EXPORT extern "C" __declspec(dllexport)
-#elif defined(__GNUC__)
-  #define X4NATIVE_EXPORT extern "C" __attribute__((visibility("default")))
+#ifdef _WIN32
+# define X4NATIVE_EXPORT extern "C" __declspec(dllexport)
+#elif defined __GNUC__
+# define X4NATIVE_EXPORT extern "C" __attribute__((visibility("default")))
 #else
-  #define X4NATIVE_EXPORT extern "C"
+# define X4NATIVE_EXPORT extern "C"
 #endif
 
 // ---- Event callback ------------------------------------------------------
 //   event_name:  Name of the event being fired (e.g. "on_game_loaded")
 //   data:        Event-specific payload (may be NULL)
 //   userdata:    Opaque pointer passed during subscribe()
-typedef void (*X4NativeEventCallback)(const char* event_name,
-                                      void* data,
-                                      void* userdata);
+typedef void (*X4NativeEventCallback)(char const *event_name, void *data, void *userdata);
 
 // ---- Hook types (internal — wrapped by x4n::hook in x4native.h) ---------
 
 // Context passed to raw hook callbacks (internal dispatcher type).
 // Extensions never construct this — the framework fills it in.
 typedef struct X4HookContext {
-    const char* function_name;
-    void**      args;            // Array of pointers to each argument
-    void*       result;          // Pointer to return value buffer (zero-initialized)
-    int         skip_original;   // OR-gate: any setter causes skip
-    void*       userdata;
+    char const *function_name;
+    void      **args;          // Array of pointers to each argument
+    void       *result;        // Pointer to return value buffer (zero-initialized)
+    int         skip_original; // OR-gate: any setter causes skip
+    void       *userdata;
 } X4HookContext;
 
 // Raw hook callback signature. Returns 0 on success.
@@ -100,12 +100,9 @@ typedef struct X4NativeAPI {
     int api_version;
 
     // --- Event system ---
-    int  (*subscribe)(const char* event_name,
-                      X4NativeEventCallback callback,
-                      void* userdata,
-                      void* _api_ptr);
+    int (*subscribe)(char const *event_name, X4NativeEventCallback callback, void *userdata, void *_api_ptr);
     void (*unsubscribe)(int subscription_id);
-    void (*raise_event)(const char* event_name, void* data);
+    void (*raise_event)(char const *event_name, void *data);
 
     // --- Lua bridge (outbound: C++ → Lua) ---
     // Dispatches to all Lua scripts that called RegisterEvent(name, fn).
@@ -113,81 +110,73 @@ typedef struct X4NativeAPI {
     // param is a string argument passed to listeners (or NULL).
     // Must be called from UI thread (i.e. from within an event callback).
     // Returns 0 on success, non-zero on error.
-    int  (*raise_lua_event)(const char* event_name, const char* param);
+    int (*raise_lua_event)(char const *event_name, char const *param);
 
     // --- Lua bridge (inbound: Lua → C++) ---
     // Register a dynamic Lua→C++ event bridge. When lua_event fires in Lua,
     // the framework calls RegisterEvent and forwards it as cpp_event to the
     // C++ event bus. Returns 0 on success.
-    int  (*register_lua_bridge)(const char* lua_event, const char* cpp_event);
+    int (*register_lua_bridge)(char const *lua_event, char const *cpp_event);
 
     // --- Logging ---
-    void (*log)(int level, const char* message);
+    void (*log)(int level, char const *message);
 
     // --- Info ---
-    const char* (*get_game_version)(void);
-    const char* (*get_x4native_version)(void);
-    const char* extension_path;                // Abs path to calling ext's folder
+    char const *(*get_game_version)(void);
+    char const *(*get_x4native_version)(void);
+    char const *extension_path; // Abs path to calling ext's folder
 
     // --- Game API (resolved at startup) ---
     // Type-safe table of 2000+ game function pointers.
     // Include x4_game_func_table.h and/or cache this pointer during init:
     //   X4GameFunctions* game = api->game;
     //   if (game->GetPlayerID) player = game->GetPlayerID();
-    struct X4GameFunctions* game;
+    struct X4GameFunctions *game;
 
     // Named lookup for any exported function (typed or untyped).
     // Returns NULL if the function name is not found in X4.exe.
-    void* (*get_game_function)(const char* name);
+    void *(*get_game_function)(char const *name);
 
     // Number of function pointer slots in the game-> struct.
     // Extensions compiled against a newer SDK should check this before
     // accessing high-index fields that may not exist at runtime.
-    int game_func_count;
+    unsigned game_func_count;
+
+    // Game build number the types/functions were extracted from (e.g. 900).
+    int game_types_build;
 
     // X4.exe image base address. Use for resolving global RVAs:
     //   void* ptr = *(void**)(api->exe_base + MY_RVA);
     // Populated once at framework startup. Always non-zero after init.
     uintptr_t exe_base;
 
-    // Game build number the types/functions were extracted from (e.g. 900).
-    int game_types_build;
-
     // --- Hook system (internal — wrapped by x4n::hook in x4native.h) ---
     // Install a before-hook on a game function. Returns hook ID (>0) or -1.
     // _api_ptr: pointer to this X4NativeAPI (passed by SDK wrapper for context).
-    int  (*hook_before)(const char* function_name,
-                        X4HookCallback callback, void* userdata,
-                        void* _api_ptr);
+    int (*hook_before)(char const *function_name, X4HookCallback callback, void *userdata, void *_api_ptr);
     // Install an after-hook on a game function. Returns hook ID (>0) or -1.
-    int  (*hook_after)(const char* function_name,
-                       X4HookCallback callback, void* userdata,
-                       void* _api_ptr);
+    int (*hook_after)(char const *function_name, X4HookCallback callback, void *userdata, void *_api_ptr);
     // Remove a hook by ID.
     void (*unhook)(int hook_id);
 
     // Internal: typed-dispatch plumbing (called by x4native.h templates).
     // Do not call directly — use x4n::hook::before<>() / after<>() instead.
-    void* (*_ensure_detour)(const char* function_name, void* detour_fn);
-    void  (*_run_before_hooks)(X4HookContext* ctx);
-    void  (*_run_after_hooks)(X4HookContext* ctx);
+    void *(*_ensure_detour)(char const *function_name, void *detour_fn);
+    void (*_run_before_hooks)(X4HookContext *ctx);
+    void (*_run_after_hooks)(X4HookContext *ctx);
 
     // --- Internal (non-exported) function resolution ---
     // Resolve a non-exported game function by name via the RVA database
     // (native/version_db/internal_functions.json). Returns NULL if not found
     // for the current game version. Use this for reverse-engineered functions
     // that aren't in X4.exe's export table.
-    void* (*resolve_internal)(const char* name);
+    void *(*resolve_internal)(char const *name);
 
     // --- MD event subscription (O(1) dispatch by type_id) ---
     // Subscribe to MD events before/after dispatch. Type IDs from x4_md_events.h.
     // Returns subscription ID (>0), or -1 on error. Unsubscribe via unsubscribe().
-    int  (*md_subscribe_before)(uint32_t type_id,
-                                X4NativeEventCallback callback, void* userdata,
-                                void* _api_ptr);
-    int  (*md_subscribe_after)(uint32_t type_id,
-                               X4NativeEventCallback callback, void* userdata,
-                               void* _api_ptr);
+    int (*md_subscribe_before)(uint32_t type_id, X4NativeEventCallback callback, void *userdata, void *_api_ptr);
+    int (*md_subscribe_after)(uint32_t type_id, X4NativeEventCallback callback, void *userdata, void *_api_ptr);
 
     // --- Stash (in-memory key-value, survives /reloadui and hot-reload) ---
     // Data lives in the proxy DLL (pinned in memory for the process lifetime).
@@ -195,64 +184,60 @@ typedef struct X4NativeAPI {
     // extension name. The C++ SDK (x4n::stash) auto-namespaces for you.
     //
     // stash_set: copy data into the stash. Returns 1 on success, 0 on error.
-    int         (*stash_set)(const char* ns, const char* key,
-                             const void* data, uint32_t size);
+    int (*stash_set)(char const *ns, char const *key, void const *data, uint32_t size);
     // stash_get: returns pointer to internal buffer (valid until next set/remove
     //            on the same key). Returns NULL if not found.
-    const void* (*stash_get)(const char* ns, const char* key,
-                             uint32_t* out_size);
+    void const *(*stash_get)(char const *ns, char const *key, uint32_t *out_size);
     // stash_remove: remove a single key. Returns 1 if found, 0 otherwise.
-    int         (*stash_remove)(const char* ns, const char* key);
+    int (*stash_remove)(char const *ns, char const *key);
     // stash_clear: remove all keys in a namespace.
-    void        (*stash_clear)(const char* ns);
+    void (*stash_clear)(char const *ns);
 
     // --- Per-extension context (set by framework during init) ---
     // Canonical unique identifier — content.xml root <content id="..."> attribute.
     // X4 enforces uniqueness of this id across enabled extensions. All framework
     // routing (stash namespacing, scoped events, log files, user settings) is
     // keyed on this.
-    const char* _ext_id;
+    char const *_ext_id;
     // Human-facing name — content.xml <content name="..."> attribute. Used for
     // log line prefixes and UI, never for identity matching.
-    const char* _ext_display_name;
-    intptr_t    _ext_priority;          // Load priority
-    void*       _ext_subscription_ids;  // vector<int>* — event subscription IDs for auto-cleanup
-    void*       _ext_log_handle;        // HANDLE — per-extension log file
-    void*       _ext_log_fn;            // fn(int,cstr,ptr) — write to extension's own log
-    void*       _ext_init_log_fn;       // fn(cstr,ptr) — reinitialize log with a new filename
-    void*       _ext_log_named_fn;      // fn(int,cstr,cstr,ptr) — one-shot write to named file
-    void*       _ext_info;              // ExtensionInfo* — internal framework pointer
+    char const *_ext_display_name;
+    intptr_t    _ext_priority;         // Load priority
+    void       *_ext_subscription_ids; // vector<int>* — event subscription IDs for auto-cleanup
+#ifdef _WIN32
+    void       *_ext_log_handle;       // HANDLE — per-extension log file
+#else
+    int         _ext_log_handle;       // file descriptor — per-extension log file
+#endif
+    void       *_ext_log_fn;           // fn(int,cstr,ptr) — write to extension's own log
+    void       *_ext_init_log_fn;      // fn(cstr,ptr) — reinitialize log with a new filename
+    void       *_ext_log_named_fn;     // fn(int,cstr,cstr,ptr) — one-shot write to named file
+    void       *_ext_info;             // ExtensionInfo* — internal framework pointer
 
     // --- Runtime-resolved game offsets (populated by framework at startup) ---
     // Pre-computed struct of all version-dependent values.
     // Extensions read from this via x4n::offsets() — never need recompilation.
-    const void* offsets;            // X4GameOffsets* — internal, used by SDK inline functions
+    void const *offsets; // X4GameOffsets* — internal, used by SDK inline functions
 
     // --- Per-extension settings (declared in x4native.json "settings" array) ---
     // Typed getters/setters scoped to the calling extension. Unknown keys or
     // type mismatches return the `fallback` and are logged. set_* writes the
     // value to <profile>\x4native\<ext_id>.user.json and fires
     // `on_setting_changed` (payload: X4NativeSettingChanged).
-    int         (*get_setting_bool)  (const char* key, int fallback,
-                                      void* _api_ptr);
-    double      (*get_setting_number)(const char* key, double fallback,
-                                      void* _api_ptr);
-    const char* (*get_setting_string)(const char* key, const char* fallback,
-                                      void* _api_ptr);
+    int (*get_setting_bool)(char const *key, int fallback, void *_api_ptr);
+    double (*get_setting_number)(char const *key, double fallback, void *_api_ptr);
+    char const *(*get_setting_string)(char const *key, char const *fallback, void *_api_ptr);
 
-    void        (*set_setting_bool)  (const char* key, int value,
-                                      void* _api_ptr);
-    void        (*set_setting_number)(const char* key, double value,
-                                      void* _api_ptr);
-    void        (*set_setting_string)(const char* key, const char* value,
-                                      void* _api_ptr);
+    void (*set_setting_bool)(char const *key, int value, void *_api_ptr);
+    void (*set_setting_number)(char const *key, double value, void *_api_ptr);
+    void (*set_setting_string)(char const *key, char const *value, void *_api_ptr);
 
     // Trailing ABI pad. New function pointers are added by decrementing this
     // count — extensions compiled against an older header still see a valid
     // struct layout for every field they know about. Grow this array (never
     // shrink it) when the runway gets low; shrinking would silently break
     // already-compiled extensions.
-    void* _reserved[16];
+    void *_reserved[16];
 } X4NativeAPI;
 
 // ---- Required exports from extension DLLs --------------------------------
@@ -262,7 +247,7 @@ X4NATIVE_EXPORT int x4native_api_version(void);
 
 // Called once when the extension is loaded. Register event subscriptions here.
 // Return X4NATIVE_OK (0) on success.
-X4NATIVE_EXPORT int x4native_init(X4NativeAPI* api);
+X4NATIVE_EXPORT int x4native_init(X4NativeAPI *api);
 
 // Called when the extension should release all resources.
 X4NATIVE_EXPORT void x4native_shutdown(void);

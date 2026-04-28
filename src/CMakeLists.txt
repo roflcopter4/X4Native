@@ -49,9 +49,9 @@ set(sdk_headers
     ${CMAKE_SOURCE_DIR}/sdk/x4native.h
     ${CMAKE_SOURCE_DIR}/sdk/x4native_extension.h
     ${CMAKE_SOURCE_DIR}/sdk/x4_game_func_table.h
-    ${CMAKE_SOURCE_DIR}/sdk/x4_game_class_ids.h
-    ${CMAKE_SOURCE_DIR}/sdk/x4_game_func_list.h
-    ${CMAKE_SOURCE_DIR}/sdk/x4_internal_func_list.h
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_class_ids.inc
+    ${CMAKE_SOURCE_DIR}/sdk/x4_game_func_list.inc
+    ${CMAKE_SOURCE_DIR}/sdk/x4_internal_func_list.inc
 )
 
 # ---------------------------------------------------------------------------

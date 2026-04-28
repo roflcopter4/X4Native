@@ -26,8 +26,11 @@
 
 #include <algorithm>
 #include <array>
-#include <string>
 #include <cmath>
+#include <filesystem>
+#include <string>
+
+namespace fs = std::filesystem;
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -125,7 +128,7 @@ X4GameOffsets s_offsets = {
 };
 
 static void                  *g_lua = nullptr; // lua_State* (opaque here)
-static std::string            g_ext_root;
+static fs::path               g_ext_root;
 static std::string            g_game_version;
 static std::string            g_version_string;                // cached for get_version()
 static raise_lua_event_fn     g_raise_lua_event     = nullptr; // proxy-provided Lua bridge
@@ -178,6 +181,8 @@ static void __fastcall frame_tick_detour(void *engineCtx, bool isSuspended)
     double raw_time_after = *s_offsets.frame_raw_time;
     double delta          = std::max(0.0, raw_time_after - raw_time_before);
 
+    auto *table = x4n::GameAPI::table();
+
     // Build event payload
     X4NativeFrameUpdate update = {
         .delta            = delta,
@@ -185,12 +190,10 @@ static void __fastcall frame_tick_detour(void *engineCtx, bool isSuspended)
         .real_time        = *s_offsets.frame_real_time,
         .fps              = *reinterpret_cast<float *>(reinterpret_cast<uintptr_t>(engineCtx) + s_offsets.enginectx_fps),
         .speed_multiplier = static_cast<float>(*s_offsets.frame_speed_mult),
+        .game_paused      = table && table->IsGamePaused ? table->IsGamePaused() : false,
         .is_suspended     = isSuspended,
         .frame_counter    = *reinterpret_cast<int *>(reinterpret_cast<uintptr_t>(engineCtx) + s_offsets.enginectx_frame_counter),
     };
-
-    auto *table        = x4n::GameAPI::table();
-    update.game_paused = (table && table->IsGamePaused) ? table->IsGamePaused() : false;
 
     // Check for extension DLL changes and reload any that have autoreload enabled.
     // Must happen before firing the event so no extension code is on the stack.
@@ -208,7 +211,7 @@ static bool install_frame_tick_hook()
         return false;
     }
 
-    g_x4_base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
+    g_x4_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     if (!g_x4_base)
         return false;
 
@@ -473,6 +476,10 @@ static void impl_set_extension_setting(char const *ext_id, char const *key, Sett
 extern "C" __declspec(dllexport)
 int core_init(CoreInitContext const *ctx)
 {
+    if (::IsDebuggerPresent())
+        ::DebugBreak();
+    (void)::setlocale(LC_ALL, "en_US.UTF-8");
+
     g_lua      = ctx->lua_state;
     g_ext_root = ctx->ext_root;
 
@@ -481,15 +488,14 @@ int core_init(CoreInitContext const *ctx)
     //    user's X4 profile path). Early log lines are replayed on open.
     x4n::Logger::init(g_ext_root);
     x4n::Logger::info("X4Native core v" X4_GAME_VERSION_LABEL " initializing...");
-    x4n::Logger::info("Extension root: {}", g_ext_root);
+    x4n::Logger::info("Extension root: {}", g_ext_root.string());
 
     // 2. Event system
     x4n::EventSystem::init();
 
     // 3. Game version
-    g_game_version  = x4n::Version::detect();
-    g_version_string = std::string(X4_GAME_VERSION_LABEL) +
-                       " (game: " + g_game_version + ")";
+    g_game_version   = x4n::Version::detect();
+    g_version_string = std::string(X4_GAME_VERSION_LABEL) + " (game: " + g_game_version + ")";
 
     // 4. Game API — resolve X4.exe function pointers
     x4n::GameAPI::init();
@@ -529,16 +535,16 @@ int core_init(CoreInitContext const *ctx)
     );
 
     // 6. Fill the proxy's dispatch table
-    ctx->dispatch->discover_extensions    = impl_discover_extensions;
-    ctx->dispatch->raise_event            = impl_raise_event;
-    ctx->dispatch->get_version            = impl_get_version;
-    ctx->dispatch->get_loaded_extensions  = impl_get_loaded_extensions;
-    ctx->dispatch->set_lua_state          = impl_set_lua_state;
-    ctx->dispatch->prepare_reload         = impl_prepare_reload;
-    ctx->dispatch->shutdown               = impl_shutdown;
-    ctx->dispatch->log                    = impl_log;
-    ctx->dispatch->enumerate_settings     = impl_enumerate_settings;
-    ctx->dispatch->set_extension_setting  = impl_set_extension_setting;
+    ctx->dispatch->discover_extensions   = &impl_discover_extensions;
+    ctx->dispatch->raise_event           = &impl_raise_event;
+    ctx->dispatch->get_version           = &impl_get_version;
+    ctx->dispatch->get_loaded_extensions = &impl_get_loaded_extensions;
+    ctx->dispatch->set_lua_state         = &impl_set_lua_state;
+    ctx->dispatch->prepare_reload        = &impl_prepare_reload;
+    ctx->dispatch->shutdown              = &impl_shutdown;
+    ctx->dispatch->log                   = &impl_log;
+    ctx->dispatch->enumerate_settings    = &impl_enumerate_settings;
+    ctx->dispatch->set_extension_setting = &impl_set_extension_setting;
 
     x4n::Logger::info("Core initialized successfully");
     return 0;
@@ -554,7 +560,12 @@ void core_shutdown()
 // DllMain — intentionally minimal
 // ---------------------------------------------------------------------------
 extern BOOL WINAPI DllMain(_In_ HINSTANCE hinstDll, _In_ DWORD fdwReason, _In_ LPVOID lpvReserved);
-BOOL WINAPI DllMain(_In_ HINSTANCE, _In_ DWORD, _In_ LPVOID)
+BOOL WINAPI DllMain(_In_ HINSTANCE, _In_ DWORD fdwReason, _In_ LPVOID)
 {
+    switch (fdwReason) {
+        case DLL_PROCESS_ATTACH:
+        (void)::setlocale(LC_ALL, "en_US.UTF-8");
+        break;
+    }
     return TRUE;
 }

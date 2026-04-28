@@ -24,19 +24,33 @@
 //   at known offsets. Parsing these patterns is equivalent to what IDA does
 //   but fully automated — no manual RE per game build.
 // ---------------------------------------------------------------------------
+
+#ifndef WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+# define NOMINMAX
+#endif
+#include <Windows.h>
+
 #include <x4n_core.h>
 #include <x4n_events.h>
 #include <x4n_log.h>
+
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <ranges>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <set>
-#include <algorithm>
-#include <cstring>
-#include <iomanip>
-#include <windows.h>
+
+namespace fs = std::filesystem;
 
 static int g_sub_loaded = 0;
 
@@ -57,12 +71,13 @@ struct EventLayout {
 
 // Check for `mov [reg+disp8], src_reg` (32-bit store: opcode 89 with ModR/M byte)
 // Returns true and sets offset/size if matched.
-static bool match_store_disp8_32(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_disp8_32(uint8_t const *p, uint32_t &out_offset)
+{
     // 89 ModRM(01 xxx rrr) disp8 — mov [reg+disp8], r32
     if (p[0] == 0x89) {
         uint8_t modrm = p[1];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t rm    = modrm & 7;
         if (mod == 1 && rm != 4) { // disp8, no SIB
             out_offset = p[2];
             return true;
@@ -72,14 +87,15 @@ static bool match_store_disp8_32(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for `mov [reg+disp32], src_reg` (32-bit store)
-static bool match_store_disp32_32(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_disp32_32(uint8_t const *p, uint32_t &out_offset)
+{
     // 89 ModRM(10 xxx rrr) disp32 — mov [reg+disp32], r32
     if (p[0] == 0x89) {
         uint8_t modrm = p[1];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t rm    = modrm & 7;
         if (mod == 2 && rm != 4) { // disp32, no SIB
-            out_offset = *reinterpret_cast<const uint32_t*>(p + 2);
+            out_offset = *reinterpret_cast<uint32_t const *>(p + 2);
             return true;
         }
     }
@@ -87,13 +103,14 @@ static bool match_store_disp32_32(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for REX.W + mov [reg+disp8], src_reg (64-bit store)
-static bool match_store_disp8_64(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_disp8_64(uint8_t const *p, uint32_t &out_offset)
+{
     // 48 89 ModRM(01 xxx rrr) disp8 — mov [reg+disp8], r64
     // Also 4C 89 for r8-r15 source
     if ((p[0] == 0x48 || p[0] == 0x4C) && p[1] == 0x89) {
         uint8_t modrm = p[2];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t rm    = modrm & 7;
         if (mod == 1 && rm != 4) {
             out_offset = p[3];
             return true;
@@ -103,13 +120,14 @@ static bool match_store_disp8_64(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for REX.W + mov [reg+disp32], src_reg (64-bit store)
-static bool match_store_disp32_64(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_disp32_64(uint8_t const *p, uint32_t &out_offset)
+{
     if ((p[0] == 0x48 || p[0] == 0x4C) && p[1] == 0x89) {
         uint8_t modrm = p[2];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t rm    = modrm & 7;
         if (mod == 2 && rm != 4) {
-            out_offset = *reinterpret_cast<const uint32_t*>(p + 3);
+            out_offset = *reinterpret_cast<uint32_t const *>(p + 3);
             return true;
         }
     }
@@ -117,12 +135,13 @@ static bool match_store_disp32_64(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for `movss [reg+disp8], xmm` (float store)
-static bool match_store_float_disp8(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_float_disp8(uint8_t const *p, uint32_t &out_offset)
+{
     // F3 0F 11 ModRM(01 xxx rrr) disp8 — movss [reg+disp8], xmmN
     if (p[0] == 0xF3 && p[1] == 0x0F && p[2] == 0x11) {
         uint8_t modrm = p[3];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t rm    = modrm & 7;
         if (mod == 1 && rm != 4) {
             out_offset = p[4];
             return true;
@@ -132,13 +151,14 @@ static bool match_store_float_disp8(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for `mov byte [reg+disp8], imm8` (byte store)
-static bool match_store_byte_disp8(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_byte_disp8(uint8_t const *p, uint32_t &out_offset)
+{
     // C6 ModRM(01 000 rrr) disp8 imm8 — mov byte [reg+disp8], imm8
     if (p[0] == 0xC6) {
         uint8_t modrm = p[1];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t reg = (modrm >> 3) & 7;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t reg   = (modrm >> 3) & 7;
+        uint8_t rm    = modrm & 7;
         if (mod == 1 && reg == 0 && rm != 4) {
             out_offset = p[2];
             return true;
@@ -148,13 +168,14 @@ static bool match_store_byte_disp8(const uint8_t* p, uint32_t& out_offset) {
 }
 
 // Check for `mov dword [reg+disp8], imm32` (immediate 32-bit store)
-static bool match_store_imm32_disp8(const uint8_t* p, uint32_t& out_offset) {
+static bool match_store_imm32_disp8(uint8_t const *p, uint32_t &out_offset)
+{
     // C7 ModRM(01 000 rrr) disp8 imm32 — mov dword [reg+disp8], imm32
     if (p[0] == 0xC7) {
         uint8_t modrm = p[1];
-        uint8_t mod = (modrm >> 6) & 3;
-        uint8_t reg = (modrm >> 3) & 7;
-        uint8_t rm = modrm & 7;
+        uint8_t mod   = (modrm >> 6) & 3;
+        uint8_t reg   = (modrm >> 3) & 7;
+        uint8_t rm    = modrm & 7;
         if (mod == 1 && reg == 0 && rm != 4) {
             out_offset = p[2];
             return true;
@@ -169,30 +190,32 @@ static bool match_store_imm32_disp8(const uint8_t* p, uint32_t& out_offset) {
 
 // Scan a builder function (~first 256 bytes) for allocation size and field stores.
 // Returns true if at least the allocation size was found.
-static bool scan_builder(const uint8_t* func, size_t max_scan, EventLayout& layout) {
+static bool scan_builder(uint8_t const *func, size_t max_scan, EventLayout &layout)
+{
     bool found_alloc = false;
 
-    for (size_t i = 0; i + 10 < max_scan; i++) {
+    for (size_t i = 0; i + 10 < max_scan; ++i) {
         // Stop at ret (C3) or int3 (CC) — likely end of function
-        if (found_alloc && (func[i] == 0xC3 || func[i] == 0xCC)) break;
+        if (found_alloc && (func[i] == 0xC3 || func[i] == 0xCC))
+            break;
 
         // --- Allocation size: mov ecx, IMM32 (B9 xx xx xx xx) before call ---
         if (!found_alloc && func[i] == 0xB9 && func[i + 5] == 0xE8) {
-            uint32_t size = *reinterpret_cast<const uint32_t*>(func + i + 1);
+            uint32_t size = *reinterpret_cast<uint32_t const *>(func + i + 1);
             if (size >= 24 && size <= 256) { // reasonable event object size
                 layout.alloc_size = size;
-                found_alloc = true;
+                found_alloc       = true;
             }
         }
         // Also: mov edx, IMM32 (BA xx xx xx xx) — some builders pass size in edx
         if (!found_alloc && func[i] == 0xBA) {
-            uint32_t size = *reinterpret_cast<const uint32_t*>(func + i + 1);
+            uint32_t size = *reinterpret_cast<uint32_t const *>(func + i + 1);
             if (size >= 24 && size <= 256) {
                 // Verify it's followed by a call within ~10 bytes
-                for (size_t j = i + 5; j < i + 15 && j + 1 < max_scan; j++) {
+                for (size_t j = i + 5; j < i + 15 && j + 1 < max_scan; ++j) {
                     if (func[j] == 0xE8) { // call
                         layout.alloc_size = size;
-                        found_alloc = true;
+                        found_alloc       = true;
                         break;
                     }
                 }
@@ -204,77 +227,76 @@ static bool scan_builder(const uint8_t* func, size_t max_scan, EventLayout& layo
 
         // 64-bit store [reg+disp8]
         if (match_store_disp8_64(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 8});
+            layout.fields.emplace_back(off, 8);
             continue;
         }
         // 64-bit store [reg+disp32]
         if (match_store_disp32_64(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 8});
+            layout.fields.emplace_back(off, 8);
             continue;
         }
         // 32-bit store [reg+disp8]
         if (match_store_disp8_32(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 4});
+            layout.fields.emplace_back(off, 4);
             continue;
         }
         // 32-bit store [reg+disp32]
         if (match_store_disp32_32(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 4});
+            layout.fields.emplace_back(off, 4);
             continue;
         }
         // SIB-addressed stores: [reg+disp8] with SIB byte
         // 89 ModRM(01 xxx 100) SIB disp8 — mov [SIB+disp8], r32
         if (func[i] == 0x89) {
-            uint8_t modrm = func[i+1];
-            uint8_t mod = (modrm >> 6) & 3;
-            uint8_t rm = modrm & 7;
+            uint8_t modrm = func[i + 1];
+            uint8_t mod   = (modrm >> 6) & 3;
+            uint8_t rm    = modrm & 7;
             if (mod == 1 && rm == 4) { // SIB present
-                off = func[i+3]; // disp8 after SIB byte
+                off = func[i + 3];     // disp8 after SIB byte
                 if (off >= 0x18 && off < 0x80) {
-                    layout.fields.push_back({off, 4});
+                    layout.fields.emplace_back(off, 4);
                     continue;
                 }
             }
         }
         // REX.W + SIB store: 48 89 ModRM(01 xxx 100) SIB disp8
-        if ((func[i] == 0x48 || func[i] == 0x4C) && func[i+1] == 0x89) {
-            uint8_t modrm = func[i+2];
-            uint8_t mod = (modrm >> 6) & 3;
-            uint8_t rm = modrm & 7;
+        if ((func[i] == 0x48 || func[i] == 0x4C) && func[i + 1] == 0x89) {
+            uint8_t modrm = func[i + 2];
+            uint8_t mod   = (modrm >> 6) & 3;
+            uint8_t rm    = modrm & 7;
             if (mod == 1 && rm == 4) { // SIB present
-                off = func[i+4]; // disp8 after SIB byte
+                off = func[i + 4];     // disp8 after SIB byte
                 if (off >= 0x18 && off < 0x80) {
-                    layout.fields.push_back({off, 8});
+                    layout.fields.emplace_back(off, 8);
                     continue;
                 }
             }
         }
         // float store [reg+disp8]
         if (match_store_float_disp8(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 4}); // float = 4 bytes
+            layout.fields.emplace_back(off, 4); // float = 4 bytes
             continue;
         }
         // byte store [reg+disp8]
         if (match_store_byte_disp8(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 1});
+            layout.fields.emplace_back(off, 1);
             continue;
         }
         // immediate 32-bit store [reg+disp8]
         if (match_store_imm32_disp8(func + i, off) && off >= 0x18 && off < 0x80) {
-            layout.fields.push_back({off, 4});
+            layout.fields.emplace_back(off, 4);
             continue;
         }
     }
 
     // Merge fields: for duplicate offsets, keep the LARGEST size (prefer u64 over u32)
     if (!layout.fields.empty()) {
-        std::sort(layout.fields.begin(), layout.fields.end(),
-            [](const FieldInfo& a, const FieldInfo& b) {
-                return a.offset < b.offset || (a.offset == b.offset && a.size > b.size);
-            });
+        std::sort(layout.fields.begin(), layout.fields.end(), [](FieldInfo const &a, FieldInfo const &b) {
+            return a.offset < b.offset || (a.offset == b.offset && a.size > b.size);
+        });
         // Deduplicate: keep first entry per offset (which is the largest due to sort)
         auto last = std::unique(layout.fields.begin(), layout.fields.end(),
-            [](const FieldInfo& a, const FieldInfo& b) { return a.offset == b.offset; });
+                                [](FieldInfo const &a, FieldInfo const &b) { return a.offset == b.offset; });
         layout.fields.erase(last, layout.fields.end());
     }
 
@@ -293,32 +315,32 @@ static bool scan_builder(const uint8_t* func, size_t max_scan, EventLayout& layo
 // Pattern: 48 8D xx yy yy yy yy  (REX.W + LEA + ModRM(00,reg,101=RIP) + disp32)
 
 struct BuilderCandidate {
-    uintptr_t func_start;  // estimated function start (scan backwards for common prologues)
+    uintptr_t func_start; // estimated function start (scan backwards for common prologues)
 };
 
-static std::vector<BuilderCandidate> find_builders_for_vtable(
-    uintptr_t vtable_va, uintptr_t text_start, uintptr_t text_end)
+static std::vector<BuilderCandidate>
+find_builders_for_vtable(uintptr_t vtable_va, uintptr_t text_start, uintptr_t text_end)
 {
     std::vector<BuilderCandidate> result;
 
-    for (uintptr_t addr = text_start; addr + 7 <= text_end; addr++) {
-        auto* p = reinterpret_cast<const uint8_t*>(addr);
+    for (uintptr_t addr = text_start; addr + 7 <= text_end; ++addr) {
+        auto *p = reinterpret_cast<uint8_t const *>(addr);
 
         // LEA reg, [rip+disp32]: 48 8D ModRM(00,reg,101) disp32
         // REX.W prefix: 48 or 4C
         if ((p[0] == 0x48 || p[0] == 0x4C) && p[1] == 0x8D) {
             uint8_t modrm = p[2];
-            uint8_t mod = (modrm >> 6) & 3;
-            uint8_t rm = modrm & 7;
+            uint8_t mod   = (modrm >> 6) & 3;
+            uint8_t rm    = modrm & 7;
             if (mod == 0 && rm == 5) { // RIP-relative
-                int32_t disp = *reinterpret_cast<const int32_t*>(p + 3);
+                int32_t   disp   = *reinterpret_cast<int32_t const *>(p + 3);
                 uintptr_t target = addr + 7 + disp; // RIP + disp (instruction is 7 bytes)
                 if (target == vtable_va) {
                     // Found a vtable reference. Estimate function start by scanning
                     // backwards for a common function prologue (up to 256 bytes).
                     uintptr_t func_start = addr;
                     for (uintptr_t scan = addr; scan > addr - 256 && scan >= text_start; scan--) {
-                        auto* sp = reinterpret_cast<const uint8_t*>(scan);
+                        auto *sp = reinterpret_cast<uint8_t const *>(scan);
                         // Common prologues:
                         // 48 89 5C 24 xx — mov [rsp+xx], rbx
                         // 48 83 EC xx    — sub rsp, xx
@@ -341,7 +363,7 @@ static std::vector<BuilderCandidate> find_builders_for_vtable(
                             break;
                         }
                     }
-                    result.push_back({func_start});
+                    result.emplace_back(func_start);
                 }
             }
         }
@@ -354,31 +376,38 @@ static std::vector<BuilderCandidate> find_builders_for_vtable(
 // CSV loading (same as before)
 // ---------------------------------------------------------------------------
 
-static bool load_vtable_rvas(const std::string& csv_path,
-    std::unordered_map<uint32_t, uintptr_t>& vtable_rvas)
+static bool load_vtable_rvas(fs::path const &csv_path, std::unordered_map<uint32_t, uintptr_t> &vtable_rvas)
 {
-    std::ifstream f(csv_path);
-    if (!f) return false;
+    auto f = std::ifstream(csv_path);
+    if (!f)
+        return false;
 
     std::string line;
     std::getline(f, line); // skip header
 
     while (std::getline(f, line)) {
-        uint32_t id = 0;
-        std::string rva_str;
         std::istringstream ss(line);
+        std::string rva_str;
         std::string token;
-        int col = 0;
+        uint32_t id = 0;
+        int      col = 0;
+
         while (std::getline(ss, token, ',')) {
             switch (col) {
-                case 0: id = static_cast<uint32_t>(std::stoul(token)); break;
-                case 3: rva_str = token; break;
+            case 0:
+                id = static_cast<uint32_t>(std::stoul(token));
+                break;
+            case 3:
+                rva_str = token;
+                break;
             }
-            col++;
+            ++col;
         }
+
         if (!rva_str.empty() && rva_str.size() > 2) {
             uintptr_t rva = std::stoull(rva_str, nullptr, 16);
-            if (rva > 0) vtable_rvas[id] = rva;
+            if (rva > 0)
+                vtable_rvas[id] = rva;
         }
     }
     return !vtable_rvas.empty();
@@ -388,7 +417,8 @@ static bool load_vtable_rvas(const std::string& csv_path,
 // Main
 // ---------------------------------------------------------------------------
 
-static void on_game_loaded() {
+static void on_game_loaded()
+{
     x4n::log::info("event_probe: on_game_loaded — starting builder code scan");
 
     uintptr_t exe_base = x4n::detail::g_api->exe_base;
@@ -398,15 +428,16 @@ static void on_game_loaded() {
     }
 
     // Find .text and .rdata section bounds
-    auto dos = reinterpret_cast<IMAGE_DOS_HEADER*>(exe_base);
-    auto nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(exe_base + dos->e_lfanew);
+    auto dos      = reinterpret_cast<IMAGE_DOS_HEADER *>(exe_base);
+    auto nt       = reinterpret_cast<IMAGE_NT_HEADERS64 *>(exe_base + dos->e_lfanew);
     auto sections = IMAGE_FIRST_SECTION(nt);
 
-    uintptr_t text_start = 0, text_end = 0;
-    for (int i = 0; i < nt->FileHeader.NumberOfSections; i++) {
-        if (std::strncmp(reinterpret_cast<char*>(sections[i].Name), ".text", 5) == 0) {
+    uintptr_t text_start = 0;
+    uintptr_t text_end   = 0;
+    for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
+        if (::strncmp(reinterpret_cast<char *>(sections[i].Name), ".text", 5) == 0) {
             text_start = exe_base + sections[i].VirtualAddress;
-            text_end = text_start + sections[i].Misc.VirtualSize;
+            text_end   = text_start + sections[i].Misc.VirtualSize;
             break;
         }
     }
@@ -416,19 +447,13 @@ static void on_game_loaded() {
     }
 
     // Load vtable RVAs from class_dump
-    const std::string base = std::string(x4n::path()) + "/";
-    std::string ext_root = base;
-    while (!ext_root.empty() && (ext_root.back() == '/' || ext_root.back() == '\\'))
-        ext_root.pop_back();
-    auto sep = ext_root.find_last_of("/\\");
-    std::string csv_path;
-    if (sep != std::string::npos) {
-        csv_path = ext_root.substr(0, sep + 1) + "x4native_class_dump\\event_type_ids.csv";
-    }
+    auto base     = fs::path(x4n::path());
+    auto ext_root = base.parent_path();
+    auto csv_path = ext_root / "x4native_class_dump" / "event_type_ids.csv";
 
     std::unordered_map<uint32_t, uintptr_t> vtable_rvas;
     if (!load_vtable_rvas(csv_path, vtable_rvas)) {
-        if (!load_vtable_rvas(base + "event_type_ids.csv", vtable_rvas)) {
+        if (!load_vtable_rvas(base / "event_type_ids.csv", vtable_rvas)) {
             x4n::log::error("event_probe: could not load event_type_ids.csv");
             return;
         }
@@ -440,47 +465,50 @@ static void on_game_loaded() {
     // For each event type, find builders and scan their code
     std::unordered_map<uint32_t, EventLayout> layouts;
     uint32_t found_builders = 0;
-    uint32_t found_layouts = 0;
+    uint32_t found_layouts  = 0;
 
-    for (auto& [type_id, vtable_rva] : vtable_rvas) {
+    for (auto const &[type_id, vtable_rva] : vtable_rvas) {
         uintptr_t vtable_va = exe_base + vtable_rva;
 
         auto builders = find_builders_for_vtable(vtable_va, text_start, text_end);
-        if (builders.empty()) continue;
-        found_builders++;
+        if (builders.empty())
+            continue;
+        ++found_builders;
 
         // Scan each builder, merge results
-        EventLayout layout{};
-        layout.type_id = type_id;
+        EventLayout layout = {.type_id = type_id};
 
-        for (auto& b : builders) {
-            EventLayout candidate{};
-            candidate.type_id = type_id;
+        for (auto &b : builders) {
+            EventLayout candidate = {.type_id = type_id};;
             size_t scan_len = std::min<size_t>(512, text_end - b.func_start);
-            if (scan_builder(reinterpret_cast<const uint8_t*>(b.func_start), scan_len, candidate)) {
+            if (scan_builder(reinterpret_cast<uint8_t const *>(b.func_start), scan_len, candidate)) {
                 // Take the best alloc_size (non-zero)
                 if (candidate.alloc_size > 0 && (layout.alloc_size == 0 || candidate.alloc_size < layout.alloc_size))
                     layout.alloc_size = candidate.alloc_size;
                 // Merge fields
-                for (auto& f : candidate.fields)
-                    layout.fields.push_back(f);
+                for (FieldInfo const &f : candidate.fields)
+                    layout.fields.emplace_back(f);
             }
         }
 
         // Deduplicate merged fields — prefer largest size per offset
         if (!layout.fields.empty()) {
-            std::sort(layout.fields.begin(), layout.fields.end(),
-                [](const FieldInfo& a, const FieldInfo& b) {
+            std::ranges::sort(
+                layout.fields, [](FieldInfo const &a, FieldInfo const &b) {
                     return a.offset < b.offset || (a.offset == b.offset && a.size > b.size);
-                });
-            auto last = std::unique(layout.fields.begin(), layout.fields.end(),
-                [](const FieldInfo& a, const FieldInfo& b) { return a.offset == b.offset; });
+                }
+            );
+            auto last = std::ranges::unique(
+                layout.fields, [](FieldInfo const &a, FieldInfo const &b) {
+                    return a.offset == b.offset;
+                }
+            ).begin();
             layout.fields.erase(last, layout.fields.end());
         }
 
         if (layout.alloc_size > 0 || !layout.fields.empty()) {
             layouts[type_id] = std::move(layout);
-            found_layouts++;
+            ++found_layouts;
         }
     }
 
@@ -489,7 +517,7 @@ static void on_game_loaded() {
 
     // Write event_layouts.csv
     {
-        std::ofstream f(base + "event_layouts.csv");
+        auto f = std::ofstream(base / "event_layouts.csv");
         if (!f) {
             x4n::log::error("event_probe: could not open event_layouts.csv for writing");
             return;
@@ -498,28 +526,32 @@ static void on_game_loaded() {
         f << "id,alloc_size,fields\n";
         // Sort by type_id
         std::vector<uint32_t> sorted_ids;
-        for (auto& [id, _] : layouts) sorted_ids.push_back(id);
-        std::sort(sorted_ids.begin(), sorted_ids.end());
+        sorted_ids.reserve(layouts.size());
+        for (auto const &id : layouts | std::views::keys)
+            sorted_ids.emplace_back(id);
+        std::ranges::sort(sorted_ids);
 
         for (uint32_t id : sorted_ids) {
-            auto& l = layouts[id];
-            f << id << "," << l.alloc_size << ",";
-            for (size_t i = 0; i < l.fields.size(); i++) {
-                if (i > 0) f << ";";
-                f << l.fields[i].offset << ":" << l.fields[i].size;
+            EventLayout &l = layouts[id];
+            f << id << ',' << l.alloc_size << ',';
+            for (size_t i = 0; i < l.fields.size(); ++i) {
+                if (i > 0)
+                    f << ';';
+                f << l.fields[i].offset << ':' << l.fields[i].size;
             }
-            f << "\n";
+            f << '\n';
         }
     }
 
-    x4n::log::info("event_probe: wrote {} event layouts → event_layouts.csv",
-                   found_layouts);
+    x4n::log::info("event_probe: wrote {} event layouts → event_layouts.csv", found_layouts);
 }
 
-X4N_EXTENSION {
+X4N_EXTENSION
+{
     // All scanning reads static .rdata/.text — no game state needed, run immediately.
     on_game_loaded();
 }
 
-X4N_SHUTDOWN {
+X4N_SHUTDOWN
+{
 }

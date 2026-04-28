@@ -134,16 +134,17 @@ inline uintptr_t exe_base() { return detail::g_api->exe_base; }
 //   }
 // ---------------------------------------------------------------------------
 #define X4N_EXTENSION                                                       \
-    static void _x4n_user_init();                                           \
+    static void _x4n_user_init(void);                                       \
     X4NATIVE_EXPORT int x4native_api_version(void) {                        \
         return X4NATIVE_API_VERSION;                                        \
     }                                                                       \
-    X4NATIVE_EXPORT int x4native_init(X4NativeAPI* _x4n_api) {              \
+    X4NATIVE_EXPORT int x4native_init(X4NativeAPI *_x4n_api) {              \
+        (void)::setlocale(LC_ALL, "en_US.UTF-8");                           \
         ::x4n::detail::g_api = _x4n_api;                                    \
         _x4n_user_init();                                                   \
         return X4NATIVE_OK;                                                 \
     }                                                                       \
-    void _x4n_user_init()
+    static void _x4n_user_init(void)
 
 // ---------------------------------------------------------------------------
 // X4N_SHUTDOWN { ... }
@@ -157,10 +158,10 @@ inline uintptr_t exe_base() { return detail::g_api->exe_base; }
 //   }
 // ---------------------------------------------------------------------------
 #define X4N_SHUTDOWN                                                        \
-    static void _x4n_user_shutdown();                                       \
+    static void _x4n_user_shutdown(void);                                   \
     X4NATIVE_EXPORT void x4native_shutdown(void) {                          \
         _x4n_user_shutdown();                                               \
         ::x4n::detail::g_api = nullptr;                                     \
     }                                                                       \
-    void _x4n_user_shutdown()
+    static void _x4n_user_shutdown(void)
 

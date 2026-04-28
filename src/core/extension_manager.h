@@ -12,14 +12,15 @@
 // ---------------------------------------------------------------------------
 
 #include "Common.h"
-#include <vector>
 
 #include <x4native_extension.h>
 #include "logger.h"
 #include "settings_manager.h"
 #include "x4native_defs.h"
 
+#include <filesystem>
 #include <utility>
+#include <vector>
 
 namespace x4n {
 
@@ -28,32 +29,37 @@ struct ExtensionInfo {
     // X4 enforces uniqueness of this id across enabled extensions. Use it
     // for every framework-internal key (logs, stash, settings, events).
     std::string extension_id;
+
     // Human-facing name — content.xml <content name="..."> attribute.
     // Used for log prefixes and UI only; never as an identity key.
     std::string display_name;
+
     // Deprecated: the "name" field from x4native.json. Parsed for backward
     // compatibility but ignored in favour of content.xml fields. Kept only
     // so we can log a deprecation warning if present.
     std::string json_name;
-    std::string path;           // Absolute path to the extension's folder
-    std::string dll_path;       // Absolute path to the extension DLL (original, never locked)
-    std::string dll_live_path;  // Copy that is actually LoadLibrary'd (deleted on unload)
-    int         priority = 0;
-    int         api_version = 0;
-    bool        autoreload = false;  // true → watch dll_path for changes and hot-reload
+
+    std::string path;                    // Absolute path to the extension's folder
+    std::filesystem::path dll_path;      // Absolute path to the extension DLL (original, never locked)
+    std::filesystem::path dll_live_path; // Copy that is actually LoadLibrary'd (deleted on unload)
+
+    int  priority    = 0;
+    int  api_version = 0;
+    bool autoreload  = false; // true → watch dll_path for changes and hot-reload
 
     // Per-extension log file.
     // log_name: raw value from "log" field in x4native.json (empty = use <name>.log default)
     // log_path: resolved absolute path (set in load_extension, may be updated by api_init_log)
     // log_handle: open HANDLE to the current log file (INVALID_HANDLE_VALUE if not open)
-    std::string log_name;
-    std::string log_path;
-    HANDLE      log_handle = INVALID_HANDLE_VALUE;
+    std::string           log_name;
+    std::filesystem::path log_path;
+    Logger::HandleType    log_handle = Logger::invalid_handle_value;
 
-    HMODULE     module = nullptr;
-    bool        initialized = false;
-    bool        reload_pending = false;  // set by tick(), consumed by flush_pending_reloads()
-    FILETIME    dll_mtime = {};          // mtime of dll_path at last load (for change detection)
+    HMODULE  module         = nullptr;
+    bool     initialized    = false;
+    bool     reload_pending = false; // set by tick(), consumed by flush_pending_reloads()
+
+    std::filesystem::file_time_type dll_mtime = {}; // mtime of dll_path at last load (for change detection)
 
     // Declared settings schema — parsed from x4native.json at discovery time.
     // The authoritative data lives in SettingsManager, keyed by extension_id.
@@ -82,40 +88,49 @@ struct ExtensionInfo {
     shutdown_fn    fn_shutdown    = nullptr;
 };
 
-class ExtensionManager {
-public:
-    static void init(const std::string& ext_root, const std::string& game_version,
-                     int (*raise_lua_event)(const char*, const char*) = nullptr,
-                     int (*register_lua_bridge)(const char*, const char*) = nullptr,
-                     stash_set_fn stash_set = nullptr,
-                     stash_get_fn stash_get = nullptr,
-                     stash_remove_fn stash_remove = nullptr,
-                     stash_clear_fn stash_clear = nullptr);
+class ExtensionManager
+{
+  public:
+    ExtensionManager() = delete;
+
+    using raise_lua_event_fn     = int (*)(char const *, char const *);
+    using register_lua_bridge_fn = int (*)(char const *, char const *);
+
+    static void init(std::filesystem::path ext_root,
+                     std::string const     &game_version,
+                     raise_lua_event_fn     raise_lua_event     = nullptr,
+                     register_lua_bridge_fn register_lua_bridge = nullptr,
+                     stash_set_fn           stash_set           = nullptr,
+                     stash_get_fn           stash_get           = nullptr,
+                     stash_remove_fn        stash_remove        = nullptr,
+                     stash_clear_fn         stash_clear         = nullptr);
     static void shutdown();
 
     static void discover();
     static void load_all();
-    static void tick();                   // throttled mtime check — call every frame
-    static void flush_pending_reloads();  // safe reload point — call before firing frame events
-    static const std::vector<ExtensionInfo>& extensions() { return s_extensions; }
+    static void tick();                  // throttled mtime check — call every frame
+    static void flush_pending_reloads(); // safe reload point — call before firing frame events
+
+    static std::vector<ExtensionInfo> const &extensions() { return s_extensions; }
+
     // Serializes the loaded-extension set as JSON. Returns a pointer into
     // a single internal static buffer — valid until the next call. Callers
     // that need to keep the string across calls must copy it.
-    static const char* loaded_extensions_json();
+    static char const *loaded_extensions_json();
 
-private:
+  private:
     enum class LoadResult { ok, skipped, failed };
 
-    static bool parse_config(const std::string& json_path, ExtensionInfo& info);
-    static LoadResult load_extension(ExtensionInfo& ext);
-    static void unload_extension(ExtensionInfo& ext);
-    static void fill_api(X4NativeAPI& api, ExtensionInfo& ext);
+    static bool       parse_config(std::filesystem::path const &json_path, ExtensionInfo &info);
+    static LoadResult load_extension(ExtensionInfo &ext);
+    static void       unload_extension(ExtensionInfo &ext);
+    static void       fill_api(X4NativeAPI &api, ExtensionInfo &ext);
 
     static std::vector<ExtensionInfo> s_extensions;
-    static std::string s_ext_root;
+    static std::filesystem::path s_ext_root;
     static std::string s_game_version;
     static int  s_tick_frame;
-    static bool s_any_autoreload;  // true if at least one loaded extension has autoreload=true
+    static bool s_any_autoreload; // true if at least one loaded extension has autoreload=true
 };
 
 } // namespace x4n

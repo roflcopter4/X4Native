@@ -20,6 +20,8 @@
 #include <cstring>
 #include <fstream>
 
+namespace fs = std::filesystem;
+
 namespace x4n {
 
 X4GameFunctions GameAPI::s_table = {};
@@ -41,7 +43,7 @@ static FuncEntry const s_func_entries[] = {
 };
 #undef X4_FUNC
 
-static constexpr int TOTAL_FUNCTIONS = static_cast<int>(std::size(s_func_entries));
+static constexpr unsigned TOTAL_FUNCTIONS = static_cast<unsigned>(std::size(s_func_entries));
 
 // Internal function resolver data — same struct, resolved from RVA database
 #define X4_FUNC(ret, name, params) { #name, offsetof(X4GameFunctions, name) },
@@ -52,7 +54,7 @@ static FuncEntry const s_ifunc_entries[] = {
 #undef X4_FUNC
 
 static HMODULE s_x4_module = nullptr;
-static int     s_resolved  = 0;
+static unsigned s_resolved  = 0;
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -61,7 +63,7 @@ static int     s_resolved  = 0;
 bool GameAPI::init()
 {
     // X4.exe is the host process — GetModuleHandle(NULL) gets its handle
-    s_x4_module = GetModuleHandleA(nullptr);
+    s_x4_module = GetModuleHandleW(nullptr);
     if (!s_x4_module) {
         Logger::error("GameAPI: Failed to get X4.exe module handle");
         return false;
@@ -127,24 +129,25 @@ uintptr_t GameAPI::exe_base()
     return reinterpret_cast<uintptr_t>(s_x4_module);
 }
 
-void GameAPI::load_internal_db(std::string const &ext_root, std::string const &primary_build, std::string const &fallback_build)
+void GameAPI::load_internal_db(fs::path const &ext_root, std::string const &primary_build, std::string const &fallback_build)
 {
-    std::string   db_path = ext_root + "native/version_db/internal_functions.json";
-    std::ifstream file(db_path);
+    auto db_path = ext_root / "native" / "version_db" / "internal_functions.json";
+    auto file    = std::ifstream(db_path);
     if (!file.is_open()) {
         Logger::debug("GameAPI: No internal functions database found");
         return;
     }
 
     try {
-        auto db = nlohmann::json::parse(file);
-        if (!db.contains("functions") || !db["functions"].is_object())
+        auto db    = nlohmann::json::parse(file);
+        auto funcs = db.find("functions");
+        if (funcs == db.end() || !funcs->is_object())
             return;
 
         auto base  = reinterpret_cast<uint8_t *>(s_x4_module);
         int  count = 0;
 
-        for (auto const &[name, entry] : db["functions"].items()) {
+        for (auto const &[name, entry] : funcs->items()) {
             std::string const *key = nullptr;
             if (entry.contains(primary_build))
                 key = &primary_build;
@@ -184,8 +187,8 @@ void GameAPI::load_internal_db(std::string const &ext_root, std::string const &p
     }
 }
 
-int GameAPI::resolved_count() { return s_resolved; }
-int GameAPI::total_count()    { return TOTAL_FUNCTIONS; }
-int GameAPI::internal_count() { return static_cast<int>(s_internal_funcs.size()); }
+unsigned GameAPI::resolved_count() { return s_resolved; }
+unsigned GameAPI::total_count()    { return static_cast<unsigned>(std::size(s_func_entries)); }
+unsigned GameAPI::internal_count() { return static_cast<unsigned>(s_internal_funcs.size()); }
 
 } // namespace x4n

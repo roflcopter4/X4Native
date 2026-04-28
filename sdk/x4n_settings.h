@@ -126,7 +126,7 @@ inline int on_setting_changed(void (*cb)(X4NativeSettingChanged const &info))
 {
     auto *api = ::x4n::detail::g_api;
     char  name[256];
-    (void)sprintf_s(name, std::size(name), "on_setting_changed:%s", api->_ext_id ? api->_ext_id : "");
+    (void)snprintf(name, std::size(name), "on_setting_changed:%s", api->_ext_id ? api->_ext_id : "");
     return api->subscribe(name, detail::trampoline_setting_changed, reinterpret_cast<void *>(cb), api);
 }
 
