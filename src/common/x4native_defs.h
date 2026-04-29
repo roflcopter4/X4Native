@@ -20,21 +20,23 @@ struct SettingOptionC {
 struct SettingInfo {
     char const *id;
     char const *name;
-    int         type; // X4N_SETTING_*
-
-    // Current value — only the field matching `type` is meaningful.
-    int         current_bool;   // X4N_SETTING_TOGGLE
-    double      current_number; // X4N_SETTING_SLIDER
-    char const *current_string; // X4N_SETTING_DROPDOWN (option id)
-
-    // Default value (populated for all types).
-    int         default_bool;
-    double      default_number;
-    char const *default_string;
 
     // Dropdown options (type == X4N_SETTING_DROPDOWN).
     SettingOptionC const *options;
-    int          option_count;
+    int option_count;
+
+    int8_t type; // X4N_SETTING_*
+    // Default value (populated for all types).
+    uint8_t     default_bool;
+    double      default_number;
+    char const *default_string;
+
+    // Current value — only the field matching `type` is meaningful.
+    union {
+        uint8_t     current_bool;   // X4N_SETTING_TOGGLE
+        double      current_number; // X4N_SETTING_SLIDER
+        char const *current_string; // X4N_SETTING_DROPDOWN (option id)
+    };
 
     // Slider bounds (type == X4N_SETTING_SLIDER).
     double min;
@@ -44,10 +46,12 @@ struct SettingInfo {
 
 // Tagged value passed to set_extension_setting. type must match the schema.
 struct SettingValueC {
-    int         type; // X4N_SETTING_*
-    int         b;    // bool (X4N_SETTING_TOGGLE)
-    double      d;    // number (X4N_SETTING_SLIDER)
-    char const *s;    // string (X4N_SETTING_DROPDOWN)
+    int8_t type; // X4N_SETTING_*
+    union {
+        uint8_t     b;  // bool   (X4N_SETTING_TOGGLE)
+        double      d;  // number (X4N_SETTING_SLIDER)
+        char const *s;  // string (X4N_SETTING_DROPDOWN)
+    };
 };
 
 // ---------------------------------------------------------------------------

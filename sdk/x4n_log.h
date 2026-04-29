@@ -229,6 +229,6 @@ struct file_sink {
 /// subfolder in the user profile (`<profile>\x4native\<extension_id>\<name>`).
 /// Usage:
 ///     x4n::log::to_file("events.log").info("event: {}", id);
-inline file_sink to_file(char const * name) { return {name}; }
+inline file_sink to_file(char const *name) { return {name}; }
 
 } // namespace x4n::log

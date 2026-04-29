@@ -33,7 +33,7 @@
 
 #include <cstdint>
 
-namespace x4n { namespace faction {
+namespace x4n::faction {
 
 namespace detail {
 
@@ -43,11 +43,11 @@ namespace detail {
 /// (FNV-1: multiply-then-XOR, NOT FNV-1a's XOR-then-multiply.)
 /// Result is a 32-bit hash extended into uint64 with high bits zero —
 /// matches the engine's `LL`-typed hash for uint64 RBTree key compares.
-inline uint64_t fnv1_id(const char* id) noexcept {
+inline uint64_t fnv1_id(char const *id) noexcept
+{
     uint64_t hash = 2166136261ULL;
-    for (const char* p = id; *p; ++p) {
+    for (char const *p = id; *p; ++p)
         hash = static_cast<uint64_t>(static_cast<uint8_t>(*p)) ^ (16777619ULL * hash);
-    }
     return hash;
 }
 
@@ -64,11 +64,14 @@ inline uint64_t fnv1_id(const char* id) noexcept {
 ///
 /// @stability MODERATE — depends on X4_RVA_FACTION_REGISTRY + node layout.
 /// @verified v9.00 build 606138 (per FACTION_RELATIONS.md §2.2)
-inline X4FactionClass* find_class_by_id(const char* faction_id) noexcept {
-    if (!faction_id || !faction_id[0]) return nullptr;
+inline X4FactionClass *find_class_by_id(char const *faction_id) noexcept
+{
+    if (!faction_id || !faction_id[0])
+        return nullptr;
 
-    auto* off = ::x4n::detail::offsets();
-    if (!off || !off->faction_registry) return nullptr;
+    auto *off = ::x4n::detail::offsets();
+    if (!off || !off->faction_registry)
+        return nullptr;
 
     // The data global at X4_RVA_FACTION_REGISTRY is a POINTER SLOT (verified
     // 2026-04-27 via IDA at SetFactionRelationToPlayerFaction RVA 0x0017F8D0:
@@ -77,42 +80,46 @@ inline X4FactionClass* find_class_by_id(const char* faction_id) noexcept {
     //   `mov rax, [rdx+8]`             — registry+24 = root
     // So we deref the slot first (matches X4Native's ComponentRegistry
     // pattern in find_component), then walk the struct fields.
-    void* reg_struct = *reinterpret_cast<void**>(off->faction_registry);
-    if (!reg_struct) return nullptr;
+    void *reg_struct = *static_cast<void **>(off->faction_registry);
+    if (!reg_struct)
+        return nullptr;
 
-    auto* reg_bytes = static_cast<uint8_t*>(reg_struct);
-    auto* sentinel  = reg_bytes + X4_FACTION_REGISTRY_TREE_BASE;
-    void* root      = *reinterpret_cast<void**>(reg_bytes + X4_FACTION_REGISTRY_TREE_ROOT);
-    if (!root) return nullptr;
+    auto *reg_bytes = static_cast<uint8_t *>(reg_struct);
+    auto *sentinel  = reg_bytes + X4_FACTION_REGISTRY_TREE_BASE;
+    void *root      = *reinterpret_cast<void **>(reg_bytes + X4_FACTION_REGISTRY_TREE_ROOT);
+    if (!root)
+        return nullptr;
 
-    const uint64_t target = detail::fnv1_id(faction_id);
+    uint64_t const target = detail::fnv1_id(faction_id);
 
     // RBTree lower_bound: traverse from root, save candidate when going left
     // (key >= target). Matches engine's inlined search exactly. Key is read
     // as a full uint64 to match the engine's qword compare (verified at
     // SetFactionRelationToPlayerFaction RVA 0x0017F8D0+0x60: `cmp [rax+20h], r11`
     // with r11 holding the zero-extended FNV-1 hash).
-    uint8_t* candidate = sentinel;
-    auto*    node      = static_cast<uint8_t*>(root);
+    uint8_t *candidate = sentinel;
+    auto    *node      = static_cast<uint8_t *>(root);
     while (node) {
-        const uint64_t key = *reinterpret_cast<const uint64_t*>(node + X4_FACTION_REGISTRY_NODE_KEY);
+        uint64_t const key = *reinterpret_cast<uint64_t const *>(node + X4_FACTION_REGISTRY_NODE_KEY);
         if (key < target) {
-            node = *reinterpret_cast<uint8_t**>(node + X4_FACTION_REGISTRY_NODE_RIGHT);
+            node = *reinterpret_cast<uint8_t **>(node + X4_FACTION_REGISTRY_NODE_RIGHT);
         } else {
             candidate = node;
-            node      = *reinterpret_cast<uint8_t**>(node + X4_FACTION_REGISTRY_NODE_LEFT);
+            node      = *reinterpret_cast<uint8_t **>(node + X4_FACTION_REGISTRY_NODE_LEFT);
         }
     }
 
-    if (candidate == sentinel) return nullptr;
+    if (candidate == sentinel)
+        return nullptr;
 
     // Sanity check: lower_bound returns NOT-LESS-THAN — verify exact match.
     // The engine skips this check (relies on hash uniqueness across vanilla
     // faction ids), but we add it cheaply to defend against future collisions.
-    const uint64_t cand_key = *reinterpret_cast<const uint64_t*>(candidate + X4_FACTION_REGISTRY_NODE_KEY);
-    if (cand_key != target) return nullptr;
+    uint64_t const cand_key = *reinterpret_cast<uint64_t const *>(candidate + X4_FACTION_REGISTRY_NODE_KEY);
+    if (cand_key != target)
+        return nullptr;
 
-    return *reinterpret_cast<X4FactionClass**>(candidate + X4_FACTION_REGISTRY_NODE_VALUE);
+    return *reinterpret_cast<X4FactionClass **>(candidate + X4_FACTION_REGISTRY_NODE_VALUE);
 }
 
 /// Read the [-1.0, +1.0] internal relation float from faction `a_id` toward
@@ -125,24 +132,29 @@ inline X4FactionClass* find_class_by_id(const char* faction_id) noexcept {
 ///
 /// @stability MODERATE — depends on FactionRelation_GetFloat resolved RVA.
 /// @verified v9.00 build 606138 (per FACTION_RELATIONS.md §2.2)
-inline float get_relation(const char* a_id, const char* b_id) noexcept {
-    auto* g = game();
-    if (!g || !g->FactionRelation_GetFloat) return 0.0f;
-    X4FactionClass* a = find_class_by_id(a_id);
-    X4FactionClass* b = find_class_by_id(b_id);
-    if (!a || !b) return 0.0f;
+inline float get_relation(char const *a_id, char const *b_id) noexcept
+{
+    auto *g = game();
+    if (!g || !g->FactionRelation_GetFloat)
+        return 0.0f;
+    X4FactionClass *a = find_class_by_id(a_id);
+    X4FactionClass *b = find_class_by_id(b_id);
+    if (!a || !b)
+        return 0.0f;
     // FFI is declared with void* (see x4_internal_func_list.inc); cast at the
     // type-safe wrapper boundary.
-    return g->FactionRelation_GetFloat(static_cast<void*>(a), static_cast<void*>(b));
+    return g->FactionRelation_GetFloat(static_cast<void *>(a), static_cast<void *>(b));
 }
 
 /// Variant for callers that already hold FactionClass pointers (e.g.,
 /// galaxy-wide matrix sweeps cache the pointer per faction once and reuse it
 /// for the inner loop, avoiding N×N redundant find_class_by_id calls).
-inline float get_relation_ptr(X4FactionClass* a, X4FactionClass* b) noexcept {
-    auto* g = game();
-    if (!g || !g->FactionRelation_GetFloat || !a || !b) return 0.0f;
-    return g->FactionRelation_GetFloat(static_cast<void*>(a), static_cast<void*>(b));
+inline float get_relation_ptr(X4FactionClass *a, X4FactionClass *b) noexcept
+{
+    auto *g = game();
+    if (!g || !g->FactionRelation_GetFloat || !a || !b)
+        return 0.0f;
+    return g->FactionRelation_GetFloat(static_cast<void *>(a), static_cast<void *>(b));
 }
 
-}} // namespace x4n::faction
+} // namespace x4n::faction

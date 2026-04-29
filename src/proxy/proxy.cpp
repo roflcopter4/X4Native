@@ -223,8 +223,8 @@ static bool load_core()
         return false;
     }
 
-    g_core_init     = reinterpret_cast<core_init_fn>(GetProcAddress(g_core_module, "core_init"));
-    g_core_shutdown = reinterpret_cast<core_shutdown_fn>(GetProcAddress(g_core_module, "core_shutdown"));
+    g_core_init     = reinterpret_cast<core_init_fn>(::GetProcAddress(g_core_module, "core_init"));
+    g_core_shutdown = reinterpret_cast<core_shutdown_fn>(::GetProcAddress(g_core_module, "core_shutdown"));
 
     if (!g_core_init) {
         output_debug_string("X4Native proxy: core_init export not found\n");
@@ -297,7 +297,7 @@ static bool core_needs_reload()
 // Lua-facing API functions  (thin forwarders into g_dispatch)
 // ---------------------------------------------------------------------------
 
-static int l_discover_extensions(lua_State *L)
+static int l_discover_extensions(lua_State *)
 {
     if (g_dispatch.discover_extensions)
         g_dispatch.discover_extensions();
@@ -426,7 +426,7 @@ static int l_reload(lua_State *L)
     return 1;
 }
 
-static int l_prepare_reload(lua_State *L)
+static int l_prepare_reload(lua_State *)
 {
     if (g_dispatch.prepare_reload)
         g_dispatch.prepare_reload();
@@ -520,11 +520,11 @@ static int l_set_extension_setting(lua_State *L)
     char const *ext_id = x4n::lua::L_checkstring(L, 1);
     char const *key    = x4n::lua::L_checkstring(L, 2);
 
-    SettingValueC v = {};
+    SettingValueC v;
     switch (x4n::lua::type(L, 3)) {
     case LUA_TBOOLEAN:
         v.type = X4N_SETTING_TOGGLE;
-        v.b    = x4n::lua::toboolean(L, 3);
+        v.b    = static_cast<uint8_t>(x4n::lua::toboolean(L, 3));
         break;
     case LUA_TNUMBER:
         v.type = X4N_SETTING_SLIDER;
@@ -604,18 +604,18 @@ int luaopen_x4native(lua_State *L)
         char const   *name;
         lua_CFunction fn;
     } funcs[] = {
-        { "discover_extensions",     l_discover_extensions     },
-        { "raise_event",             l_raise_event             },
-        { "raise_lua_event",         l_raise_lua_event         },
-        { "log",                     l_log                     },
-        { "get_version",             l_get_version             },
-        { "get_loaded_extensions",   l_get_loaded_extensions   },
-        { "reload",                  l_reload                  },
-        { "prepare_reload",          l_prepare_reload          },
-        { "get_extension_settings",  l_get_extension_settings  },
-        { "set_extension_setting",   l_set_extension_setting   },
+        { "discover_extensions",     &l_discover_extensions    },
+        { "raise_event",             &l_raise_event            },
+        { "raise_lua_event",         &l_raise_lua_event        },
+        { "log",                     &l_log                    },
+        { "get_version",             &l_get_version            },
+        { "get_loaded_extensions",   &l_get_loaded_extensions  },
+        { "reload",                  &l_reload                 },
+        { "prepare_reload",          &l_prepare_reload         },
+        { "get_extension_settings",  &l_get_extension_settings },
+        { "set_extension_setting",   &l_set_extension_setting  },
 #ifdef X4N_WITH_RELOAD
-        { "should_autoreload",       l_should_autoreload       },
+        { "should_autoreload",       &l_should_autoreload      },
 #endif
     };
 
@@ -640,9 +640,9 @@ BOOL WINAPI DllMain(_In_ HINSTANCE hinstDll, _In_ DWORD fdwReason, _In_ LPVOID l
         // Pin this DLL so LuaJIT's FreeLibrary (on lua_close during save
         // load) cannot unload us. This preserves all static state —
         // g_initialized, g_core_module, g_dispatch — across Lua state
-        // destruction and recreation. Without this, save loads cause the
-        // proxy to unload while core_live.dll remains file-locked, making
-        // the next load_core() CopyFile fail.
+        // destruction and recreation. Without this, save loads cause the proxy
+        // to unload while core_live.dll remains file-locked, making the next
+        // load_core() CopyFile fail.
         HMODULE pinned = nullptr;
         ::GetModuleHandleExW(
             GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,

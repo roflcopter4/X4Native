@@ -10,18 +10,22 @@
 // ---------------------------------------------------------------------------
 
 #include "Common.h"
+#include <string>
 
 namespace x4n {
 
-class Version {
-public:
+class Version
+{
+  public:
+    Version() = delete;
+
     /// Detect X4.exe version from file version resource.
     /// Returns a string like "9.00" or "unknown" on failure.
     static std::string detect();
 
     /// Raw build number from version.dat (e.g. "900"). Empty if unknown.
     /// Only valid after detect() has been called.
-    static const std::string& build();
+    static std::string const &build();
 };
 
 } // namespace x4n

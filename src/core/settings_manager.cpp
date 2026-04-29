@@ -415,20 +415,13 @@ void SettingsManager::rebuild_abi_cache(ExtensionSettings &ext)
     ext.options_cache.reserve(ext.schema.size());
 
     for (SettingSchema const &s : ext.schema) {
-        SettingInfo info = {};
-        info.id          = s.id.c_str();
-        info.name        = s.name.c_str();
+        int8_t type;
         switch (s.type) {
-        case SettingType::Toggle:   info.type = X4N_SETTING_TOGGLE;   break;
-        case SettingType::Dropdown: info.type = X4N_SETTING_DROPDOWN; break;
-        case SettingType::Slider:   info.type = X4N_SETTING_SLIDER;   break;
+        case SettingType::Toggle:   type = X4N_SETTING_TOGGLE;   break;
+        case SettingType::Dropdown: type = X4N_SETTING_DROPDOWN; break;
+        case SettingType::Slider:   type = X4N_SETTING_SLIDER;   break;
+        default:                    type = -1;                   break;
         }
-        info.default_bool   = s.default_bool ? 1 : 0;
-        info.default_number = s.default_number;
-        info.default_string = s.default_string.c_str();
-        info.min            = s.min;
-        info.max            = s.max;
-        info.step           = s.step;
 
         // Options array for dropdowns — stored in parallel per-schema vector.
         std::vector<SettingOptionC> opts;
@@ -436,12 +429,21 @@ void SettingsManager::rebuild_abi_cache(ExtensionSettings &ext)
         for (SettingOption const &o : s.options)
             opts.emplace_back(SettingOptionC{o.id.c_str(), o.text.c_str()});
         ext.options_cache.emplace_back(std::move(opts));
-
         auto const &stored = ext.options_cache.back();
-        info.options       = stored.empty() ? nullptr : stored.data();
-        info.option_count  = static_cast<int>(stored.size());
 
-        ext.abi_cache.emplace_back(info);
+        ext.abi_cache.emplace_back(SettingInfo{
+            .id             = s.id.c_str(),
+            .name           = s.name.c_str(),
+            .options        = stored.empty() ? nullptr : stored.data(),
+            .option_count   = static_cast<int>(stored.size()),
+            .type           = type,
+            .default_bool   = static_cast<uint8_t>(s.default_bool ? 1 : 0),
+            .default_number = s.default_number,
+            .default_string = s.default_string.c_str(),
+            .min            = s.min,
+            .max            = s.max,
+            .step           = s.step,
+        });
     }
 
     ext.abi_cache_built = true;
@@ -586,11 +588,14 @@ static bool parse_one(
 
     case SettingType::Slider:
         it = j.find("min");
-        if (it != j.end() && it->is_number()) out.min = it->get<double>();
+        if (it != j.end() && it->is_number())
+            out.min = it->get<double>();
         it = j.find("max");
-        if (it != j.end() && it->is_number()) out.max = it->get<double>();
+        if (it != j.end() && it->is_number())
+            out.max = it->get<double>();
         it = j.find("step");
-        if (it != j.end() && it->is_number()) out.step = it->get<double>();
+        if (it != j.end() && it->is_number())
+            out.step = it->get<double>();
         if (out.max < out.min)
             std::swap(out.min, out.max);
         if (out.step <= 0)
