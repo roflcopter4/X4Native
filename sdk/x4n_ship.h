@@ -148,7 +148,7 @@ public:
 
     // ---------------------------------------------------------------
     // Order methods — public API.
-    // Param indices verified via IDA + AI script XML declarations.
+    // Param indices verified via binary analysis + AI script XML declarations.
     // ---------------------------------------------------------------
 
     /// Patrol a sector. Engages hostiles on sight. Loops indefinitely.

@@ -242,7 +242,7 @@ if (Test-Path $xsdFile) {
 
     foreach ($xt in $xsdRoomTypes) {
         if (-not $roomtypeEnum.Contains($xt)) {
-            $warnings += "XSD roomtype '$xt' not in X4RoomType enum -- may need IDA analysis"
+            $warnings += "XSD roomtype '$xt' not in X4RoomType enum - may need binary analysis"
         }
     }
 }

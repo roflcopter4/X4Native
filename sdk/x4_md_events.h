@@ -2,7 +2,7 @@
 // x4_md_events.h - Typed MD Event Subscription API
 // ==========================================================================
 // Auto-generated from event_type_ids.csv + event_layouts.csv + common.xsd
-// Game version: 900-606138
+// Game version: 900-607242
 //
 // Usage:
 //   x4n::md::on_sector_changed_owner_before([](const x4n::md::SectorChangedOwnerData& e) {
@@ -528,8 +528,8 @@ namespace x4n::md
     struct BuildFinishedComponentsData {
         uint64_t source_id;        // Event source entity (X4MdEvent)
         double   timestamp;         // Game time (X4MdEvent)
-        uint32_t buildprocessor;
-        uint32_t list;
+        uint64_t buildprocessor;
+        uint64_t list;
         uint64_t buildtask;
 
         static BuildFinishedComponentsData from(const X4MdEvent* ev) {
@@ -537,8 +537,8 @@ namespace x4n::md
             return {
                 ev->source_id,
                 ev->timestamp,
-                *reinterpret_cast<const uint32_t*>(p + 0x18),
-                *reinterpret_cast<const uint32_t*>(p + 0x20),
+                *reinterpret_cast<const uint64_t*>(p + 0x18),
+                *reinterpret_cast<const uint64_t*>(p + 0x20),
                 *reinterpret_cast<const uint64_t*>(p + 0x28)
             };
         }
@@ -1223,7 +1223,7 @@ namespace x4n::md
         uint64_t source_id;        // Event source entity (X4MdEvent)
         double   timestamp;         // Game time (X4MdEvent)
         uint64_t entity;
-        uint32_t kill_method;
+        uint64_t kill_method;
 
         static ControlEntityRemovedData from(const X4MdEvent* ev) {
             auto* p = static_cast<const uint8_t*>(ev->raw_event);
@@ -1231,7 +1231,7 @@ namespace x4n::md
                 ev->source_id,
                 ev->timestamp,
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
-                *reinterpret_cast<const uint32_t*>(p + 0x20)
+                *reinterpret_cast<const uint64_t*>(p + 0x20)
             };
         }
     };
@@ -3022,7 +3022,7 @@ namespace x4n::md
     struct InfluenceUpdatedData {
         uint64_t source_id;        // Event source entity (X4MdEvent)
         double   timestamp;         // Game time (X4MdEvent)
-        uint32_t oldamount;
+        uint64_t oldamount;
         uint32_t newamount;
 
         static InfluenceUpdatedData from(const X4MdEvent* ev) {
@@ -3030,7 +3030,7 @@ namespace x4n::md
             return {
                 ev->source_id,
                 ev->timestamp,
-                *reinterpret_cast<const uint32_t*>(p + 0x18),
+                *reinterpret_cast<const uint64_t*>(p + 0x18),
                 *reinterpret_cast<const uint32_t*>(p + 0x1C)
             };
         }
@@ -3205,6 +3205,7 @@ namespace x4n::md
         double   timestamp;         // Game time (X4MdEvent)
         uint64_t the_other_object;
         uint64_t locking_weapon;
+        uint32_t target_component;
 
         static LockAcquiredData from(const X4MdEvent* ev) {
             auto* p = static_cast<const uint8_t*>(ev->raw_event);
@@ -3212,7 +3213,8 @@ namespace x4n::md
                 ev->source_id,
                 ev->timestamp,
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
-                *reinterpret_cast<const uint64_t*>(p + 0x20)
+                *reinterpret_cast<const uint64_t*>(p + 0x20),
+                *reinterpret_cast<const uint32_t*>(p + 0x48)
             };
         }
     };
@@ -3259,6 +3261,7 @@ namespace x4n::md
         double   timestamp;         // Game time (X4MdEvent)
         uint64_t the_other_object;
         uint64_t locking_weapon;
+        uint32_t target_component;
 
         static LockInitiatedData from(const X4MdEvent* ev) {
             auto* p = static_cast<const uint8_t*>(ev->raw_event);
@@ -3266,7 +3269,8 @@ namespace x4n::md
                 ev->source_id,
                 ev->timestamp,
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
-                *reinterpret_cast<const uint64_t*>(p + 0x20)
+                *reinterpret_cast<const uint64_t*>(p + 0x20),
+                *reinterpret_cast<const uint32_t*>(p + 0x48)
             };
         }
     };
@@ -5644,7 +5648,7 @@ namespace x4n::md
         uint64_t resource_ware;
         uint32_t depletion_amount;
         uint64_t sector_position;
-        uint32_t killed_object;
+        uint64_t killed_object;
 
         static SectorResourceDepletedData from(const X4MdEvent* ev) {
             auto* p = static_cast<const uint8_t*>(ev->raw_event);
@@ -5654,7 +5658,7 @@ namespace x4n::md
                 *reinterpret_cast<const uint64_t*>(p + 0x18),
                 *reinterpret_cast<const uint32_t*>(p + 0x20),
                 *reinterpret_cast<const uint64_t*>(p + 0x40),
-                *reinterpret_cast<const uint32_t*>(p + 0x58)
+                *reinterpret_cast<const uint64_t*>(p + 0x58)
             };
         }
     };

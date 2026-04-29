@@ -25,9 +25,9 @@ Handle Types:
   typedef uint64_t UniverseID;
 
 Cross-Reference (PE exports vs FFI):
-  PE exports:       2365
+  PE exports:       2366
   FFI functions:    2055
   In both:          2054  (ready to use)
-  Export-only:      311 (need manual typing)
+  Export-only:      312 (need manual typing)
   FFI-only:         1  (not exported)
   Coverage:         86.8% of exports have FFI signatures

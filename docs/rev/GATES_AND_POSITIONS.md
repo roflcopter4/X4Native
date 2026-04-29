@@ -122,7 +122,7 @@ MD scripts use `.destination` (a property). No direct `GetGateDestination(gate_i
 **Workaround options**:
 1. Build lookup table during GAME_DATA collection by zone/sector hierarchy traversal
 2. Use Lua bridge: `AddUITriggeredEvent` → MD reads gate.destination → returns via event
-3. IDA investigation of `GetComponentDetails` for gate-class entities may reveal destination in the struct
+3. Binary investigation of `GetComponentDetails` for gate-class entities may reveal destination in the struct
 
 ~130 gates in the full universe. One-time cost at session start. Any approach is fast enough.
 

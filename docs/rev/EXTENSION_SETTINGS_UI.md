@@ -5,7 +5,7 @@ Research into how X4 renders the per-extension settings panel shown via the
 and what it would take to add custom rows for X4Native-loaded extensions.
 
 All line numbers reference the shipped `v9.00` game files mirrored under
-`reference/game/`. IDA addresses reference `X4.exe` build `9.00 (603098)`.
+`reference/game/`. Binary addresses reference `X4.exe` build `9.00 (603098)`.
 
 ---
 

@@ -21,7 +21,7 @@
 // WHY CODE SCANNING:
 //   The event builder functions follow predictable MSVC codegen patterns.
 //   Each builder allocates via GameAlloc, sets the vtable, then stores fields
-//   at known offsets. Parsing these patterns is equivalent to what IDA does
+//   at known offsets. Parsing these patterns is equivalent to what binary does
 //   but fully automated — no manual RE per game build.
 // ---------------------------------------------------------------------------
 #include <x4n_core.h>

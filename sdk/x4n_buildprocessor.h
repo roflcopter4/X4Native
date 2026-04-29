@@ -64,12 +64,12 @@ public:
     /// the original queue time. For "has this task existed > Xh" semantics
     /// you need your own timer — this field only measures active CV-work time.
     ///
-    /// See docs/rev/PRODUCTION_MODULES.md (to be extended) for IDA traces.
+    /// See docs/rev/PRODUCTION_MODULES.md (to be extended) for binary traces.
     double started_at() const { return read_double_or(X4_BUILDPROCESSOR_STARTED_AT_OFFSET, -1.0); }
 
     /// True iff this buildprocessor is currently processing a build.
     /// Equivalent to `started_at() > -0.9999` (sentinel check matching the
-    /// engine's own test — see IDA sub_14034FE00).
+    /// engine's own test — see binary sub_14034FE00).
     bool is_processing() const {
         return started_at() > -0.9999;
     }

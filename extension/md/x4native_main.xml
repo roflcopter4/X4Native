@@ -32,7 +32,7 @@
          Fires for BOTH new game and save loads. This is the definitive "world ready" signal.
          XSD: "Event for when the universe generation process has been completed
          (all stations have been built) at game start or when loading a savegame."
-         IDA: NotifyUniverseGenerated (0x1409A49A0) dispatches U::UniverseGeneratedEvent
+         Binary: NotifyUniverseGenerated (0x1409A49A0) dispatches U::UniverseGeneratedEvent
          after GodEngine completes. -->
     <cue name="x4native_UniverseReady" instantiate="true">
       <conditions>

@@ -71,12 +71,15 @@ inline X4FactionClass* find_class_by_id(const char* faction_id) noexcept {
     if (!off || !off->faction_registry) return nullptr;
 
     // The data global at X4_RVA_FACTION_REGISTRY is a POINTER SLOT (verified
-    // 2026-04-27 via IDA at SetFactionRelationToPlayerFaction RVA 0x0017F8D0:
+    // 2026-04-27 via binary analysis at SetFactionRelationToPlayerFaction RVA 0x0017F8D0:
     //   `mov rdx, cs:qword_146C80848`  — explicit MEM load, not LEA
     //   `add rdx, 10h`                 — registry+16 = sentinel
     //   `mov rax, [rdx+8]`             — registry+24 = root
     // So we deref the slot first (matches X4Native's ComponentRegistry
-    // pattern in find_component), then walk the struct fields.
+    // pattern in find_component), then walk the struct fields. This is the ONLY pointer dereference
+    // in the lookup. The value at offset 0x30 of each tree node is the
+    // FactionClass struct INLINE — no second deref. See the comment block
+    // at the return statement below for the full rationale.
     void* reg_struct = *reinterpret_cast<void**>(off->faction_registry);
     if (!reg_struct) return nullptr;
 
@@ -112,7 +115,18 @@ inline X4FactionClass* find_class_by_id(const char* faction_id) noexcept {
     const uint64_t cand_key = *reinterpret_cast<const uint64_t*>(candidate + X4_FACTION_REGISTRY_NODE_KEY);
     if (cand_key != target) return nullptr;
 
-    return *reinterpret_cast<X4FactionClass**>(candidate + X4_FACTION_REGISTRY_NODE_VALUE);
+    // GALAXY-RELATIONS-MATRIX-BUG fix (2026-04-28): FactionClass is INLINE
+    // at registry-node offset +0x30 — the engine's
+    // `v17 = v15 + 48; sub_140998C90(v17, …)` (per
+    // `SetFactionRelationToPlayerFaction` decompile, RVA 0x0017F8D0) treats
+    // `node + 0x30` directly as the `FactionClass*`, NOT `*(node + 0x30)`.
+    // The earlier dereference returned the FactionClass *vtable* pointer
+    // (a single shared global since every node holds the same value type),
+    // which is why every distinct id resolved to the same pointer and
+    // FactionRelation_GetFloat's same-pointer fast-path returned +1.0
+    // for every cell — invalidating the entire NPC-NPC relation matrix.
+    // Verified via runtime probe in galaxy_diplomacy.cpp 2026-04-28.
+    return reinterpret_cast<X4FactionClass*>(candidate + X4_FACTION_REGISTRY_NODE_VALUE);
 }
 
 /// Read the [-1.0, +1.0] internal relation float from faction `a_id` toward
